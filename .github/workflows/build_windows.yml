@@ -9,8 +9,6 @@ on:
       - 'Resources/**'
       - 'installer_win64.nsi'
       - '.github/workflows/**'
-  tags:
-    - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -38,6 +36,7 @@ jobs:
           $nsis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
           if (!$nsis) { $nsis = "C:\Program Files (x86)\NSIS\makensis.exe" }
           & $nsis installer_win64.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload Windows .exe Artifact
         uses: actions/upload-artifact@v4
@@ -51,11 +50,11 @@ jobs:
         shell: pwsh
         run: |
           $tag = "v1.0.0-win"
-          if (gh release view $tag 2>$null) {
+          $notes = "Instalador oficial de MI AMP para Windows 64-bit (VST3 + App Standalone): Cabezal 8x10, Pedalboard de 5 pedales (XV Bass, Compresor, Chorus, Phaser, Reverb), Drop Tuner, Afinador YIN y 15 Presets."
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
             gh release upload $tag Instalar_MI_AMP_Windows_x64.exe --clobber
           } else {
-            gh release create $tag Instalar_MI_AMP_Windows_x64.exe `
-              --title "MI AMP Bass Edition v1.0.0 (Windows x64 Installer)" `
-              --notes "Instalador oficial de MI AMP para Windows 64-bit (VST3 + App Standalone):`n- Cabezal de Bajo 8x10 Valvular con Smart Cab Handoff`n- Pedalera de 5 pedales (Compresor, XV Bass, Chorus, Phaser, Reverb)`n- Drop Tuner (-12/+12 semitonos) y Afinador YIN`n- 15 Presets (Iniciales + 11 XV Bass) + Presets de usuario" `
-              --latest
+            gh release create $tag Instalar_MI_AMP_Windows_x64.exe --title "MI AMP Bass Edition v1.0.0 (Windows x64 Installer)" --notes $notes --latest
           }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
