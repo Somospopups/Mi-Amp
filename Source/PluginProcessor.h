@@ -218,7 +218,7 @@ private:
     std::vector<MiAmpBassPreset> userPresets;
     std::vector<MiAmpGuitarPreset> guitarUserPresets;
     juce::String activeBassPresetName   { "Inicial (XV Pop-Punk)" };
-    juce::String activeGuitarPresetName { "Zenbox • Rock Crunch" };
+    juce::String activeGuitarPresetName { "Tom DeLonge • Enema Dirt" };
     int currentProgramIndex = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MiAmpAudioProcessor)

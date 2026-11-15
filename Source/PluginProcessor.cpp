@@ -93,23 +93,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::reverbTone,  "Reverb Tone",   50.0f);
     addPct  (MiAmpParams::reverbMix,   "Reverb Mix",    50.0f);
 
-    // Guitar Head (Zenbox Edition)
-    addPct  (MiAmpParams::gtrInput,      "Zenbox Input",      50.0f);
-    addPct  (MiAmpParams::gtrGate,       "Zenbox Gate",       18.0f);
+    // Guitar Head (Zenbox + Dual-Amp Edition)
+    addPct  (MiAmpParams::gtrInput,      "Zenbox Input",      56.0f);
+    addPct  (MiAmpParams::gtrGate,       "Zenbox Gate",       28.0f);
     addBool (MiAmpParams::gtrOs4x,       "Zenbox 4x OS",      true);
     addInt  (MiAmpParams::gtrCab,        "Zenbox Cab",        0, 4, 1);
     addBool (MiAmpParams::gtrPower,      "Zenbox Power",      true);
     addBool (MiAmpParams::gtrStandby,    "Zenbox Standby",    false);
     addBool (MiAmpParams::gtrModeBright, "Zenbox Bright Cap", true);
-    addInt  (MiAmpParams::gtrChannel,    "Zenbox Channel",    0, 2, 1);
+    addInt  (MiAmpParams::gtrChannel,    "Zenbox Channel",    0, 2, 2);
     addPct  (MiAmpParams::gtrOutput,     "Zenbox Output",     58.0f);
 
-    const float defGain[3]   = { 32.0f, 58.0f, 74.0f };
-    const float defBass[3]   = { 52.0f, 54.0f, 56.0f };
-    const float defMid[3]    = { 54.0f, 60.0f, 62.0f };
-    const float defTreb[3]   = { 56.0f, 58.0f, 62.0f };
-    const float defPres[3]   = { 52.0f, 56.0f, 60.0f };
-    const float defMast[3]   = { 58.0f, 58.0f, 56.0f };
+    const float defGain[3]   = { 28.0f, 58.0f, 68.0f };
+    const float defBass[3]   = { 44.0f, 54.0f, 56.0f };
+    const float defMid[3]    = { 54.0f, 60.0f, 60.0f };
+    const float defTreb[3]   = { 68.0f, 58.0f, 64.0f };
+    const float defPres[3]   = { 62.0f, 56.0f, 66.0f };
+    const float defMast[3]   = { 64.0f, 58.0f, 60.0f };
 
     for (int c = 0; c < 3; ++c)
     {
@@ -134,9 +134,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::gtrCompLvl,  "Gtr Comp Lvl",  52.0f);
 
     addBool (MiAmpParams::gtrDriveOn,   "Gtr Drive On",   true);
-    addPct  (MiAmpParams::gtrDriveGain, "Gtr Drive Gain", 42.0f);
-    addPct  (MiAmpParams::gtrDriveTone, "Gtr Drive Tone", 58.0f);
-    addPct  (MiAmpParams::gtrDriveLvl,  "Gtr Drive Lvl",  62.0f);
+    addPct  (MiAmpParams::gtrDriveGain, "Gtr Drive Gain", 18.0f);
+    addPct  (MiAmpParams::gtrDriveTone, "Gtr Drive Tone", 66.0f);
+    addPct  (MiAmpParams::gtrDriveLvl,  "Gtr Drive Lvl",  64.0f);
 
     addBool (MiAmpParams::gtrFuzzOn,   "Gtr Fuzz On",   true);
     addPct  (MiAmpParams::gtrFuzzFuzz, "Gtr Fuzz Fuzz", 65.0f);
@@ -566,6 +566,44 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
 std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
 {
     std::vector<MiAmpGuitarPreset> list;
+
+    {
+        MiAmpGuitarPreset p;
+        p.name = "Tom DeLonge • Enema Dirt";
+        p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
+        p.input = 56.0f; p.gate = 28.0f; p.output = 58.0f;
+        p.gain = 68.0f; p.bass = 56.0f; p.mid = 60.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 60.0f;
+        p.slots = { 1, -1, -1, -1, -1, -1, -1 };
+        p.driveOn = true; p.driveGain = 18.0f; p.driveTone = 66.0f; p.driveLvl = 64.0f;
+        p.hint = "Triple Rectifier Vintage + JCM900 Cranked + Mesa 4x12 V30/GB";
+        list.push_back (p);
+    }
+    {
+        MiAmpGuitarPreset p;
+        p.name = "Tom DeLonge • Enema Clean";
+        p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
+        p.input = 52.0f; p.gate = 10.0f; p.output = 60.0f;
+        p.gain = 28.0f; p.bass = 44.0f; p.mid = 54.0f; p.treble = 68.0f; p.presence = 62.0f; p.master = 64.0f;
+        p.slots = { 0, 6, -1, -1, -1, -1, -1 };
+        p.compOn = true; p.compSus = 52.0f; p.compAtt = 35.0f; p.compLvl = 56.0f;
+        p.reverbOn = true; p.rvDec = 38.0f; p.rvTone = 64.0f; p.rvMix = 20.0f;
+        p.hint = "What's My Age Again / Adam's Song: JCM900 limpio + Comp + Room";
+        list.push_back (p);
+    }
+    {
+        MiAmpGuitarPreset p;
+        p.name = "Tom DeLonge • TOYPAJ / Untitled";
+        p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
+        p.input = 56.0f; p.gate = 26.0f; p.output = 58.0f;
+        p.gain = 74.0f; p.bass = 58.0f; p.mid = 56.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 58.0f;
+        p.slots = { 1, 3, 5, 6, -1, -1, -1 };
+        p.driveOn = true; p.driveGain = 26.0f; p.driveTone = 64.0f; p.driveLvl = 64.0f;
+        p.chorusOn = true; p.chRate = 34.0f; p.chDepth = 48.0f; p.chMix = 28.0f;
+        p.delayOn = false; p.dlTime = 38.0f; p.dlFb = 30.0f; p.dlMix = 22.0f;
+        p.reverbOn = true; p.rvDec = 46.0f; p.rvTone = 60.0f; p.rvMix = 22.0f;
+        p.hint = "Anthem Pt 2 / Feeling This: Recto+JCM + Drive + Chorus sutil";
+        list.push_back (p);
+    }
 
     {
         MiAmpGuitarPreset p;
