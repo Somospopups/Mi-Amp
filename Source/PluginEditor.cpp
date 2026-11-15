@@ -305,8 +305,8 @@ void MiAmpAudioProcessorEditor::ImageToggleSwitch::mouseDown (const juce::MouseE
 // PalettePedalButton (exact .palette-item with real pedal PNG thumbnail)
 //==============================================================================
 MiAmpAudioProcessorEditor::PalettePedalButton::PalettePedalButton (
-    int pedalType, const juce::String& title, juce::Image img, std::function<void()> onClick)
-    : type (pedalType), name (title), art (std::move (img)), clickFn (std::move (onClick))
+    const juce::String& title, juce::Image img, std::function<void()> onClick)
+    : name (title), art (std::move (img)), clickFn (std::move (onClick))
 {
     setRepaintsOnMouseActivity (true);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
@@ -787,7 +787,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     {
         const int pt = paletteOrder[idx];
         paletteItems[idx] = std::make_unique<PalettePedalButton> (
-            pt, pedalName (pt).toUpperCase(), pedalImage (pt, true), [this, pt]
+            pedalName (pt).toUpperCase(), pedalImage (pt, true), [this, pt]
             {
                 audioProcessor.addPedalToChain (pt);
                 selectedPedalType = pt;
@@ -965,9 +965,9 @@ void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
         editorOpen = ! ch.empty();
     }
 
-    for (auto* c : { static_cast<juce::Component*> (&btnInstGuitar), &btnInstBass,
+    for (auto* b : { &btnInstGuitar, &btnInstBass,
                      &btnMainPresets, &btnMainTuner, &btnMainPedals, &btnDockCab, &btnDockDrop })
-        c->setVisible (! isFloorMode);
+        b->setVisible (! isFloorMode);
     for (auto& k : headKnobs)    k->setVisible (! isFloorMode);
     for (auto& s : headSwitches) s->setVisible (! isFloorMode);
 

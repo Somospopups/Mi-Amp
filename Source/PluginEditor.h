@@ -87,14 +87,13 @@ private:
     class PalettePedalButton final : public juce::Component
     {
     public:
-        PalettePedalButton (int pedalType, const juce::String& title, juce::Image img,
+        PalettePedalButton (const juce::String& title, juce::Image img,
                             std::function<void()> onClick);
         void paint (juce::Graphics& g) override;
         void mouseDown (const juce::MouseEvent&) override { if (clickFn) clickFn(); }
         void setInChain (bool inChain) { alreadyInChain = inChain; repaint(); }
 
     private:
-        int type = 0;
         juce::String name;
         juce::Image art;
         bool alreadyInChain = false;
