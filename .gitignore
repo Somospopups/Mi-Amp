@@ -1,0 +1,6 @@
+build/
+build-*/
+Instalar_MI_AMP_Windows_x64.exe
+*.user
+.DS_Store
+Thumbs.db

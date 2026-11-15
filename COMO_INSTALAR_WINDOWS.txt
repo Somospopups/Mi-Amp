@@ -1,0 +1,14 @@
+MI AMP (Bass Edition) - Windows 64-bit (VST3 + App Standalone)
+================================================================
+
+1. Descarga "Instalar_MI_AMP_Windows_x64.exe" desde:
+   https://github.com/Somospopups/Mi-Amp/releases
+
+2. Hace doble clic en "Instalar_MI_AMP_Windows_x64.exe".
+   Si Windows SmartScreen pregunta "Windows protegio su PC",
+   hace clic en "Mas informacion" -> "Ejecutar de todas formas".
+
+3. Siguiente -> Instalar -> Finalizar.
+   - El plugin VST3 queda instalado en:
+     C:\Program Files\Common Files\VST3\MI AMP.vst3
+   - La App independiente queda en el Escritorio y Menu Inicio ("MI AMP").
