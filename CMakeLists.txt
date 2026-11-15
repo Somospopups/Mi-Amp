@@ -117,6 +117,11 @@ target_compile_definitions(MiAmp
         JUCE_DISPLAY_SPLASH_SCREEN=0
 )
 
+target_compile_options(MiAmp
+    PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+)
+
 target_link_libraries(MiAmp
     PRIVATE
         MiAmpAssets

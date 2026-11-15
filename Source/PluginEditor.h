@@ -34,12 +34,18 @@ private:
     class GlassLookAndFeel final : public juce::LookAndFeel_V4
     {
     public:
+        GlassLookAndFeel();
         void drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour& bg,
                                    bool highlighted, bool down) override;
         void drawButtonText (juce::Graphics& g, juce::TextButton& b, bool highlighted, bool down) override;
         void drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height,
                                float sliderPos, float minSliderPos, float maxSliderPos,
                                const juce::Slider::SliderStyle, juce::Slider&) override;
+        void drawScrollbar (juce::Graphics& g, juce::ScrollBar& scrollbar, int x, int y, int width, int height,
+                            bool isScrollbarVertical, int thumbStartPosition, int thumbSize,
+                            bool isMouseOver, bool isMouseDown) override;
+        void fillTextEditorBackground (juce::Graphics& g, int width, int height, juce::TextEditor& te) override;
+        void drawTextEditorOutline (juce::Graphics& g, int width, int height, juce::TextEditor& te) override;
     };
 
     class ImageRotaryKnob final : public juce::Component
@@ -217,14 +223,14 @@ private:
 
     // Floor Editor controls (.edit)
     std::unique_ptr<ImageRotaryKnob> editorKnobs[7];
-    juce::TextButton btnEditClose { "x" };
+    juce::TextButton btnEditClose { juce::String::fromUTF8 (u8"\u00d7") };
     juce::TextButton btnMoveLeft { "<" }, btnMoveRight { ">" };
     TrashIconButton btnTrashPedal;
 
     // Floor Palette (.palette)
     std::unique_ptr<PalettePedalButton> paletteItems[7];
     juce::TextButton btnFloorPresets { "PRESETS" }, btnFloorTuner { "AFINADOR" };
-    juce::TextButton btnFloorDrop { "↕" }, btnFloorConfig { "⚙" }, btnBackToAmp { "VOLVER AL AMPLI" };
+    juce::TextButton btnFloorDrop { "" }, btnFloorConfig { "" }, btnBackToAmp { "VOLVER AL AMPLI" };
     juce::TextButton btnFloorTunerMute { "MUTE" }, btnFloorTunerNotation { "DO RE MI" };
 
     // Floating glass popover (.popover / .floor-popover)

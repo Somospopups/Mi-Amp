@@ -16,7 +16,7 @@ struct TunerReading
     int   midiNote   = 0;
     int   octave     = 1;
     const char* noteName   = "--";
-    const char* stringHint = "Tocá una cuerda";
+    const char* stringHint = u8"Toc\u00e1 una cuerda";
 };
 
 /**
@@ -241,17 +241,17 @@ private:
     {
         switch (midi)
         {
-            case 23: return "5a Cuerda · Si (B0)";
-            case 24: return "Drop C · Do (C1)";
-            case 26: return "Drop D · Re (D1)";
+            case 23: return u8"5a Cuerda \u00b7 Si (B0)";
+            case 24: return u8"Drop C \u00b7 Do (C1)";
+            case 26: return u8"Drop D \u00b7 Re (D1)";
             case 27: return "4a Mi bemol (Eb1)";
-            case 28: return "4a Cuerda · Mi (E1)";
+            case 28: return u8"4a Cuerda \u00b7 Mi (E1)";
             case 32: return "3a La bemol (Ab1)";
-            case 33: return "3a Cuerda · La (A1)";
+            case 33: return u8"3a Cuerda \u00b7 La (A1)";
             case 37: return "2a Re bemol (Db2)";
-            case 38: return "2a Cuerda · Re (D2)";
+            case 38: return u8"2a Cuerda \u00b7 Re (D2)";
             case 42: return "1a Sol bemol (Gb2)";
-            case 43: return "1a Cuerda · Sol (G2)";
+            case 43: return u8"1a Cuerda \u00b7 Sol (G2)";
             default: return "Modo Cromatico";
         }
     }

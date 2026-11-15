@@ -79,6 +79,11 @@ namespace
     static juce::Colour inkColour()  { return juce::Colour::fromRGB (247, 241, 223); }
     static juce::Colour mintBorder() { return juce::Colour::fromRGB (191, 252, 225); }
 
+    static juce::Font sansFont (float size, int style = juce::Font::plain)
+    {
+        return juce::Font (juce::FontOptions ("Arial", size, style));
+    }
+
     static float cubicBezierIntro (float t) noexcept
     {
         // Smooth approximation of CSS cubic-bezier(.45, 0, .2, 1)
@@ -122,10 +127,48 @@ juce::String MiAmpAudioProcessorEditor::formatNoteName (const char* noteName, in
 //==============================================================================
 // GlassLookAndFeel
 //==============================================================================
+MiAmpAudioProcessorEditor::GlassLookAndFeel::GlassLookAndFeel()
+{
+    setDefaultSansSerifTypefaceName ("Arial");
+}
+
 void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
     juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
 {
-    const auto r = b.getLocalBounds().toFloat().reduced (0.5f);
+    const auto id = b.getComponentID();
+    const auto r  = b.getLocalBounds().toFloat().reduced (0.5f);
+
+    if (id == "popoverClose" || id == "presetLoad")
+    {
+        if (id == "popoverClose" && (highlighted || down))
+        {
+            g.setColour (juce::Colour::fromRGBA (255, 255, 255, down ? 42 : 24));
+            g.fillEllipse (r.reduced (1.0f));
+        }
+        return;
+    }
+
+    if (id == "presetDelete")
+    {
+        const float diam = juce::jmin (r.getWidth(), r.getHeight());
+        const auto cr = r.withSizeKeepingCentre (diam, diam);
+        if (highlighted || down)
+        {
+            g.setColour (juce::Colour::fromRGBA (198, 120, 97, down ? 140 : 102));
+            g.fillEllipse (cr);
+            g.setColour (juce::Colour::fromRGB (255, 222, 209));
+            g.drawEllipse (cr, 1.1f);
+        }
+        else
+        {
+            g.setColour (juce::Colour::fromRGBA (255, 255, 255, 11));
+            g.fillEllipse (cr);
+            g.setColour (juce::Colour::fromRGBA (255, 244, 219, 74));
+            g.drawEllipse (cr, 1.0f);
+        }
+        return;
+    }
+
     const bool active = b.getToggleState();
 
     if (active)
@@ -156,11 +199,91 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
 void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
     juce::Graphics& g, juce::TextButton& b, bool, bool)
 {
-    const float h = juce::jlimit (9.5f, 13.5f, static_cast<float> (b.getHeight()) * 0.35f);
-    g.setFont (juce::Font (juce::FontOptions (h, juce::Font::plain)));
+    const auto id = b.getComponentID();
+    const auto bounds = b.getLocalBounds();
+
+    if (id == "popoverClose")
+    {
+        g.setFont (sansFont (24.0f, juce::Font::plain));
+        g.setColour (juce::Colour::fromRGB (255, 247, 234));
+        g.drawText (juce::String::fromUTF8 (u8"\u00d7"), bounds.toFloat(), juce::Justification::centred);
+        return;
+    }
+
+    if (id == "presetDelete")
+    {
+        g.setFont (sansFont (18.0f, juce::Font::plain));
+        g.setColour (juce::Colour::fromRGB (255, 244, 230));
+        g.drawText (juce::String::fromUTF8 (u8"\u00d7"), bounds.toFloat(), juce::Justification::centred);
+        return;
+    }
+
+    if (id == "presetLoad")
+    {
+        const bool sel = b.getToggleState();
+        g.setFont (sansFont (13.0f, sel ? juce::Font::bold : juce::Font::plain));
+        g.setColour (sel ? juce::Colour::fromRGB (227, 255, 232)
+                         : juce::Colour::fromRGB (255, 247, 233));
+        g.drawFittedText (b.getButtonText(), bounds.reduced (4, 0), juce::Justification::centredLeft, 1);
+        return;
+    }
+
+    if (id == "floorDropIcon")
+    {
+        const auto c = bounds.toFloat().getCentre();
+        const float sz = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.28f;
+        g.setColour (juce::Colour::fromRGB (250, 243, 227));
+        juce::Path p;
+        p.startNewSubPath (c.x, c.y - sz);
+        p.lineTo (c.x, c.y + sz);
+        p.startNewSubPath (c.x - sz * 0.55f, c.y - sz * 0.42f);
+        p.lineTo (c.x, c.y - sz);
+        p.lineTo (c.x + sz * 0.55f, c.y - sz * 0.42f);
+        p.startNewSubPath (c.x - sz * 0.55f, c.y + sz * 0.42f);
+        p.lineTo (c.x, c.y + sz);
+        p.lineTo (c.x + sz * 0.55f, c.y + sz * 0.42f);
+        g.strokePath (p, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        return;
+    }
+
+    if (id == "floorCfgIcon")
+    {
+        const auto c = bounds.toFloat().getCentre();
+        const float rOut = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.28f;
+        const float rIn  = rOut * 0.44f;
+        g.setColour (juce::Colour::fromRGB (250, 243, 227));
+        g.drawEllipse (c.x - rIn, c.y - rIn, rIn * 2.0f, rIn * 2.0f, 1.8f);
+        for (int i = 0; i < 8; ++i)
+        {
+            const float a = static_cast<float> (i) * juce::MathConstants<float>::pi * 0.25f;
+            g.drawLine (c.x + std::cos (a) * (rOut * 0.62f), c.y + std::sin (a) * (rOut * 0.62f),
+                        c.x + std::cos (a) * rOut,          c.y + std::sin (a) * rOut, 2.2f);
+        }
+        return;
+    }
+
+    const float h = juce::jlimit (9.5f, 13.0f, static_cast<float> (b.getHeight()) * 0.34f);
+    g.setFont (sansFont (h, (id == "presetSave" || id == "presetFactory") && b.getToggleState()
+                            ? juce::Font::bold : juce::Font::plain));
     g.setColour (b.isEnabled() ? juce::Colour::fromRGB (250, 243, 227)
                                : juce::Colour::fromRGBA (250, 243, 227, 105));
-    g.drawFittedText (b.getButtonText(), b.getLocalBounds().reduced (4, 2), juce::Justification::centred, 1);
+
+    auto textArea = bounds.reduced (6, 2);
+    if (id == "presetFactory" && b.getToggleState())
+    {
+        const float cx = static_cast<float> (textArea.getX()) + 7.0f;
+        const float cy = textArea.toFloat().getCentreY();
+        juce::Path chk;
+        chk.startNewSubPath (cx - 4.0f, cy);
+        chk.lineTo (cx - 1.0f, cy + 3.5f);
+        chk.lineTo (cx + 5.0f, cy - 3.5f);
+        g.strokePath (chk, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        textArea.removeFromLeft (14);
+        g.drawFittedText (b.getButtonText(), textArea, juce::Justification::centredLeft, 1);
+        return;
+    }
+
+    g.drawFittedText (b.getButtonText(), textArea, juce::Justification::centred, 1);
 }
 
 void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawLinearSlider (
@@ -176,6 +299,55 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawLinearSlider (
     g.fillRoundedRectangle (track.withWidth (fillW), 3.0f);
     g.setColour (inkColour());
     g.fillEllipse (sliderPos - 7.0f, cy - 7.0f, 14.0f, 14.0f);
+}
+
+void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawScrollbar (
+    juce::Graphics& g, juce::ScrollBar&, int x, int y, int width, int height,
+    bool isScrollbarVertical, int thumbStartPosition, int thumbSize,
+    bool isMouseOver, bool isMouseDown)
+{
+    if (thumbSize <= 0)
+        return;
+    const auto col = juce::Colour::fromRGBA (
+        isMouseOver || isMouseDown ? 242 : 232,
+        isMouseOver || isMouseDown ? 231 : 220,
+        isMouseOver || isMouseDown ? 211 : 200,
+        isMouseOver || isMouseDown ? 173 : 110);
+    g.setColour (col);
+    if (isScrollbarVertical)
+    {
+        const auto r = juce::Rectangle<float> (static_cast<float> (x) + 1.0f,
+                                               static_cast<float> (thumbStartPosition),
+                                               juce::jmax (3.0f, static_cast<float> (width) - 2.0f),
+                                               static_cast<float> (thumbSize));
+        g.fillRoundedRectangle (r, r.getWidth() * 0.5f);
+    }
+    else
+    {
+        const auto r = juce::Rectangle<float> (static_cast<float> (thumbStartPosition),
+                                               static_cast<float> (y) + 1.0f,
+                                               static_cast<float> (thumbSize),
+                                               juce::jmax (3.0f, static_cast<float> (height) - 2.0f));
+        g.fillRoundedRectangle (r, r.getHeight() * 0.5f);
+    }
+}
+
+void MiAmpAudioProcessorEditor::GlassLookAndFeel::fillTextEditorBackground (
+    juce::Graphics& g, int width, int height, juce::TextEditor&)
+{
+    const auto r = juce::Rectangle<float> (0.5f, 0.5f, static_cast<float> (width) - 1.0f, static_cast<float> (height) - 1.0f);
+    g.setColour (juce::Colour::fromRGBA (255, 255, 255, 28)); // #ffffff1c
+    g.fillRoundedRectangle (r, 8.0f);
+}
+
+void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawTextEditorOutline (
+    juce::Graphics& g, int width, int height, juce::TextEditor& te)
+{
+    const auto r = juce::Rectangle<float> (0.75f, 0.75f, static_cast<float> (width) - 1.5f, static_cast<float> (height) - 1.5f);
+    const bool focused = te.hasKeyboardFocus (true);
+    g.setColour (focused ? juce::Colour::fromRGB (194, 236, 212)   // #c2ecd4
+                         : juce::Colour::fromRGBA (241, 224, 190, 102)); // #f1e0be66
+    g.drawRoundedRectangle (r, 8.0f, focused ? 1.8f : 1.0f);
 }
 
 //==============================================================================
@@ -293,7 +465,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseDown (const juce::MouseEve
     dragStartY = e.getPosition().y;
     dragging = true;
     if (hudCallback)
-        hudCallback (label + " · " + juce::String (juce::roundToInt (dragStartVal)) + "%");
+        hudCallback (label + juce::String::fromUTF8 (u8" \u00b7 ") + juce::String (juce::roundToInt (dragStartVal)) + "%");
     repaint();
 }
 
@@ -306,7 +478,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseDrag (const juce::MouseEve
     if (auto* p = apvts.getParameter (pid))
         p->setValueNotifyingHost (p->convertTo0to1 (nextVal));
     if (hudCallback)
-        hudCallback (label + " · " + juce::String (juce::roundToInt (nextVal)) + "%");
+        hudCallback (label + juce::String::fromUTF8 (u8" \u00b7 ") + juce::String (juce::roundToInt (nextVal)) + "%");
     repaint();
 }
 
@@ -322,7 +494,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseDoubleClick (const juce::M
     if (auto* p = apvts.getParameter (pid))
         p->setValueNotifyingHost (p->convertTo0to1 (50.0f));
     if (hudCallback)
-        hudCallback (label + " · 50%");
+        hudCallback (label + juce::String::fromUTF8 (u8" \u00b7 50%"));
     repaint();
 }
 
@@ -335,7 +507,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseWheelMove (const juce::Mou
         if (auto* p = apvts.getParameter (pid))
             p->setValueNotifyingHost (p->convertTo0to1 (nextVal));
         if (hudCallback)
-            hudCallback (label + " · " + juce::String (juce::roundToInt (nextVal)) + "%");
+            hudCallback (label + juce::String::fromUTF8 (u8" \u00b7 ") + juce::String (juce::roundToInt (nextVal)) + "%");
         repaint();
     }
 }
@@ -393,13 +565,13 @@ void MiAmpAudioProcessorEditor::ImageToggleSwitch::mouseDown (const juce::MouseE
         if (hudCallback)
         {
             if (pid == MiAmpParams::ampUltraHi)
-                hudCallback (next ? "ULTRA · ULTRA-HI" : "ULTRA · ULTRA-LO");
+                hudCallback (juce::String::fromUTF8 (next ? u8"ULTRA \u00b7 ULTRA-HI" : u8"ULTRA \u00b7 ULTRA-LO"));
             else if (pid == MiAmpParams::ampStandby || pid == MiAmpParams::gtrStandby)
-                hudCallback (next ? "STANDBY · STANDBY" : "STANDBY · ON");
+                hudCallback (juce::String::fromUTF8 (next ? u8"STANDBY \u00b7 STANDBY" : u8"STANDBY \u00b7 ON"));
             else if (pid == MiAmpParams::gtrModeBright)
-                hudCallback (next ? "MODE · ABAJO" : "MODE · ARRIBA");
+                hudCallback (juce::String::fromUTF8 (next ? u8"MODE \u00b7 ABAJO" : u8"MODE \u00b7 ARRIBA"));
             else
-                hudCallback (label + (next ? " · ON" : " · OFF"));
+                hudCallback (label + juce::String::fromUTF8 (next ? u8" \u00b7 ON" : u8" \u00b7 OFF"));
         }
         repaint();
     }
@@ -526,7 +698,7 @@ void MiAmpAudioProcessorEditor::PalettePedalButton::paint (juce::Graphics& g)
     }
 
     g.setColour (inkColour().withAlpha (alreadyInChain ? 0.95f : 0.90f));
-    g.setFont (juce::Font (juce::FontOptions (juce::jlimit (8.0f, 10.0f, r.getHeight() * 0.105f), juce::Font::bold)));
+    g.setFont (sansFont (juce::jlimit (8.0f, 10.0f, r.getHeight() * 0.105f), juce::Font::bold));
     g.drawText (name, r.withTop (r.getBottom() - 18.0f), juce::Justification::centred);
 }
 
@@ -544,21 +716,37 @@ public:
           closeFn (std::move (onClose)), changedFn (std::move (onChanged))
     {
         addAndMakeVisible (btnClose);
-        btnClose.setButtonText ("x");
+        btnClose.setComponentID ("popoverClose");
+        btnClose.setButtonText (juce::String::fromUTF8 (u8"\u00d7"));
         btnClose.onClick = [this] { if (closeFn) closeFn(); };
 
-        // Presets
+        // Presets (.save-row matching index.html 1:1)
         addChildComponent (presetNameEdit);
-        presetNameEdit.setTextToShowWhenEmpty ("Nuevo preset...", juce::Colours::lightgrey);
-        presetNameEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colour::fromRGBA (27, 39, 33, 185));
-        presetNameEdit.setColour (juce::TextEditor::outlineColourId, juce::Colour::fromRGBA (241, 224, 190, 102));
-        presetNameEdit.setColour (juce::TextEditor::textColourId, juce::Colours::white);
+        presetNameEdit.setFont (sansFont (13.0f));
+        presetNameEdit.setJustification (juce::Justification::centredLeft);
+        presetNameEdit.setIndents (10, 0);
+        presetNameEdit.setInputRestrictions (32);
+        presetNameEdit.setTextToShowWhenEmpty (juce::String::fromUTF8 (u8"Nombre del preset"),
+                                               juce::Colour::fromRGBA (246, 237, 221, 170));
+        presetNameEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+        presetNameEdit.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        presetNameEdit.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+        presetNameEdit.setColour (juce::TextEditor::textColourId, juce::Colour::fromRGB (255, 250, 242));
+        presetNameEdit.setColour (juce::CaretComponent::caretColourId, juce::Colour::fromRGB (255, 250, 242));
+        presetNameEdit.onReturnKey = [this] { btnSavePreset.triggerClick(); };
 
         addChildComponent (btnSavePreset);
-        btnSavePreset.setButtonText ("Guardar");
+        btnSavePreset.setComponentID ("presetSave");
+        btnSavePreset.setButtonText ("GUARDAR");
         btnSavePreset.onClick = [this]
         {
-            processor.saveUserPreset (presetNameEdit.getText());
+            const auto name = presetNameEdit.getText().trim();
+            if (name.isEmpty())
+            {
+                presetNameEdit.grabKeyboardFocus();
+                return;
+            }
+            processor.saveUserPreset (name);
             presetNameEdit.clear();
             rebuildPresetList();
             if (changedFn) changedFn();
@@ -567,6 +755,7 @@ public:
         addChildComponent (presetViewport);
         presetViewport.setViewedComponent (&presetListHolder, false);
         presetViewport.setScrollBarsShown (true, false);
+        presetViewport.setScrollBarThickness (6);
 
         // Drop
         addChildComponent (btnDropToggle);
@@ -754,17 +943,32 @@ public:
 
         auto inner = r.reduced (18.0f, 16.0f);
         g.setColour (inkColour());
-        g.setFont (juce::Font (juce::FontOptions (15.5f, juce::Font::bold)));
+        g.setFont (sansFont (16.0f, juce::Font::bold));
         juce::String title = (kind == PopoverKind::Presets)
-                                ? (processor.isBassMode() ? "PRESETS · BAJO" : "PRESETS · GUITARRA")
+                                ? (processor.isBassMode() ? juce::String::fromUTF8 (u8"PRESETS \u00b7 BAJO")
+                                                          : juce::String::fromUTF8 (u8"PRESETS \u00b7 GUITARRA"))
                            : (kind == PopoverKind::Drop)   ? "DROP TUNER"
-                           : (kind == PopoverKind::Config) ? "CONFIGURACIÓN"
+                           : (kind == PopoverKind::Config) ? juce::String::fromUTF8 (u8"CONFIGURACI\u00d3N")
                                                            : "AFINADOR";
-        g.drawText (title, inner.removeFromTop (24.0f), juce::Justification::centredLeft);
+        g.drawText (title, inner.removeFromTop (24.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft);
 
-        if (kind == PopoverKind::Drop)
+        if (kind == PopoverKind::Presets)
         {
-            g.setFont (juce::Font (juce::FontOptions (12.0f)));
+            const auto b = getLocalBounds().toFloat().reduced (18.0f, 14.0f);
+            g.setFont (sansFont (10.0f, juce::Font::bold));
+            g.setColour (juce::Colour::fromRGBA (244, 234, 217, 184)); // #f4ead9b8
+            g.drawText ("GUARDAR PRESET",
+                        juce::Rectangle<float> (b.getX(), b.getBottom() - 88.0f, b.getWidth(), 16.0f),
+                        juce::Justification::centredLeft);
+            g.setFont (sansFont (11.5f));
+            g.setColour (inkColour().withAlpha (0.80f));
+            g.drawText ("Un preset reemplaza la cadena y ajustes actuales.",
+                        juce::Rectangle<float> (b.getX(), b.getBottom() - 24.0f, b.getWidth(), 22.0f),
+                        juce::Justification::centredLeft);
+        }
+        else if (kind == PopoverKind::Drop)
+        {
+            g.setFont (sansFont (12.0f));
             g.setColour (inkColour().withAlpha (0.85f));
             const float x = inner.getX();
             const float w = inner.getWidth();
@@ -776,7 +980,7 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
-            g.setFont (juce::Font (juce::FontOptions (12.0f, juce::Font::bold)));
+            g.setFont (sansFont (12.0f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.88f));
             const float x = inner.getX();
             const float w = inner.getWidth();
@@ -794,15 +998,15 @@ public:
             const bool inTune = active && std::fabs (tuner.cents) < 6.0f;
             const juce::String noteStr = active ? MiAmpAudioProcessorEditor::formatNoteName (tuner.noteName, tuner.octave, useSolfege) : "--";
 
-            g.setFont (juce::Font (juce::FontOptions (useSolfege ? 42.0f : 52.0f, juce::Font::bold)));
+            g.setFont (sansFont (useSolfege ? 42.0f : 52.0f, juce::Font::bold));
             g.setColour (active ? (inTune ? mintBorder() : inkColour()) : inkColour().withAlpha (0.55f));
             g.drawText (noteStr, inner.removeFromTop (64.0f), juce::Justification::centred);
 
-            g.setFont (juce::Font (juce::FontOptions (13.0f)));
+            g.setFont (sansFont (13.0f));
             g.setColour (inkColour().withAlpha (0.85f));
             const juce::String hz = active
                 ? (juce::String (tuner.freqHz, 1) + " Hz  (" + (tuner.cents >= 0 ? "+" : "") + juce::String (tuner.cents, 1) + " ct)")
-                : "Esperando señal";
+                : juce::String::fromUTF8 (u8"Esperando se\u00f1al");
             g.drawText (hz, inner.removeFromTop (20.0f), juce::Justification::centred);
 
             auto meter = inner.removeFromTop (30.0f).reduced (6.0f, 7.0f);
@@ -842,7 +1046,7 @@ public:
                 g.setColour (hit ? mintBorder() : juce::Colour::fromRGBA (255, 244, 212, 60));
                 g.drawRoundedRectangle (cell, 6.0f, 1.0f);
                 g.setColour (hit ? juce::Colours::white : inkColour().withAlpha (0.85f));
-                g.setFont (juce::Font (juce::FontOptions (useSolfege ? 9.5f : (isBass ? 11.5f : 10.5f), juce::Font::bold)));
+                g.setFont (sansFont (useSolfege ? 9.5f : (isBass ? 11.5f : 10.5f), juce::Font::bold));
                 g.drawText (txt, cell, juce::Justification::centred);
             }
         }
@@ -850,16 +1054,17 @@ public:
 
     void resized() override
     {
-        btnClose.setBounds (getWidth() - 38, 12, 26, 26);
-        auto inner = getLocalBounds().reduced (16, 46);
+        btnClose.setBounds (getWidth() - 38, 10, 26, 28);
+        auto inner = getLocalBounds().reduced (18, 46);
 
         if (kind == PopoverKind::Presets)
         {
-            auto saveRow = inner.removeFromBottom (34);
-            btnSavePreset.setBounds (saveRow.removeFromRight (78));
+            inner.removeFromBottom (16); // hint text area below .save-row
+            auto saveRow = inner.removeFromBottom (41);
+            btnSavePreset.setBounds (saveRow.removeFromRight (80));
             saveRow.removeFromRight (6);
             presetNameEdit.setBounds (saveRow);
-            inner.removeFromBottom (8);
+            inner.removeFromBottom (26); // space for GUARDAR PRESET section title
             presetViewport.setBounds (inner);
             layoutPresetButtons();
         }
@@ -963,10 +1168,10 @@ private:
         presetRows.clear();
         presetListHolder.removeAllChildren();
 
-        auto addRow = [this] (const juce::String& text, bool isActive,
+        auto addRow = [this] (const juce::String& text, bool isActive, bool isUserRow,
                               std::function<void()> onLoad, std::function<void()> onDel)
         {
-            auto row = std::make_unique<PresetRow> (text, isActive, std::move (onLoad), std::move (onDel));
+            auto row = std::make_unique<PresetRow> (text, isActive, isUserRow, std::move (onLoad), std::move (onDel));
             presetListHolder.addAndMakeVisible (*row);
             presetRows.push_back (std::move (row));
         };
@@ -978,13 +1183,13 @@ private:
             for (int i = 0; i < static_cast<int> (userList.size()); ++i)
             {
                 const auto& up = userList[static_cast<size_t> (i)];
-                addRow (up.name, up.name == activeName,
+                addRow (up.name, up.name == activeName, true,
                     [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
             }
             for (const auto& fp : MiAmpAudioProcessor::getFactoryPresets())
             {
-                addRow (fp.name, fp.name == activeName,
+                addRow (fp.name, fp.name == activeName, false,
                     [this, fp] { processor.applyPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     nullptr);
             }
@@ -995,13 +1200,13 @@ private:
             for (int i = 0; i < static_cast<int> (userList.size()); ++i)
             {
                 const auto& up = userList[static_cast<size_t> (i)];
-                addRow (up.name, up.name == activeName,
+                addRow (up.name, up.name == activeName, true,
                     [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
             }
             for (const auto& fp : MiAmpAudioProcessor::getGuitarFactoryPresets())
             {
-                addRow (fp.name, fp.name == activeName,
+                addRow (fp.name, fp.name == activeName, false,
                     [this, fp] { processor.applyGuitarPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     nullptr);
             }
@@ -1012,12 +1217,12 @@ private:
 
     void layoutPresetButtons()
     {
-        const int vw = juce::jmax (160, presetViewport.getWidth() - 12);
-        const int rowH = 36;
+        const int vw = juce::jmax (160, presetViewport.getWidth() - 10);
+        const int rowH = 42;
         int y = 0;
         for (auto& r : presetRows)
         {
-            r->setBounds (0, y, vw, rowH - 4);
+            r->setBounds (0, y, vw, rowH - 5);
             y += rowH;
         }
         presetListHolder.setSize (vw, juce::jmax (10, y));
@@ -1025,30 +1230,49 @@ private:
 
     struct PresetRow final : public juce::Component
     {
-        PresetRow (const juce::String& title, bool active,
+        PresetRow (const juce::String& title, bool active, bool userRow,
                    std::function<void()> loadCb, std::function<void()> delCb)
+            : isUser (userRow)
         {
             addAndMakeVisible (btnLoad);
+            btnLoad.setComponentID (userRow ? "presetLoad" : "presetFactory");
             btnLoad.setButtonText (title);
             btnLoad.setToggleState (active, juce::dontSendNotification);
             btnLoad.onClick = std::move (loadCb);
             if (delCb)
             {
                 addAndMakeVisible (btnDel);
-                btnDel.setButtonText ("x");
+                btnDel.setComponentID ("presetDelete");
+                btnDel.setButtonText (juce::String::fromUTF8 (u8"\u00d7"));
                 btnDel.onClick = std::move (delCb);
             }
+        }
+        void paint (juce::Graphics& g) override
+        {
+            if (! isUser)
+                return;
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            juce::ColourGradient grad (juce::Colour::fromRGBA (255, 255, 255, 32), r.getX(), r.getY(),
+                                       juce::Colour::fromRGBA (255, 255, 255, 11), r.getX(), r.getBottom(), false);
+            g.setGradientFill (grad);
+            g.fillRoundedRectangle (r, 8.0f);
+            g.setColour (juce::Colour::fromRGBA (241, 224, 190, 85)); // #f1e0be55
+            g.drawRoundedRectangle (r, 8.0f, 1.0f);
         }
         void resized() override
         {
             auto b = getLocalBounds();
+            if (isUser)
+                b = b.reduced (6, 2);
             if (btnDel.isVisible())
             {
-                btnDel.setBounds (b.removeFromRight (32));
+                const int sz = juce::jmin (32, b.getHeight());
+                btnDel.setBounds (b.removeFromRight (sz).withSizeKeepingCentre (sz, sz));
                 b.removeFromRight (4);
             }
             btnLoad.setBounds (b);
         }
+        bool isUser = false;
         juce::TextButton btnLoad, btnDel;
     };
 
@@ -1199,6 +1423,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     }
 
     addChildComponent (btnEditClose);
+    btnEditClose.setComponentID ("popoverClose");
     btnEditClose.onClick = [this] { editorOpen = false; syncPedalEditorControls(); repaint(); };
 
     addChildComponent (btnMoveLeft);
@@ -1251,8 +1476,10 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
         repaint();
     };
     addChildComponent (btnFloorDrop);
+    btnFloorDrop.setComponentID ("floorDropIcon");
     btnFloorDrop.onClick = [this] { togglePopover (PopoverKind::Drop); };
     addChildComponent (btnFloorConfig);
+    btnFloorConfig.setComponentID ("floorCfgIcon");
     btnFloorConfig.onClick = [this] { togglePopover (PopoverKind::Config); };
     addChildComponent (btnBackToAmp);
     btnBackToAmp.onClick = [this] { setFloorMode (false); };
@@ -1504,7 +1731,7 @@ void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
     audioProcessor.setInstrumentMode (toBass);
     activePopover = PopoverKind::None;
     popover->setVisible (false);
-    showHud (toBass ? "BAJO · XV EDITION" : "GUITARRA · ZENBOX / ENEMA");
+    showHud (juce::String::fromUTF8 (toBass ? u8"BAJO \u00b7 XV EDITION" : u8"GUITARRA \u00b7 ZENBOX / ENEMA"));
     syncHeadControls();
     syncPedalEditorControls();
     layoutAll();
@@ -2237,7 +2464,7 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     const float inFrac  = juce::jlimit (0.0f, 1.0f, audioProcessor.inputRms.load() * 3.5f);
     const float outFrac = juce::jlimit (0.0f, 1.0f, audioProcessor.outputRms.load() * 3.5f);
     g.setColour (inkColour().withAlpha (0.78f));
-    g.setFont (juce::Font (juce::FontOptions (juce::jmax (8.0f, 9.5f * s), juce::Font::bold)));
+    g.setFont (sansFont (juce::jmax (8.0f, 9.5f * s), juce::Font::bold));
     g.drawText ("IN",  toScreen (72, 36, 24, 12), juce::Justification::centredLeft);
     g.drawText ("OUT", toScreen (72, 52, 26, 12), juce::Justification::centredLeft);
 
@@ -2271,7 +2498,7 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
         auto hudR = toScreen (35, 92, 245, 34);
         paintGlassPanel (g, hudR, 11.0f);
         g.setColour (inkColour());
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 12.5f * s), juce::Font::bold)));
+        g.setFont (sansFont (juce::jmax (10.0f, 12.5f * s), juce::Font::bold));
         g.drawText (hudText, hudR, juce::Justification::centred);
     }
 }
@@ -2298,8 +2525,8 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
     if (chain.empty())
     {
         g.setColour (juce::Colour::fromRGBA (242, 232, 212, 180));
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (13.0f, 20.0f * s), juce::Font::bold)));
-        g.drawText ("TU PEDALBOARD ESTÁ VACÍA — Arrastrá un pedal desde abajo",
+        g.setFont (sansFont (juce::jmax (13.0f, 20.0f * s), juce::Font::bold));
+        g.drawText (juce::String::fromUTF8 (u8"TU PEDALBOARD EST\u00c1 VAC\u00cdA \u2014 Arrastr\u00e1 un pedal desde abajo"),
                     boardScreenR, juce::Justification::centred);
     }
     else
@@ -2400,8 +2627,8 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             g.setColour (juce::Colour::fromRGBA (120, 26, 22, 220));
             g.fillRoundedRectangle (tagR, 6.0f * s);
             g.setColour (juce::Colours::white);
-            g.setFont (juce::Font (juce::FontOptions (juce::jmax (9.0f, 11.0f * s), juce::Font::bold)));
-            g.drawText ("SOLTÁ PARA QUITAR", tagR, juce::Justification::centred);
+            g.setFont (sansFont (juce::jmax (9.0f, 11.0f * s), juce::Font::bold));
+            g.drawText (juce::String::fromUTF8 (u8"SOLT\u00c1 PARA QUITAR"), tagR, juce::Justification::centred);
         }
     }
 
@@ -2410,7 +2637,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
     {
         paintGlassPanel (g, toScreen (35, 28, 420, 577), 22.0f);
         g.setColour (inkColour());
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (14.0f, 19.0f * s), juce::Font::bold)));
+        g.setFont (sansFont (juce::jmax (14.0f, 19.0f * s), juce::Font::bold));
         g.drawText ("EDITAR " + pedalName (bass, sel).toUpperCase(),
                     toScreen (60, 42, 330, 28), juce::Justification::centredLeft);
 
@@ -2448,7 +2675,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         // Value readout row (.value-readout / .xv-values) matching index.html!
         if (bass && sel == 1)
         {
-            g.setFont (juce::Font (juce::FontOptions (juce::jmax (9.0f, 10.5f * s), juce::Font::bold)));
+            g.setFont (sansFont (juce::jmax (9.0f, 10.5f * s), juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.92f));
             const float x0 = 56.0f, rw = 378.0f / 4.0f;
             for (int i = 0; i < 7; ++i)
@@ -2483,7 +2710,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
                     default:kNames[0]="DECAY";   kNames[1]="TONE";   kNames[2]="MIX";      kIds[0]=MiAmpParams::gtrReverbDec;  kIds[1]=MiAmpParams::gtrReverbTone; kIds[2]=MiAmpParams::gtrReverbMix; break;
                 }
             }
-            g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 12.5f * s), juce::Font::bold)));
+            g.setFont (sansFont (juce::jmax (10.0f, 12.5f * s), juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.94f));
             const float cw = 378.0f / 3.0f;
             for (int i = 0; i < 3; ++i)
@@ -2497,10 +2724,10 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         auto it = std::find (chain.begin(), chain.end(), sel);
         const int posIdx = (it != chain.end()) ? static_cast<int> (std::distance (chain.begin(), it)) + 1 : 1;
         g.setColour (inkColour().withAlpha (0.85f));
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (9.5f, 11.0f * s), juce::Font::plain)));
+        g.setFont (sansFont (juce::jmax (9.5f, 11.0f * s), juce::Font::plain));
         g.drawText ("CADENA " + juce::String (posIdx) + "/" + juce::String (chain.size()),
                     toScreen (96, 553, 76, 34), juce::Justification::centred);
-        g.drawText ("Arrastrá una perilla · " + juce::String (selActive ? "ACTIVO" : "BYPASS"),
+        g.drawText (juce::String::fromUTF8 (u8"Arrastr\u00e1 una perilla \u00b7 ") + juce::String (selActive ? "ACTIVO" : "BYPASS"),
                     toScreen (56, 514, 330, 26), juce::Justification::centredLeft);
     }
 
@@ -2509,11 +2736,11 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
     if (! floorTunerOpen)
     {
         g.setColour (inkColour());
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.5f * s), juce::Font::bold)));
-        g.drawText ("ARRASTRÁ LOS PEDALES", toScreen (56, 650, 200, 24), juce::Justification::centredLeft);
+        g.setFont (sansFont (juce::jmax (10.0f, 13.5f * s), juce::Font::bold));
+        g.drawText (juce::String::fromUTF8 (u8"ARRASTR\u00c1 LOS PEDALES"), toScreen (56, 650, 200, 24), juce::Justification::centredLeft);
         g.setColour (inkColour().withAlpha (0.82f));
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (9.0f, 11.5f * s), juce::Font::plain)));
-        g.drawText ("o hacé clic para agregar", toScreen (56, 676, 200, 34), juce::Justification::topLeft);
+        g.setFont (sansFont (juce::jmax (9.0f, 11.5f * s), juce::Font::plain));
+        g.drawText (juce::String::fromUTF8 (u8"o hac\u00e9 clic para agregar"), toScreen (56, 676, 200, 34), juce::Justification::topLeft);
     }
     else
     {
@@ -2526,16 +2753,16 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         g.setColour (juce::Colour::fromRGBA (15, 24, 22, 130));
         g.fillRoundedRectangle (noteBox, 12.0f * s);
         g.setColour (active ? (inTune ? mintBorder() : inkColour()) : inkColour().withAlpha (0.6f));
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (20.0f, (useSolfege ? 34.0f : 44.0f) * s), juce::Font::bold)));
+        g.setFont (sansFont (juce::jmax (20.0f, (useSolfege ? 34.0f : 44.0f) * s), juce::Font::bold));
         g.drawText (noteStr, noteBox, juce::Justification::centred);
 
         g.setColour (inkColour());
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.0f * s), juce::Font::bold)));
+        g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s), juce::Font::bold));
         g.drawText ("AFINADOR", toScreen (210, 638, 220, 20), juce::Justification::centredLeft);
         const juce::String hzStr = active
             ? (juce::String (tunerReading.freqHz, 1) + " Hz  (" + (tunerReading.cents >= 0 ? "+" : "") + juce::String (tunerReading.cents, 1) + " ct)")
-            : "Esperando señal";
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.0f * s))));
+            : juce::String::fromUTF8 (u8"Esperando se\u00f1al");
+        g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s)));
         g.drawText (hzStr, toScreen (650, 638, 345, 20), juce::Justification::centredRight);
 
         auto meter = toScreen (225, 670, 760, 13);
@@ -2572,7 +2799,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             g.setColour (hit ? mintBorder() : juce::Colour::fromRGBA (255, 244, 212, 60));
             g.drawRoundedRectangle (cr, 6.0f * s, 1.0f);
             g.setColour (hit ? juce::Colours::white : inkColour().withAlpha (0.88f));
-            g.setFont (juce::Font (juce::FontOptions (juce::jmax (9.5f, 11.5f * s), juce::Font::bold)));
+            g.setFont (sansFont (juce::jmax (9.5f, 11.5f * s), juce::Font::bold));
             g.drawText (txt, cr, juce::Justification::centred);
         }
     }
@@ -2582,7 +2809,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         auto hudR = toScreen (475, 28, 240, 36);
         paintGlassPanel (g, hudR, 11.0f);
         g.setColour (inkColour());
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.0f * s), juce::Font::bold)));
+        g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s), juce::Font::bold));
         g.drawText (hudText, hudR, juce::Justification::centred);
     }
 }
@@ -2653,7 +2880,7 @@ void MiAmpAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
         g.fillRect (getLocalBounds());
 
         g.setColour (inkColour().withAlpha (0.85f));
-        g.setFont (juce::Font (juce::FontOptions (juce::jmax (12.0f, 16.0f * s), juce::Font::bold)));
+        g.setFont (sansFont (juce::jmax (12.0f, 16.0f * s), juce::Font::bold));
         g.drawText ("DESARROLLADO POR", toScreen (475, 220, 600, 32), juce::Justification::centred);
 
         if (imgs.popupsCredit.isValid())
@@ -2715,7 +2942,7 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
                 if (auto* p = audioProcessor.apvts.getParameter (MiAmpParams::xvCab))
                     p->setValueNotifyingHost (p->convertTo0to1 (static_cast<float> (nxt)));
                 const char* names[3] = { "BASS", "PUNK", "CLEAN" };
-                showHud (juce::String ("XV CAB · ") + names[nxt]);
+                showHud (juce::String::fromUTF8 (u8"XV CAB \u00b7 ") + names[nxt]);
                 repaint();
                 return;
             }
@@ -2732,7 +2959,7 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
             {
                 const bool nxt = p->getValue() < 0.5f;
                 p->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
-                showHud (pedalName (bass, sel) + (nxt ? " · ON" : " · BYPASS"));
+                showHud (pedalName (bass, sel) + juce::String::fromUTF8 (nxt ? u8" \u00b7 ON" : u8" \u00b7 BYPASS"));
                 repaint();
                 return;
             }
@@ -2842,7 +3069,7 @@ void MiAmpAudioProcessorEditor::mouseDoubleClick (const juce::MouseEvent& e)
             {
                 const bool nxt = p->getValue() < 0.5f;
                 p->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
-                showHud (pedalName (bass, chain[i]) + (nxt ? " · ON" : " · BYPASS"));
+                showHud (pedalName (bass, chain[i]) + juce::String::fromUTF8 (nxt ? u8" \u00b7 ON" : u8" \u00b7 BYPASS"));
                 repaint();
                 return;
             }

@@ -493,10 +493,10 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
 {
     std::vector<MiAmpBassPreset> list;
 
-    auto mkXv = [](juce::String name, float lvl, float drv, float lowDb, float highDb, float blendPct, float midDb, float presDb, int cab, juce::String hint)
+    auto mkXv = [](const char* nameUtf8, float lvl, float drv, float lowDb, float highDb, float blendPct, float midDb, float presDb, int cab, const char* hintUtf8)
     {
         MiAmpBassPreset p;
-        p.name = name; p.isXvFactory = true; p.hint = hint;
+        p.name = juce::String::fromUTF8 (nameUtf8); p.isXvFactory = true; p.hint = juce::String::fromUTF8 (hintUtf8);
         p.ampGain = 50.0f; p.ampBass = 50.0f; p.ampMid = 50.0f; p.ampFreq = 50.0f; p.ampTreble = 50.0f; p.ampUltraHi = false;
         p.slots = { 1, -1, -1, -1, -1 };
         p.xvOn = true; p.xvLvl = lvl * 10.0f; p.xvDrv = drv * 10.0f;
@@ -506,17 +506,17 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
         return p;
     };
 
-    list.push_back (mkXv ("Inicial (XV Pop-Punk)", 5.6f, 4.08f, +3.7f, +0.85f, 57.6f, -5.8f, +7.3f, 1, "Cabezal neutro + XV Pop-Punk (Cab PUNK)"));
-    list.push_back (mkXv ("XV • Mark Hoppus Punk",   6.2f, 5.2f,  +4.5f, +2.0f,  72.0f, -4.5f, +8.5f, 1, "Bite agresivo con pua en PUNK"));
-    list.push_back (mkXv ("XV • Blink Enema",       5.8f, 4.4f,  +3.5f, +1.5f,  60.0f, -5.5f, +7.5f, 1, "Crunch limpio de finales de los 90"));
-    list.push_back (mkXv ("XV • Pop Punk Moderno",  6.0f, 6.2f,  +5.0f, +2.5f,  78.0f, -6.5f, +9.0f, 1, "Scoop moderno con presencia alta"));
-    list.push_back (mkXv ("XV • Clack de Pua",      5.5f, 3.8f,  +2.0f, +3.5f,  65.0f, -3.0f, +10.0f,1, "Ataque afilado de pua"));
-    list.push_back (mkXv ("XV • Calido Vintage",    6.5f, 2.2f,  +5.5f, -3.5f,  35.0f, +2.5f, +1.5f, 0, "Cuerpo gordo clasico (Cab BASS)"));
-    list.push_back (mkXv ("XV • Motown / Soul",     7.0f, 1.5f,  +6.0f, -6.0f,  25.0f, +3.5f, -2.0f, 0, "Graves redondos sin brillo"));
-    list.push_back (mkXv ("XV • Rock Clasico",      6.0f, 4.8f,  +3.5f, +0.5f,  58.0f, +1.5f, +4.5f, 0, "Rugido rockero con medios presentes"));
-    list.push_back (mkXv ("XV • Sub / Slap Clean",  6.4f, 1.2f,  +6.5f, +3.0f,  30.0f, -7.0f, +6.5f, 2, "Clean + sub profundo"));
-    list.push_back (mkXv ("XV • Drive Brutal",      5.4f, 8.8f,  +4.0f, +2.0f,  88.0f, -2.0f, +9.5f, 1, "Saturacion extrema"));
-    list.push_back (mkXv ("XV • DI Estudio",        6.2f, 2.5f,  +2.5f, +1.0f,  45.0f, -1.5f, +3.5f, 2, "Directo cristalino sin cabina"));
+    list.push_back (mkXv (u8"Inicial (XV Pop-Punk)",       5.6f, 4.08f, +3.7f, +0.85f, 57.6f, -5.8f, +7.3f, 1, u8"Cabezal neutro + XV Pop-Punk (Cab PUNK)"));
+    list.push_back (mkXv (u8"XV \u2022 Mark Hoppus Punk",  6.2f, 5.2f,  +4.5f, +2.0f,  72.0f, -4.5f, +8.5f, 1, u8"Bite agresivo con pua en PUNK"));
+    list.push_back (mkXv (u8"XV \u2022 Blink Enema",      5.8f, 4.4f,  +3.5f, +1.5f,  60.0f, -5.5f, +7.5f, 1, u8"Crunch limpio de finales de los 90"));
+    list.push_back (mkXv (u8"XV \u2022 Pop Punk Moderno", 6.0f, 6.2f,  +5.0f, +2.5f,  78.0f, -6.5f, +9.0f, 1, u8"Scoop moderno con presencia alta"));
+    list.push_back (mkXv (u8"XV \u2022 Clack de Pua",     5.5f, 3.8f,  +2.0f, +3.5f,  65.0f, -3.0f, +10.0f,1, u8"Ataque afilado de pua"));
+    list.push_back (mkXv (u8"XV \u2022 Calido Vintage",   6.5f, 2.2f,  +5.5f, -3.5f,  35.0f, +2.5f, +1.5f, 0, u8"Cuerpo gordo clasico (Cab BASS)"));
+    list.push_back (mkXv (u8"XV \u2022 Motown / Soul",    7.0f, 1.5f,  +6.0f, -6.0f,  25.0f, +3.5f, -2.0f, 0, u8"Graves redondos sin brillo"));
+    list.push_back (mkXv (u8"XV \u2022 Rock Clasico",     6.0f, 4.8f,  +3.5f, +0.5f,  58.0f, +1.5f, +4.5f, 0, u8"Rugido rockero con medios presentes"));
+    list.push_back (mkXv (u8"XV \u2022 Sub / Slap Clean", 6.4f, 1.2f,  +6.5f, +3.0f,  30.0f, -7.0f, +6.5f, 2, u8"Clean + sub profundo"));
+    list.push_back (mkXv (u8"XV \u2022 Drive Brutal",     5.4f, 8.8f,  +4.0f, +2.0f,  88.0f, -2.0f, +9.5f, 1, u8"Saturacion extrema"));
+    list.push_back (mkXv (u8"XV \u2022 DI Estudio",       6.2f, 2.5f,  +2.5f, +1.0f,  45.0f, -1.5f, +3.5f, 2, u8"Directo cristalino sin cabina"));
 
     {
         MiAmpBassPreset p;
@@ -569,7 +569,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
 
     {
         MiAmpGuitarPreset p;
-        p.name = "Tom DeLonge • Enema Dirt";
+        p.name = juce::String::fromUTF8 (u8"Tom DeLonge \u2022 Enema Dirt");
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 28.0f; p.output = 58.0f;
         p.gain = 68.0f; p.bass = 56.0f; p.mid = 60.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 60.0f;
@@ -580,7 +580,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Tom DeLonge • Enema Clean";
+        p.name = juce::String::fromUTF8 (u8"Tom DeLonge \u2022 Enema Clean");
         p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
         p.input = 52.0f; p.gate = 10.0f; p.output = 60.0f;
         p.gain = 28.0f; p.bass = 44.0f; p.mid = 54.0f; p.treble = 68.0f; p.presence = 62.0f; p.master = 64.0f;
@@ -592,7 +592,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Tom DeLonge • TOYPAJ / Untitled";
+        p.name = juce::String::fromUTF8 (u8"Tom DeLonge \u2022 TOYPAJ / Untitled");
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 26.0f; p.output = 58.0f;
         p.gain = 74.0f; p.bass = 58.0f; p.mid = 56.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 58.0f;
@@ -607,7 +607,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
 
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Rock Crunch";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Rock Crunch");
         p.channel = 1; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 52.0f; p.gate = 18.0f; p.output = 58.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 60.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
@@ -618,7 +618,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Pop-Punk Drive";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Pop-Punk Drive");
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 55.0f; p.gate = 28.0f; p.output = 56.0f;
         p.gain = 72.0f; p.bass = 56.0f; p.mid = 62.0f; p.treble = 64.0f; p.presence = 62.0f; p.master = 56.0f;
@@ -629,7 +629,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • 70s Breakup";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 70s Breakup");
         p.channel = 0; p.cab = 0; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 12.0f; p.output = 60.0f;
         p.gain = 46.0f; p.bass = 52.0f; p.mid = 56.0f; p.treble = 58.0f; p.presence = 54.0f; p.master = 62.0f;
@@ -640,7 +640,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Glass Clean Chorus";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Glass Clean Chorus");
         p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
         p.input = 48.0f; p.gate = 10.0f; p.output = 62.0f;
         p.gain = 26.0f; p.bass = 50.0f; p.mid = 52.0f; p.treble = 62.0f; p.presence = 58.0f; p.master = 64.0f;
@@ -653,7 +653,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Hard Rock Lead";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Hard Rock Lead");
         p.channel = 2; p.cab = 0; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 32.0f; p.output = 56.0f;
         p.gain = 78.0f; p.bass = 54.0f; p.mid = 68.0f; p.treble = 60.0f; p.presence = 60.0f; p.master = 58.0f;
@@ -666,7 +666,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Fuzz Stoner Wall";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Fuzz Stoner Wall");
         p.channel = 1; p.cab = 0; p.bright = false; p.os4x = true;
         p.input = 54.0f; p.gate = 28.0f; p.output = 55.0f;
         p.gain = 64.0f; p.bass = 66.0f; p.mid = 58.0f; p.treble = 50.0f; p.presence = 48.0f; p.master = 60.0f;
@@ -678,7 +678,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Studio 1x12 Indie";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Studio 1x12 Indie");
         p.channel = 1; p.cab = 3; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 16.0f; p.output = 58.0f;
         p.gain = 48.0f; p.bass = 50.0f; p.mid = 62.0f; p.treble = 60.0f; p.presence = 58.0f; p.master = 58.0f;
@@ -691,7 +691,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = "Zenbox • Cab Off (IR Externo)";
+        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Cab Off (IR Externo)");
         p.channel = 1; p.cab = 4; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 20.0f; p.output = 56.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 58.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
