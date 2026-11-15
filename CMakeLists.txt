@@ -41,7 +41,7 @@ juce_add_plugin(MiAmp
     ICON_BIG                      "${CMAKE_CURRENT_SOURCE_DIR}/Resources/app_icon_512.png"
     ICON_SMALL                    "${CMAKE_CURRENT_SOURCE_DIR}/Resources/app_icon_180.png"
     MICROPHONE_PERMISSION_ENABLED TRUE
-    MICROPHONE_PERMISSION_TEXT    "MI AMP usa la entrada de audio para procesar tu bajo electrico en tiempo real."
+    MICROPHONE_PERMISSION_TEXT    "MI AMP usa la entrada de audio para procesar guitarra y bajo electrico en tiempo real."
 )
 
 juce_generate_juce_header(MiAmp)
@@ -53,6 +53,8 @@ target_sources(MiAmp
         Source/PluginEditor.cpp
         Source/PluginEditor.h
         Source/DSP/MiAmpBassChainDSP.h
+        Source/DSP/MiAmpGuitarChainDSP.h
+        Source/DSP/ZenboxCabIRs.h
         Source/DSP/XVBassDSP.h
         Source/DSP/XVCabIRs.h
         Source/DSP/XVBassTuner.h
@@ -62,6 +64,7 @@ target_sources(MiAmp
 juce_add_binary_data(MiAmpAssets
     NAMESPACE BinaryData
     SOURCES
+        Resources/main_bg.png
         Resources/bass_bg.png
         Resources/bass_knob_cap.png
         Resources/toggle_up.png
@@ -76,15 +79,24 @@ juce_add_binary_data(MiAmpAssets
         Resources/xv_cab_clean.png
         Resources/pedal_compresor_active.png
         Resources/pedal_compresor_off.png
+        Resources/pedal_drive_active.png
+        Resources/pedal_drive_off.png
+        Resources/pedal_fuzz_active.png
+        Resources/pedal_fuzz_off.png
         Resources/pedal_chorus_active.png
         Resources/pedal_chorus_off.png
         Resources/pedal_phaser_active.png
         Resources/pedal_phaser_off.png
+        Resources/pedal_delay_active.png
+        Resources/pedal_delay_off.png
         Resources/pedal_reverb_active.png
         Resources/pedal_reverb_off.png
         Resources/knob_compresor_0.png
         Resources/knob_compresor_1.png
         Resources/knob_compresor_2.png
+        Resources/knob_drive_0.png
+        Resources/knob_drive_1.png
+        Resources/knob_drive_2.png
         Resources/knob_chorus_0.png
         Resources/knob_chorus_1.png
         Resources/knob_chorus_2.png

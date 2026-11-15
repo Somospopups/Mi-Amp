@@ -1,6 +1,8 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <BinaryData.h>
+#include <algorithm>
+#include <cmath>
 
 namespace
 {
@@ -10,22 +12,36 @@ namespace
     constexpr float kAmpOriginX = 625.0f;
     constexpr float kAmpOriginY = 325.0f;
 
-    constexpr float kHeadKnobX[5] = { 398.0f, 483.0f, 568.0f, 653.0f, 738.0f };
-    constexpr float kHeadKnobY    = 410.0f;
-    constexpr const char* kHeadKnobIds[5] = {
+    // Bass Head (5 knobs, 3 switches)
+    constexpr float kBassHeadKnobX[5] = { 398.0f, 483.0f, 568.0f, 653.0f, 738.0f };
+    constexpr float kBassHeadKnobY    = 410.0f;
+    constexpr const char* kBassHeadKnobIds[5] = {
         MiAmpParams::ampGain, MiAmpParams::ampBass, MiAmpParams::ampMid,
         MiAmpParams::ampFreq, MiAmpParams::ampTreble
     };
-    constexpr const char* kHeadKnobNames[5] = { "GAIN", "BASS", "MID", "FREQ", "TREBLE" };
+    constexpr const char* kBassHeadKnobNames[5] = { "GAIN", "BASS", "MID", "FREQ", "TREBLE" };
 
-    constexpr float kSwitchX[3] = { 258.0f, 323.0f, 822.0f };
-    constexpr float kSwitchY    = 414.0f;
-    constexpr const char* kSwitchIds[3] = {
+    constexpr float kBassSwitchX[3] = { 258.0f, 323.0f, 822.0f };
+    constexpr float kBassSwitchY    = 414.0f;
+    constexpr const char* kBassSwitchIds[3] = {
         MiAmpParams::ampPower, MiAmpParams::ampUltraHi, MiAmpParams::ampStandby
     };
-    constexpr const char* kSwitchNames[3] = { "POWER", "ULTRA", "STANDBY" };
+    constexpr const char* kBassSwitchNames[3] = { "POWER", "ULTRA", "STANDBY" };
 
-    // XV Bass (1391x1131) normalized coords matching Mi-Amp/index.html
+    // Guitar Head (main_bg.png: 19 knobs, 3 switches matching index.html)
+    constexpr float kGtrXs[9] = { 385.0f, 445.0f, 505.0f, 593.0f, 653.0f, 712.0f, 778.0f, 838.0f, 897.0f };
+    constexpr float kGtrScX = 744.0f / 894.0f;
+    constexpr float kGtrScY = 416.0f / 490.0f;
+
+    constexpr float kGtrSwitchX[3]    = { 245.5f, 290.0f, 485.0f };
+    constexpr float kGtrSwitchY[3]    = { 394.0f, 394.0f, 400.0f };
+    constexpr float kGtrSwitchSize[3] = { 30.0f,  30.0f,  17.0f };
+    constexpr const char* kGtrSwitchIds[3] = {
+        MiAmpParams::gtrPower, MiAmpParams::gtrStandby, MiAmpParams::gtrModeBright
+    };
+    constexpr const char* kGtrSwitchNames[3] = { "POWER", "STANDBY", "BRIGHT CAP" };
+
+    // XV Bass (1391x1131)
     constexpr float kXvPoints[7][2] = {
         { 0.19482f, 0.196f }, { 0.35226f, 0.196f }, { 0.50683f, 0.196f },
         { 0.66139f, 0.196f }, { 0.81668f, 0.196f },
@@ -39,10 +55,15 @@ namespace
         "LEVEL", "DRIVE", "LOW", "HIGH", "BLEND", "MID", "PRESENCE"
     };
 
-    // 700x1000 pedal knob coordinates
+    // 700x1000 pedal knob coordinates from Mi-Amp/index.html
+    constexpr float kDrivePoints[3][2]  = { { 0.255218f, 0.220509f }, { 0.499051f, 0.220509f }, { 0.745731f, 0.220509f } };
     constexpr float kCompPoints[3][2]   = { { 0.244975f, 0.218473f }, { 0.50098f,  0.218473f }, { 0.756985f, 0.218473f } };
     constexpr float kChorusPoints[3][2] = { { 0.20807f,  0.291823f }, { 0.498418f, 0.291823f }, { 0.788766f, 0.291823f } };
     constexpr float kPhaserPoints[3][2] = { { 0.239171f, 0.220286f }, { 0.500f,    0.220286f }, { 0.762712f, 0.220286f } };
+
+    // Palette orders
+    constexpr int kBassPaletteOrder[5]   = { 2, 3, 0, 4, 1 };             // Chorus, Phaser, Compresor, Reverb, XV Bass
+    constexpr int kGuitarPaletteOrder[7] = { 1, 2, 3, 4, 0, 5, 6 };       // Drive, Fuzz, Chorus, Phaser, Compresor, Delay, Reverb
 
     static juce::Point<float> ampZoomPt (float xStage, float yStage) noexcept
     {
@@ -57,7 +78,7 @@ namespace
 }
 
 //==============================================================================
-// GlassLookAndFeel (matches Mi-Amp/index.html .glass button styling)
+// GlassLookAndFeel
 //==============================================================================
 void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
     juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
@@ -93,11 +114,11 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
 void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
     juce::Graphics& g, juce::TextButton& b, bool, bool)
 {
-    const float h = juce::jlimit (10.0f, 14.5f, static_cast<float> (b.getHeight()) * 0.36f);
+    const float h = juce::jlimit (9.5f, 14.0f, static_cast<float> (b.getHeight()) * 0.35f);
     g.setFont (juce::Font (juce::FontOptions (h, juce::Font::plain)));
     g.setColour (b.isEnabled() ? juce::Colour::fromRGB (250, 243, 227)
                                : juce::Colour::fromRGBA (250, 243, 227, 105));
-    g.drawFittedText (b.getButtonText(), b.getLocalBounds().reduced (6, 2), juce::Justification::centred, 1);
+    g.drawFittedText (b.getButtonText(), b.getLocalBounds().reduced (4, 2), juce::Justification::centred, 1);
 }
 
 void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawLinearSlider (
@@ -123,18 +144,22 @@ MiAmpAudioProcessorEditor::ImageRotaryKnob::ImageRotaryKnob (
     const juce::String& paramId,
     const juce::String& labelText,
     juce::Image knobImg,
-    bool isBassHeadStyle,
-    std::function<void(const juce::String&)> onHud)
+    bool isHeadStyle,
+    std::function<void(const juce::String&)> onHud,
+    std::function<void()> onInteract)
     : apvts (state), pid (paramId), label (labelText),
-      image (std::move (knobImg)), headStyle (isBassHeadStyle), hudCallback (std::move (onHud))
+      image (std::move (knobImg)), headStyle (isHeadStyle),
+      hudCallback (std::move (onHud)), interactCallback (std::move (onInteract))
 {
     setRepaintsOnMouseActivity (true);
     setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
 }
 
-void MiAmpAudioProcessorEditor::ImageRotaryKnob::setParamId (const juce::String& newId)
+void MiAmpAudioProcessorEditor::ImageRotaryKnob::setParam (const juce::String& newId, const juce::String& newLabel, juce::Image newImg)
 {
     pid = newId;
+    label = newLabel;
+    image = std::move (newImg);
     repaint();
 }
 
@@ -172,12 +197,12 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::paint (juce::Graphics& g)
         g.setColour (juce::Colour::fromRGBA (255, 255, 255, 240));
         g.drawLine (cx + sinA * rInner, cy + cosA * rInner,
                     cx + sinA * rOuter, cy + cosA * rOuter,
-                    juce::jmax (1.8f, sz * 0.045f));
+                    juce::jmax (1.5f, sz * 0.045f));
 
         if (isMouseOver() || dragging)
         {
             g.setColour (juce::Colour::fromRGB (189, 238, 208));
-            g.drawEllipse (cx - sz * 0.47f, cy - sz * 0.47f, sz * 0.94f, sz * 0.94f, 2.2f);
+            g.drawEllipse (cx - sz * 0.47f, cy - sz * 0.47f, sz * 0.94f, sz * 0.94f, 2.0f);
         }
     }
     else
@@ -202,6 +227,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::paint (juce::Graphics& g)
 
 void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseDown (const juce::MouseEvent& e)
 {
+    if (interactCallback) interactCallback();
     if (auto* raw = apvts.getRawParameterValue (pid))
         dragStartVal = raw->load();
     dragStartY = e.getPosition().y;
@@ -232,6 +258,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseUp (const juce::MouseEvent
 
 void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseDoubleClick (const juce::MouseEvent&)
 {
+    if (interactCallback) interactCallback();
     if (auto* p = apvts.getParameter (pid))
         p->setValueNotifyingHost (p->convertTo0to1 (50.0f));
     if (hudCallback)
@@ -241,6 +268,7 @@ void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseDoubleClick (const juce::M
 
 void MiAmpAudioProcessorEditor::ImageRotaryKnob::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
+    if (interactCallback) interactCallback();
     if (auto* raw = apvts.getRawParameterValue (pid))
     {
         const float nextVal = juce::jlimit (0.0f, 100.0f, raw->load() + wheel.deltaY * 14.0f);
@@ -269,6 +297,13 @@ MiAmpAudioProcessorEditor::ImageToggleSwitch::ImageToggleSwitch (
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
 }
 
+void MiAmpAudioProcessorEditor::ImageToggleSwitch::setConfig (const juce::String& newId, const juce::String& newLabel)
+{
+    pid = newId;
+    label = newLabel;
+    repaint();
+}
+
 void MiAmpAudioProcessorEditor::ImageToggleSwitch::paint (juce::Graphics& g)
 {
     auto* raw = apvts.getRawParameterValue (pid);
@@ -294,6 +329,8 @@ void MiAmpAudioProcessorEditor::ImageToggleSwitch::mouseDown (const juce::MouseE
         {
             if (pid == MiAmpParams::ampUltraHi)
                 hudCallback (next ? "ULTRA-HI" : "ULTRA-LO");
+            else if (pid == MiAmpParams::gtrModeBright)
+                hudCallback (next ? "BRIGHT CAP ON" : "BRIGHT CAP OFF");
             else
                 hudCallback (label + (next ? " ON" : " OFF"));
         }
@@ -302,14 +339,67 @@ void MiAmpAudioProcessorEditor::ImageToggleSwitch::mouseDown (const juce::MouseE
 }
 
 //==============================================================================
-// PalettePedalButton (exact .palette-item with real pedal PNG thumbnail)
+// PalettePedalButton (supports click OR drag directly onto pedalboard!)
 //==============================================================================
 MiAmpAudioProcessorEditor::PalettePedalButton::PalettePedalButton (
-    const juce::String& title, juce::Image img, std::function<void()> onClick)
-    : name (title), art (std::move (img)), clickFn (std::move (onClick))
+    const juce::String& title, juce::Image img,
+    std::function<void()> onClick,
+    std::function<void(juce::Point<float>)> onDragMove,
+    std::function<void(juce::Point<float>)> onDragEnd)
+    : name (title), art (std::move (img)),
+      clickFn (std::move (onClick)), dragMoveFn (std::move (onDragMove)), dragEndFn (std::move (onDragEnd))
 {
     setRepaintsOnMouseActivity (true);
     setMouseCursor (juce::MouseCursor::PointingHandCursor);
+}
+
+void MiAmpAudioProcessorEditor::PalettePedalButton::setData (
+    const juce::String& title, juce::Image img,
+    std::function<void()> onClick,
+    std::function<void(juce::Point<float>)> onDragMove,
+    std::function<void(juce::Point<float>)> onDragEnd)
+{
+    name = title;
+    art = std::move (img);
+    clickFn = std::move (onClick);
+    dragMoveFn = std::move (onDragMove);
+    dragEndFn = std::move (onDragEnd);
+    repaint();
+}
+
+void MiAmpAudioProcessorEditor::PalettePedalButton::mouseDown (const juce::MouseEvent& e)
+{
+    downPos = e.getPosition();
+    dragged = false;
+}
+
+void MiAmpAudioProcessorEditor::PalettePedalButton::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! dragged && e.getPosition().getDistanceFrom (downPos) > 7)
+        dragged = true;
+
+    if (dragged && dragMoveFn)
+    {
+        auto ptInParent = e.getEventRelativeTo (getParentComponent()).position;
+        dragMoveFn (ptInParent);
+    }
+}
+
+void MiAmpAudioProcessorEditor::PalettePedalButton::mouseUp (const juce::MouseEvent& e)
+{
+    if (dragged)
+    {
+        if (dragEndFn)
+        {
+            auto ptInParent = e.getEventRelativeTo (getParentComponent()).position;
+            dragEndFn (ptInParent);
+        }
+    }
+    else
+    {
+        if (clickFn) clickFn();
+    }
+    dragged = false;
 }
 
 void MiAmpAudioProcessorEditor::PalettePedalButton::paint (juce::Graphics& g)
@@ -326,17 +416,17 @@ void MiAmpAudioProcessorEditor::PalettePedalButton::paint (juce::Graphics& g)
 
     if (art.isValid())
     {
-        auto imgR = r.reduced (8.0f, 6.0f).withTrimmedBottom (16.0f);
+        auto imgR = r.reduced (6.0f, 5.0f).withTrimmedBottom (16.0f);
         g.drawImage (art, imgR, juce::RectanglePlacement::centred);
     }
 
     g.setColour (inkColour().withAlpha (alreadyInChain ? 0.95f : 0.90f));
-    g.setFont (juce::Font (juce::FontOptions (juce::jlimit (8.5f, 11.0f, r.getHeight() * 0.11f), juce::Font::bold)));
+    g.setFont (juce::Font (juce::FontOptions (juce::jlimit (8.0f, 10.5f, r.getHeight() * 0.11f), juce::Font::bold)));
     g.drawText (name, r.withTop (r.getBottom() - 18.0f), juce::Justification::centred);
 }
 
 //==============================================================================
-// GlassPopover (exact .popover / .floor-popover from Mi-Amp/index.html)
+// GlassPopover
 //==============================================================================
 class MiAmpAudioProcessorEditor::GlassPopover final : public juce::Component
 {
@@ -350,7 +440,6 @@ public:
         btnClose.setButtonText ("x");
         btnClose.onClick = [this] { if (closeFn) closeFn(); };
 
-        // Presets
         addChildComponent (presetNameEdit);
         presetNameEdit.setTextToShowWhenEmpty ("Nuevo preset...", juce::Colours::lightgrey);
         presetNameEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colour::fromRGBA (27, 39, 33, 185));
@@ -371,7 +460,6 @@ public:
         presetViewport.setViewedComponent (&presetListHolder, false);
         presetViewport.setScrollBarsShown (true, false);
 
-        // Drop
         addChildComponent (btnDropToggle);
         btnDropToggle.onClick = [this]
         {
@@ -421,7 +509,6 @@ public:
         slMixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             processor.apvts, MiAmpParams::pitchMix, slMix);
 
-        // Tuner
         addChildComponent (btnTunerMute);
         btnTunerMute.onClick = [this]
         {
@@ -478,9 +565,10 @@ public:
         auto inner = r.reduced (18.0f, 16.0f);
         g.setColour (inkColour());
         g.setFont (juce::Font (juce::FontOptions (15.5f, juce::Font::bold)));
-        juce::String title = (kind == PopoverKind::Presets) ? "PRESETS"
-                           : (kind == PopoverKind::Drop)    ? "DROP TUNER"
-                                                            : "AFINADOR";
+        juce::String title = (kind == PopoverKind::Presets)
+                                ? (processor.isBassMode() ? "PRESETS · BAJO" : "PRESETS · ZENBOX")
+                           : (kind == PopoverKind::Drop) ? "DROP TUNER"
+                                                         : "AFINADOR";
         g.drawText (title, inner.removeFromTop (24.0f), juce::Justification::centredLeft);
 
         if (kind == PopoverKind::Drop)
@@ -529,19 +617,23 @@ public:
             g.fillRect (nx - 2.0f, meter.getY() - 5.0f, 4.0f, meter.getHeight() + 10.0f);
 
             auto row = inner.removeFromTop (32.0f).reduced (4.0f, 4.0f);
-            const char* strs[4] = { "E1", "A1", "D2", "G2" };
-            const float cw = row.getWidth() * 0.25f;
-            for (int i = 0; i < 4; ++i)
+            const char* strsBass[4] = { "E1", "A1", "D2", "G2" };
+            const char* strsGtr[6]  = { "E2", "A2", "D3", "G3", "B3", "E4" };
+            const bool isBass = processor.isBassMode();
+            const int nNotes = isBass ? 4 : 6;
+            const float cw = row.getWidth() / static_cast<float> (nNotes);
+            for (int i = 0; i < nNotes; ++i)
             {
-                auto cell = juce::Rectangle<float> (row.getX() + i * cw, row.getY(), cw, row.getHeight()).reduced (3.0f, 0.0f);
-                const bool hit = active && (juce::String (tuner.noteName) + juce::String (tuner.octave)) == strs[i];
+                const char* txt = isBass ? strsBass[i] : strsGtr[i];
+                auto cell = juce::Rectangle<float> (row.getX() + i * cw, row.getY(), cw, row.getHeight()).reduced (2.0f, 0.0f);
+                const bool hit = active && (juce::String (tuner.noteName) + juce::String (tuner.octave)) == txt;
                 g.setColour (hit ? juce::Colour::fromRGBA (141, 224, 184, 90) : juce::Colour::fromRGBA (255, 255, 255, 22));
                 g.fillRoundedRectangle (cell, 6.0f);
                 g.setColour (hit ? mintBorder() : juce::Colour::fromRGBA (255, 244, 212, 60));
                 g.drawRoundedRectangle (cell, 6.0f, 1.0f);
                 g.setColour (hit ? juce::Colours::white : inkColour().withAlpha (0.85f));
-                g.setFont (juce::Font (juce::FontOptions (11.5f, juce::Font::bold)));
-                g.drawText (strs[i], cell, juce::Justification::centred);
+                g.setFont (juce::Font (juce::FontOptions (isBass ? 11.5f : 10.5f, juce::Font::bold)));
+                g.drawText (txt, cell, juce::Justification::centred);
             }
         }
     }
@@ -613,20 +705,39 @@ private:
         };
 
         const auto activeName = processor.getActivePresetName();
-        const auto& userList = processor.getUserPresets();
-        for (int i = 0; i < static_cast<int> (userList.size()); ++i)
+        if (processor.isBassMode())
         {
-            const auto& up = userList[static_cast<size_t> (i)];
-            addRow (up.name, up.name == activeName,
-                [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
-                [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
+            const auto& userList = processor.getUserPresets();
+            for (int i = 0; i < static_cast<int> (userList.size()); ++i)
+            {
+                const auto& up = userList[static_cast<size_t> (i)];
+                addRow (up.name, up.name == activeName,
+                    [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
+                    [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
+            }
+            for (const auto& fp : MiAmpAudioProcessor::getFactoryPresets())
+            {
+                addRow (fp.name, fp.name == activeName,
+                    [this, fp] { processor.applyPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
+                    nullptr);
+            }
         }
-
-        for (const auto& fp : MiAmpAudioProcessor::getFactoryPresets())
+        else
         {
-            addRow (fp.name, fp.name == activeName,
-                [this, fp] { processor.applyPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
-                nullptr);
+            const auto& userList = processor.getGuitarUserPresets();
+            for (int i = 0; i < static_cast<int> (userList.size()); ++i)
+            {
+                const auto& up = userList[static_cast<size_t> (i)];
+                addRow (up.name, up.name == activeName,
+                    [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
+                    [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
+            }
+            for (const auto& fp : MiAmpAudioProcessor::getGuitarFactoryPresets())
+            {
+                addRow (fp.name, fp.name == activeName,
+                    [this, fp] { processor.applyGuitarPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
+                    nullptr);
+            }
         }
 
         layoutPresetButtons();
@@ -704,18 +815,18 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     loadImages();
 
     for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals,
-                     &btnDockCab, &btnDockDrop, &btnEditClose, &btnMoveLeft, &btnMoveRight, &btnRemovePedal,
+                     &btnDockCab, &btnDockDrop, &btnDockCh, &btnDockOs, &btnDockGate,
+                     &btnEditClose, &btnMoveLeft, &btnMoveRight, &btnRemovePedal,
                      &btnFloorPresets, &btnFloorTuner, &btnFloorCab, &btnFloorDrop, &btnBackToAmp, &btnFloorTunerMute })
     {
         b->setLookAndFeel (&glassLaf);
     }
 
-    // Head right menu (.menu)
+    // Instrument switch (.instrument-switch)
     addAndMakeVisible (btnInstGuitar);
-    btnInstGuitar.setEnabled (false);
-    btnInstGuitar.setTooltip ("Guitarra estara disponible en la proxima etapa");
+    btnInstGuitar.onClick = [this] { switchInstrument (false); };
     addAndMakeVisible (btnInstBass);
-    btnInstBass.setToggleState (true, juce::dontSendNotification);
+    btnInstBass.onClick = [this] { switchInstrument (true); };
 
     addAndMakeVisible (btnMainPresets);
     btnMainPresets.onClick = [this] { togglePopover (PopoverKind::Presets); };
@@ -724,34 +835,124 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     addAndMakeVisible (btnMainPedals);
     btnMainPedals.onClick = [this] { setFloorMode (true); };
 
-    // Head top-left dock (.audio-dock)
+    // Top-left dock (.audio-dock)
     addAndMakeVisible (btnDockCab);
     btnDockCab.onClick = [this]
     {
-        if (auto* cab = audioProcessor.apvts.getParameter (MiAmpParams::ampCabOn))
+        if (audioProcessor.isBassMode())
         {
-            const bool nxt = cab->getValue() < 0.5f;
-            cab->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
-            showHud (nxt ? "CAJA 8x10 ON" : "CAJA 8x10 OFF");
+            if (auto* cab = audioProcessor.apvts.getParameter (MiAmpParams::ampCabOn))
+            {
+                const bool nxt = cab->getValue() < 0.5f;
+                cab->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
+                showHud (nxt ? "CAJA 8x10 ON" : "CAJA 8x10 OFF");
+            }
+        }
+        else
+        {
+            const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrCab)->load()));
+            const int nxt = (cur + 1) % 5;
+            if (auto* cab = audioProcessor.apvts.getParameter (MiAmpParams::gtrCab))
+                cab->setValueNotifyingHost (cab->convertTo0to1 (static_cast<float> (nxt)));
+            const char* names[5] = { "CAB: VINT 4x12", "CAB: MOD 4x12", "CAB: OPEN 2x12", "CAB: STUD 1x12", "CAB: OFF" };
+            showHud (names[nxt]);
         }
     };
+
+    addAndMakeVisible (btnDockCh);
+    btnDockCh.onClick = [this]
+    {
+        const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrChannel)->load()));
+        const int nxt = (cur + 1) % 3;
+        if (auto* p = audioProcessor.apvts.getParameter (MiAmpParams::gtrChannel))
+            p->setValueNotifyingHost (p->convertTo0to1 (static_cast<float> (nxt)));
+        const char* names[3] = { "CH1 CLEAN/EDGE", "CH2 CRUNCH 70s", "CH3 PUNK/HIGH" };
+        showHud (names[nxt]);
+    };
+
+    addAndMakeVisible (btnDockOs);
+    btnDockOs.onClick = [this]
+    {
+        if (auto* p = audioProcessor.apvts.getParameter (MiAmpParams::gtrOs4x))
+        {
+            const bool nxt = p->getValue() < 0.5f;
+            p->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
+            showHud (nxt ? "4x OVERSAMPLING ON" : "1x OVERSAMPLING");
+        }
+    };
+
+    addAndMakeVisible (btnDockGate);
+    btnDockGate.onClick = [this]
+    {
+        const float cur = audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrGate)->load();
+        const float nxt = (cur < 5.0f) ? 18.0f : (cur < 28.0f ? 35.0f : (cur < 48.0f ? 55.0f : 0.0f));
+        if (auto* p = audioProcessor.apvts.getParameter (MiAmpParams::gtrGate))
+            p->setValueNotifyingHost (p->convertTo0to1 (nxt));
+        showHud (nxt < 1.0f ? "GATE OFF" : ("GATE " + juce::String (juce::roundToInt (nxt)) + "%"));
+    };
+
     addAndMakeVisible (btnDockDrop);
     btnDockDrop.onClick = [this] { togglePopover (PopoverKind::Drop); };
 
-    // Head physical knobs & switches
+    // Bass Head Knobs & Switches
     for (int i = 0; i < 5; ++i)
     {
-        headKnobs[i] = std::make_unique<ImageRotaryKnob> (
-            audioProcessor.apvts, kHeadKnobIds[i], kHeadKnobNames[i],
+        bassHeadKnobs[i] = std::make_unique<ImageRotaryKnob> (
+            audioProcessor.apvts, kBassHeadKnobIds[i], kBassHeadKnobNames[i],
             imgs.bassKnobCap, true, [this] (const juce::String& t) { showHud (t); });
-        addAndMakeVisible (*headKnobs[i]);
+        addChildComponent (*bassHeadKnobs[i]);
     }
     for (int i = 0; i < 3; ++i)
     {
-        headSwitches[i] = std::make_unique<ImageToggleSwitch> (
-            audioProcessor.apvts, kSwitchIds[i], kSwitchNames[i],
+        bassHeadSwitches[i] = std::make_unique<ImageToggleSwitch> (
+            audioProcessor.apvts, kBassSwitchIds[i], kBassSwitchNames[i],
             imgs.toggleUp, imgs.toggleDown, [this] (const juce::String& t) { showHud (t); });
-        addAndMakeVisible (*headSwitches[i]);
+        addChildComponent (*bassHeadSwitches[i]);
+    }
+
+    // Guitar Head Knobs (19 total: 9 top row CH1..3 Gain/Treble/Mid, 9 bottom row Bass/Presence/Master, 1 Output)
+    const char* topNames[3] = { "GAIN", "TREBLE", "MID" };
+    const char* botNames[3] = { "BASS", "PRESENCE", "MASTER" };
+    for (int i = 0; i < 9; ++i)
+    {
+        const int ch = i / 3;
+        const int col = i % 3;
+        const char* topId = (col == 0) ? MiAmpParams::gtrChGain[ch]
+                          : (col == 1) ? MiAmpParams::gtrChTreble[ch]
+                                       : MiAmpParams::gtrChMid[ch];
+        const char* botId = (col == 0) ? MiAmpParams::gtrChBass[ch]
+                          : (col == 1) ? MiAmpParams::gtrChPresence[ch]
+                                       : MiAmpParams::gtrChMaster[ch];
+
+        auto switchChFn = [this, ch]
+        {
+            if (auto* p = audioProcessor.apvts.getParameter (MiAmpParams::gtrChannel))
+                p->setValueNotifyingHost (p->convertTo0to1 (static_cast<float> (ch)));
+        };
+
+        guitarHeadKnobs[i] = std::make_unique<ImageRotaryKnob> (
+            audioProcessor.apvts, topId,
+            "CH" + juce::String (ch + 1) + " " + topNames[col],
+            imgs.bassKnobCap, true, [this] (const juce::String& t) { showHud (t); }, switchChFn);
+        addChildComponent (*guitarHeadKnobs[i]);
+
+        guitarHeadKnobs[9 + i] = std::make_unique<ImageRotaryKnob> (
+            audioProcessor.apvts, botId,
+            "CH" + juce::String (ch + 1) + " " + botNames[col],
+            imgs.bassKnobCap, true, [this] (const juce::String& t) { showHud (t); }, switchChFn);
+        addChildComponent (*guitarHeadKnobs[9 + i]);
+    }
+    guitarHeadKnobs[18] = std::make_unique<ImageRotaryKnob> (
+        audioProcessor.apvts, MiAmpParams::gtrOutput, "OUTPUT",
+        imgs.bassKnobCap, true, [this] (const juce::String& t) { showHud (t); });
+    addChildComponent (*guitarHeadKnobs[18]);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        guitarHeadSwitches[i] = std::make_unique<ImageToggleSwitch> (
+            audioProcessor.apvts, kGtrSwitchIds[i], kGtrSwitchNames[i],
+            imgs.toggleUp, imgs.toggleDown, [this] (const juce::String& t) { showHud (t); });
+        addChildComponent (*guitarHeadSwitches[i]);
     }
 
     // Floor editor controls
@@ -767,34 +968,40 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     btnEditClose.onClick = [this] { editorOpen = false; syncPedalEditorControls(); repaint(); };
 
     addChildComponent (btnMoveLeft);
-    btnMoveLeft.onClick = [this] { audioProcessor.movePedalInChain (selectedPedalType, -1); syncPedalEditorControls(); repaint(); };
+    btnMoveLeft.onClick = [this]
+    {
+        const bool bass = audioProcessor.isBassMode();
+        const int sel = bass ? selectedBassPedal : selectedGuitarPedal;
+        audioProcessor.movePedalInChain (bass, sel, -1);
+        syncPedalEditorControls();
+        repaint();
+    };
     addChildComponent (btnMoveRight);
-    btnMoveRight.onClick = [this] { audioProcessor.movePedalInChain (selectedPedalType, +1); syncPedalEditorControls(); repaint(); };
+    btnMoveRight.onClick = [this]
+    {
+        const bool bass = audioProcessor.isBassMode();
+        const int sel = bass ? selectedBassPedal : selectedGuitarPedal;
+        audioProcessor.movePedalInChain (bass, sel, +1);
+        syncPedalEditorControls();
+        repaint();
+    };
     addChildComponent (btnRemovePedal);
     btnRemovePedal.onClick = [this]
     {
-        audioProcessor.removePedalFromChain (selectedPedalType);
-        auto ch = audioProcessor.getActiveChain();
-        if (! ch.empty()) selectedPedalType = ch.front();
+        const bool bass = audioProcessor.isBassMode();
+        int& sel = bass ? selectedBassPedal : selectedGuitarPedal;
+        audioProcessor.removePedalFromChain (bass, sel);
+        auto ch = audioProcessor.getActiveChain (bass);
+        if (! ch.empty()) sel = ch.front();
         else editorOpen = false;
         syncPedalEditorControls();
         repaint();
     };
 
-    // Floor palette items (with real pedal artwork!)
-    const int paletteOrder[5] = { 2, 3, 0, 4, 1 }; // Chorus, Phaser, Compresor, Reverb, XV Bass
-    for (int idx = 0; idx < 5; ++idx)
+    // Floor palette items (up to 7 slots, dynamically mapped per instrument)
+    for (int idx = 0; idx < 7; ++idx)
     {
-        const int pt = paletteOrder[idx];
-        paletteItems[idx] = std::make_unique<PalettePedalButton> (
-            pedalName (pt).toUpperCase(), pedalImage (pt, true), [this, pt]
-            {
-                audioProcessor.addPedalToChain (pt);
-                selectedPedalType = pt;
-                editorOpen = true;
-                syncPedalEditorControls();
-                repaint();
-            });
+        paletteItems[idx] = std::make_unique<PalettePedalButton> ("", juce::Image(), nullptr);
         addChildComponent (*paletteItems[idx]);
     }
 
@@ -826,7 +1033,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     popover = std::make_unique<GlassPopover> (
         audioProcessor,
         [this] { togglePopover (PopoverKind::None); },
-        [this] { syncPedalEditorControls(); repaint(); });
+        [this] { syncHeadControls(); syncPedalEditorControls(); repaint(); });
     popover->setLookAndFeel (&glassLaf);
     addChildComponent (*popover);
 
@@ -845,7 +1052,8 @@ MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
 {
     stopTimer();
     for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals,
-                     &btnDockCab, &btnDockDrop, &btnEditClose, &btnMoveLeft, &btnMoveRight, &btnRemovePedal,
+                     &btnDockCab, &btnDockDrop, &btnDockCh, &btnDockOs, &btnDockGate,
+                     &btnEditClose, &btnMoveLeft, &btnMoveRight, &btnRemovePedal,
                      &btnFloorPresets, &btnFloorTuner, &btnFloorCab, &btnFloorDrop, &btnBackToAmp, &btnFloorTunerMute })
     {
         b->setLookAndFeel (nullptr);
@@ -859,10 +1067,11 @@ void MiAmpAudioProcessorEditor::loadImages()
 {
     auto img = [] (const void* data, int size) { return juce::ImageCache::getFromMemory (data, size); };
 
-    imgs.bassBg      = img (BinaryData::bass_bg_png,      BinaryData::bass_bg_pngSize);
+    imgs.guitarBg    = img (BinaryData::main_bg_png,       BinaryData::main_bg_pngSize);
+    imgs.bassBg      = img (BinaryData::bass_bg_png,       BinaryData::bass_bg_pngSize);
     imgs.bassKnobCap = img (BinaryData::bass_knob_cap_png, BinaryData::bass_knob_cap_pngSize);
-    imgs.toggleUp    = img (BinaryData::toggle_up_png,    BinaryData::toggle_up_pngSize);
-    imgs.toggleDown  = img (BinaryData::toggle_down_png,  BinaryData::toggle_down_pngSize);
+    imgs.toggleUp    = img (BinaryData::toggle_up_png,     BinaryData::toggle_up_pngSize);
+    imgs.toggleDown  = img (BinaryData::toggle_down_png,   BinaryData::toggle_down_pngSize);
 
     imgs.floorBg      = img (BinaryData::floor_bg_png,      BinaryData::floor_bg_pngSize);
     imgs.boardSurface = img (BinaryData::board_surface_png, BinaryData::board_surface_pngSize);
@@ -874,24 +1083,33 @@ void MiAmpAudioProcessorEditor::loadImages()
     imgs.xvCabPunk  = img (BinaryData::xv_cab_punk_png,  BinaryData::xv_cab_punk_pngSize);
     imgs.xvCabClean = img (BinaryData::xv_cab_clean_png, BinaryData::xv_cab_clean_pngSize);
 
-    imgs.compActive = img (BinaryData::pedal_compresor_active_png, BinaryData::pedal_compresor_active_pngSize);
-    imgs.compOff    = img (BinaryData::pedal_compresor_off_png,    BinaryData::pedal_compresor_off_pngSize);
-    imgs.chActive   = img (BinaryData::pedal_chorus_active_png,    BinaryData::pedal_chorus_active_pngSize);
-    imgs.chOff      = img (BinaryData::pedal_chorus_off_png,       BinaryData::pedal_chorus_off_pngSize);
-    imgs.phActive   = img (BinaryData::pedal_phaser_active_png,    BinaryData::pedal_phaser_active_pngSize);
-    imgs.phOff      = img (BinaryData::pedal_phaser_off_png,       BinaryData::pedal_phaser_off_pngSize);
-    imgs.rvActive   = img (BinaryData::pedal_reverb_active_png,    BinaryData::pedal_reverb_active_pngSize);
-    imgs.rvOff      = img (BinaryData::pedal_reverb_off_png,       BinaryData::pedal_reverb_off_pngSize);
+    imgs.compActive  = img (BinaryData::pedal_compresor_active_png, BinaryData::pedal_compresor_active_pngSize);
+    imgs.compOff     = img (BinaryData::pedal_compresor_off_png,    BinaryData::pedal_compresor_off_pngSize);
+    imgs.driveActive = img (BinaryData::pedal_drive_active_png,     BinaryData::pedal_drive_active_pngSize);
+    imgs.driveOff    = img (BinaryData::pedal_drive_off_png,        BinaryData::pedal_drive_off_pngSize);
+    imgs.fuzzActive  = img (BinaryData::pedal_fuzz_active_png,      BinaryData::pedal_fuzz_active_pngSize);
+    imgs.fuzzOff     = img (BinaryData::pedal_fuzz_off_png,         BinaryData::pedal_fuzz_off_pngSize);
+    imgs.chActive    = img (BinaryData::pedal_chorus_active_png,    BinaryData::pedal_chorus_active_pngSize);
+    imgs.chOff       = img (BinaryData::pedal_chorus_off_png,       BinaryData::pedal_chorus_off_pngSize);
+    imgs.phActive    = img (BinaryData::pedal_phaser_active_png,    BinaryData::pedal_phaser_active_pngSize);
+    imgs.phOff       = img (BinaryData::pedal_phaser_off_png,       BinaryData::pedal_phaser_off_pngSize);
+    imgs.delayActive = img (BinaryData::pedal_delay_active_png,     BinaryData::pedal_delay_active_pngSize);
+    imgs.delayOff    = img (BinaryData::pedal_delay_off_png,        BinaryData::pedal_delay_off_pngSize);
+    imgs.rvActive    = img (BinaryData::pedal_reverb_active_png,    BinaryData::pedal_reverb_active_pngSize);
+    imgs.rvOff       = img (BinaryData::pedal_reverb_off_png,       BinaryData::pedal_reverb_off_pngSize);
 
-    imgs.compKnob[0] = img (BinaryData::knob_compresor_0_png, BinaryData::knob_compresor_0_pngSize);
-    imgs.compKnob[1] = img (BinaryData::knob_compresor_1_png, BinaryData::knob_compresor_1_pngSize);
-    imgs.compKnob[2] = img (BinaryData::knob_compresor_2_png, BinaryData::knob_compresor_2_pngSize);
-    imgs.chKnob[0]   = img (BinaryData::knob_chorus_0_png,    BinaryData::knob_chorus_0_pngSize);
-    imgs.chKnob[1]   = img (BinaryData::knob_chorus_1_png,    BinaryData::knob_chorus_1_pngSize);
-    imgs.chKnob[2]   = img (BinaryData::knob_chorus_2_png,    BinaryData::knob_chorus_2_pngSize);
-    imgs.phKnob[0]   = img (BinaryData::knob_phaser_0_png,    BinaryData::knob_phaser_0_pngSize);
-    imgs.phKnob[1]   = img (BinaryData::knob_phaser_1_png,    BinaryData::knob_phaser_1_pngSize);
-    imgs.phKnob[2]   = img (BinaryData::knob_phaser_2_png,    BinaryData::knob_phaser_2_pngSize);
+    imgs.compKnob[0]  = img (BinaryData::knob_compresor_0_png, BinaryData::knob_compresor_0_pngSize);
+    imgs.compKnob[1]  = img (BinaryData::knob_compresor_1_png, BinaryData::knob_compresor_1_pngSize);
+    imgs.compKnob[2]  = img (BinaryData::knob_compresor_2_png, BinaryData::knob_compresor_2_pngSize);
+    imgs.driveKnob[0] = img (BinaryData::knob_drive_0_png,     BinaryData::knob_drive_0_pngSize);
+    imgs.driveKnob[1] = img (BinaryData::knob_drive_1_png,     BinaryData::knob_drive_1_pngSize);
+    imgs.driveKnob[2] = img (BinaryData::knob_drive_2_png,     BinaryData::knob_drive_2_pngSize);
+    imgs.chKnob[0]    = img (BinaryData::knob_chorus_0_png,    BinaryData::knob_chorus_0_pngSize);
+    imgs.chKnob[1]    = img (BinaryData::knob_chorus_1_png,    BinaryData::knob_chorus_1_pngSize);
+    imgs.chKnob[2]    = img (BinaryData::knob_chorus_2_png,    BinaryData::knob_chorus_2_pngSize);
+    imgs.phKnob[0]    = img (BinaryData::knob_phaser_0_png,    BinaryData::knob_phaser_0_pngSize);
+    imgs.phKnob[1]    = img (BinaryData::knob_phaser_1_png,    BinaryData::knob_phaser_1_pngSize);
+    imgs.phKnob[2]    = img (BinaryData::knob_phaser_2_png,    BinaryData::knob_phaser_2_pngSize);
 }
 
 juce::Rectangle<float> MiAmpAudioProcessorEditor::toScreen (float x, float y, float w, float h) const noexcept
@@ -905,42 +1123,90 @@ juce::Rectangle<int> MiAmpAudioProcessorEditor::toScreenInt (float x, float y, f
     return toScreen (x, y, w, h).toNearestInt();
 }
 
-juce::String MiAmpAudioProcessorEditor::pedalName (int type)
+juce::Point<float> MiAmpAudioProcessorEditor::editorPtToStage (juce::Point<float> editorPt) const noexcept
 {
+    const float s = juce::jmax (0.001f, stageScale());
+    return { editorPt.x / s, editorPt.y / s };
+}
+
+juce::String MiAmpAudioProcessorEditor::pedalName (bool bassMode, int type)
+{
+    if (bassMode)
+    {
+        switch (type)
+        {
+            case 0: return "Compresor";
+            case 1: return "XV Bass";
+            case 2: return "Chorus";
+            case 3: return "Phaser";
+            case 4: return "Reverb";
+            default: return "Pedal";
+        }
+    }
     switch (type)
     {
         case 0: return "Compresor";
-        case 1: return "XV Bass";
-        case 2: return "Chorus";
-        case 3: return "Phaser";
-        case 4: return "Reverb";
+        case 1: return "Drive";
+        case 2: return "Fuzz";
+        case 3: return "Chorus";
+        case 4: return "Phaser";
+        case 5: return "Delay";
+        case 6: return "Reverb";
         default: return "Pedal";
     }
 }
 
-const juce::Image& MiAmpAudioProcessorEditor::pedalImage (int type, bool active) const
+const juce::Image& MiAmpAudioProcessorEditor::pedalImage (bool bassMode, int type, bool active) const
 {
+    if (bassMode)
+    {
+        switch (type)
+        {
+            case 0: return active ? imgs.compActive : imgs.compOff;
+            case 1: return active ? imgs.xvActive   : imgs.xvBypass;
+            case 2: return active ? imgs.chActive   : imgs.chOff;
+            case 3: return active ? imgs.phActive   : imgs.phOff;
+            case 4:
+            default: return active ? imgs.rvActive  : imgs.rvOff;
+        }
+    }
     switch (type)
     {
-        case 0: return active ? imgs.compActive : imgs.compOff;
-        case 1: return active ? imgs.xvActive   : imgs.xvBypass;
-        case 2: return active ? imgs.chActive   : imgs.chOff;
-        case 3: return active ? imgs.phActive   : imgs.phOff;
-        case 4:
-        default: return active ? imgs.rvActive  : imgs.rvOff;
+        case 0: return active ? imgs.compActive  : imgs.compOff;
+        case 1: return active ? imgs.driveActive : imgs.driveOff;
+        case 2: return active ? imgs.fuzzActive  : imgs.fuzzOff;
+        case 3: return active ? imgs.chActive    : imgs.chOff;
+        case 4: return active ? imgs.phActive    : imgs.phOff;
+        case 5: return active ? imgs.delayActive : imgs.delayOff;
+        case 6:
+        default: return active ? imgs.rvActive   : imgs.rvOff;
     }
 }
 
-const char* MiAmpAudioProcessorEditor::pedalBypassParamId (int type)
+const char* MiAmpAudioProcessorEditor::pedalBypassParamId (bool bassMode, int type)
 {
+    if (bassMode)
+    {
+        switch (type)
+        {
+            case 0: return MiAmpParams::compOn;
+            case 1: return MiAmpParams::xvOn;
+            case 2: return MiAmpParams::chorusOn;
+            case 3: return MiAmpParams::phaserOn;
+            case 4:
+            default: return MiAmpParams::reverbOn;
+        }
+    }
     switch (type)
     {
-        case 0: return MiAmpParams::compOn;
-        case 1: return MiAmpParams::xvOn;
-        case 2: return MiAmpParams::chorusOn;
-        case 3: return MiAmpParams::phaserOn;
-        case 4:
-        default: return MiAmpParams::reverbOn;
+        case 0: return MiAmpParams::gtrCompOn;
+        case 1: return MiAmpParams::gtrDriveOn;
+        case 2: return MiAmpParams::gtrFuzzOn;
+        case 3: return MiAmpParams::gtrChorusOn;
+        case 4: return MiAmpParams::gtrPhaserOn;
+        case 5: return MiAmpParams::gtrDelayOn;
+        case 6:
+        default: return MiAmpParams::gtrReverbOn;
     }
 }
 
@@ -951,35 +1217,69 @@ void MiAmpAudioProcessorEditor::showHud (const juce::String& text)
     repaint();
 }
 
+void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
+{
+    if (audioProcessor.isBassMode() == toBass)
+        return;
+
+    audioProcessor.setInstrumentMode (toBass);
+    activePopover = PopoverKind::None;
+    popover->setVisible (false);
+    showHud (toBass ? "MODO BAJO · XV EDITION" : "MODO GUITARRA · ZENBOX");
+    syncHeadControls();
+    syncPedalEditorControls();
+    layoutAll();
+    repaint();
+}
+
 void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
 {
     isFloorMode = floor;
     activePopover = PopoverKind::None;
     popover->setVisible (false);
+    draggingPedalActive = false;
 
+    const bool bass = audioProcessor.isBassMode();
     if (isFloorMode)
     {
-        auto ch = audioProcessor.getActiveChain();
-        if (! ch.empty() && std::find (ch.begin(), ch.end(), selectedPedalType) == ch.end())
-            selectedPedalType = ch.front();
+        auto ch = audioProcessor.getActiveChain (bass);
+        int& sel = bass ? selectedBassPedal : selectedGuitarPedal;
+        if (! ch.empty() && std::find (ch.begin(), ch.end(), sel) == ch.end())
+            sel = ch.front();
         editorOpen = ! ch.empty();
     }
+
+    syncHeadControls();
+    syncPedalEditorControls();
+    layoutAll();
+    repaint();
+}
+
+void MiAmpAudioProcessorEditor::syncHeadControls()
+{
+    const bool bass = audioProcessor.isBassMode();
+
+    btnInstGuitar.setToggleState (! bass, juce::dontSendNotification);
+    btnInstBass.setToggleState   (bass,   juce::dontSendNotification);
 
     for (auto* b : { &btnInstGuitar, &btnInstBass,
                      &btnMainPresets, &btnMainTuner, &btnMainPedals, &btnDockCab, &btnDockDrop })
         b->setVisible (! isFloorMode);
-    for (auto& k : headKnobs)    k->setVisible (! isFloorMode);
-    for (auto& s : headSwitches) s->setVisible (! isFloorMode);
+
+    btnDockCh.setVisible   (! isFloorMode && ! bass);
+    btnDockOs.setVisible   (! isFloorMode && ! bass);
+    btnDockGate.setVisible (! isFloorMode && ! bass);
+
+    for (auto& k : bassHeadKnobs)      k->setVisible (! isFloorMode && bass);
+    for (auto& s : bassHeadSwitches)   s->setVisible (! isFloorMode && bass);
+    for (auto& k : guitarHeadKnobs)    k->setVisible (! isFloorMode && ! bass);
+    for (auto& s : guitarHeadSwitches) s->setVisible (! isFloorMode && ! bass);
 
     btnFloorPresets.setVisible (isFloorMode);
-    btnFloorTuner.setVisible (isFloorMode);
-    btnFloorCab.setVisible (isFloorMode);
-    btnFloorDrop.setVisible (isFloorMode);
-    btnBackToAmp.setVisible (isFloorMode);
-
-    syncPedalEditorControls();
-    layoutAll();
-    repaint();
+    btnFloorTuner.setVisible   (isFloorMode);
+    btnFloorCab.setVisible     (isFloorMode);
+    btnFloorDrop.setVisible    (isFloorMode);
+    btnBackToAmp.setVisible    (isFloorMode);
 }
 
 void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
@@ -1002,10 +1302,13 @@ void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
 
 void MiAmpAudioProcessorEditor::syncPedalEditorControls()
 {
-    auto chain = audioProcessor.getActiveChain();
-    const bool hasSelected = std::find (chain.begin(), chain.end(), selectedPedalType) != chain.end();
+    const bool bass = audioProcessor.isBassMode();
+    auto chain = audioProcessor.getActiveChain (bass);
+    int& sel = bass ? selectedBassPedal : selectedGuitarPedal;
+
+    const bool hasSelected = std::find (chain.begin(), chain.end(), sel) != chain.end();
     if (isFloorMode && ! hasSelected && ! chain.empty())
-        selectedPedalType = chain.front();
+        sel = chain.front();
 
     const bool showEd = isFloorMode && editorOpen && ! chain.empty();
 
@@ -1014,14 +1317,60 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
     btnMoveRight.setVisible (showEd);
     btnRemovePedal.setVisible (showEd);
 
-    const int paletteOrder[5] = { 2, 3, 0, 4, 1 };
-    for (int idx = 0; idx < 5; ++idx)
+    const int nPalette = bass ? 5 : 7;
+    for (int idx = 0; idx < 7; ++idx)
     {
-        const int pt = paletteOrder[idx];
+        if (idx >= nPalette)
+        {
+            paletteItems[idx]->setVisible (false);
+            continue;
+        }
+        const int pt = bass ? kBassPaletteOrder[idx] : kGuitarPaletteOrder[idx];
         const bool inChain = std::find (chain.begin(), chain.end(), pt) != chain.end();
+        paletteItems[idx]->setData (
+            pedalName (bass, pt).toUpperCase(),
+            pedalImage (bass, pt, true),
+            [this, bass, pt]
+            {
+                audioProcessor.addPedalToChain (bass, pt, -1);
+                if (bass) selectedBassPedal = pt; else selectedGuitarPedal = pt;
+                editorOpen = true;
+                syncPedalEditorControls();
+                repaint();
+            },
+            [this, bass, pt] (juce::Point<float> editorPt)
+            {
+                draggingPedalActive = true;
+                draggingFromPalette = true;
+                draggingPedalType   = pt;
+                dragStagePos = editorPtToStage (editorPt);
+                dragInsertIndex = computeDropInsertIndex (bass, dragStagePos, pt);
+                repaint();
+            },
+            [this, bass, pt] (juce::Point<float> editorPt)
+            {
+                if (draggingPedalActive)
+                {
+                    const auto stPt = editorPtToStage (editorPt);
+                    const int idxIns = computeDropInsertIndex (bass, stPt, pt);
+                    if (idxIns >= 0)
+                    {
+                        audioProcessor.addPedalToChain (bass, pt, idxIns);
+                        if (bass) selectedBassPedal = pt; else selectedGuitarPedal = pt;
+                        editorOpen = true;
+                    }
+                }
+                draggingPedalActive = false;
+                draggingFromPalette = false;
+                draggingPedalType   = -1;
+                dragInsertIndex     = -1;
+                syncPedalEditorControls();
+                repaint();
+            });
         paletteItems[idx]->setInChain (inChain);
         paletteItems[idx]->setVisible (isFloorMode && ! floorTunerOpen);
     }
+
     btnFloorTunerMute.setVisible (isFloorMode && floorTunerOpen);
 
     if (! showEd)
@@ -1030,19 +1379,17 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
         return;
     }
 
-    auto it = std::find (chain.begin(), chain.end(), selectedPedalType);
+    auto it = std::find (chain.begin(), chain.end(), sel);
     const int posIdx = (it != chain.end()) ? static_cast<int> (std::distance (chain.begin(), it)) : 0;
     btnMoveLeft.setEnabled (posIdx > 0);
     btnMoveRight.setEnabled (posIdx + 1 < static_cast<int> (chain.size()));
 
-    if (selectedPedalType == 1)
+    if (bass && sel == 1)
     {
         for (int i = 0; i < 7; ++i)
         {
-            editorKnobs[i] = std::make_unique<ImageRotaryKnob> (
-                audioProcessor.apvts, kXvKnobIds[i], kXvKnobNames[i],
-                imgs.xvKnobPtr, false, [this] (const juce::String& s) { showHud (s); });
-            addAndMakeVisible (*editorKnobs[i]);
+            editorKnobs[i]->setParam (kXvKnobIds[i], kXvKnobNames[i], imgs.xvKnobPtr);
+            editorKnobs[i]->setVisible (true);
         }
     }
     else
@@ -1051,37 +1398,80 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
         const char* names[3] = {};
         const juce::Image* kImgs = imgs.compKnob;
 
-        if (selectedPedalType == 0)
+        if (bass)
         {
-            ids[0] = MiAmpParams::compSustain; ids[1] = MiAmpParams::compAttack; ids[2] = MiAmpParams::compLevel;
-            names[0] = "SUSTAIN"; names[1] = "ATTACK"; names[2] = "LEVEL";
-            kImgs = imgs.compKnob;
-        }
-        else if (selectedPedalType == 2)
-        {
-            ids[0] = MiAmpParams::chorusRate; ids[1] = MiAmpParams::chorusDepth; ids[2] = MiAmpParams::chorusMix;
-            names[0] = "RATE"; names[1] = "DEPTH"; names[2] = "MIX";
-            kImgs = imgs.chKnob;
-        }
-        else if (selectedPedalType == 3)
-        {
-            ids[0] = MiAmpParams::phaserRate; ids[1] = MiAmpParams::phaserDepth; ids[2] = MiAmpParams::phaserFeedback;
-            names[0] = "RATE"; names[1] = "DEPTH"; names[2] = "FEEDBACK";
-            kImgs = imgs.phKnob;
+            if (sel == 0)
+            {
+                ids[0] = MiAmpParams::compSustain; ids[1] = MiAmpParams::compAttack; ids[2] = MiAmpParams::compLevel;
+                names[0] = "SUSTAIN"; names[1] = "ATTACK"; names[2] = "LEVEL";
+                kImgs = imgs.compKnob;
+            }
+            else if (sel == 2)
+            {
+                ids[0] = MiAmpParams::chorusRate; ids[1] = MiAmpParams::chorusDepth; ids[2] = MiAmpParams::chorusMix;
+                names[0] = "RATE"; names[1] = "DEPTH"; names[2] = "MIX";
+                kImgs = imgs.chKnob;
+            }
+            else if (sel == 3)
+            {
+                ids[0] = MiAmpParams::phaserRate; ids[1] = MiAmpParams::phaserDepth; ids[2] = MiAmpParams::phaserFeedback;
+                names[0] = "RATE"; names[1] = "DEPTH"; names[2] = "FEEDBACK";
+                kImgs = imgs.phKnob;
+            }
+            else
+            {
+                ids[0] = MiAmpParams::reverbDecay; ids[1] = MiAmpParams::reverbTone; ids[2] = MiAmpParams::reverbMix;
+                names[0] = "DECAY"; names[1] = "TONE"; names[2] = "MIX";
+                kImgs = imgs.chKnob;
+            }
         }
         else
         {
-            ids[0] = MiAmpParams::reverbDecay; ids[1] = MiAmpParams::reverbTone; ids[2] = MiAmpParams::reverbMix;
-            names[0] = "DECAY"; names[1] = "TONE"; names[2] = "MIX";
-            kImgs = imgs.chKnob;
+            switch (sel)
+            {
+                case 0:
+                    ids[0] = MiAmpParams::gtrCompSus; ids[1] = MiAmpParams::gtrCompAtt; ids[2] = MiAmpParams::gtrCompLvl;
+                    names[0] = "SUSTAIN"; names[1] = "ATTACK"; names[2] = "LEVEL";
+                    kImgs = imgs.compKnob;
+                    break;
+                case 1:
+                    ids[0] = MiAmpParams::gtrDriveGain; ids[1] = MiAmpParams::gtrDriveTone; ids[2] = MiAmpParams::gtrDriveLvl;
+                    names[0] = "GAIN"; names[1] = "TONE"; names[2] = "LEVEL";
+                    kImgs = imgs.driveKnob;
+                    break;
+                case 2:
+                    ids[0] = MiAmpParams::gtrFuzzFuzz; ids[1] = MiAmpParams::gtrFuzzTone; ids[2] = MiAmpParams::gtrFuzzLvl;
+                    names[0] = "FUZZ"; names[1] = "TONE"; names[2] = "LEVEL";
+                    kImgs = imgs.driveKnob;
+                    break;
+                case 3:
+                    ids[0] = MiAmpParams::gtrChorusRate; ids[1] = MiAmpParams::gtrChorusDepth; ids[2] = MiAmpParams::gtrChorusMix;
+                    names[0] = "RATE"; names[1] = "DEPTH"; names[2] = "MIX";
+                    kImgs = imgs.chKnob;
+                    break;
+                case 4:
+                    ids[0] = MiAmpParams::gtrPhaserRate; ids[1] = MiAmpParams::gtrPhaserDepth; ids[2] = MiAmpParams::gtrPhaserFb;
+                    names[0] = "RATE"; names[1] = "DEPTH"; names[2] = "FEEDBACK";
+                    kImgs = imgs.phKnob;
+                    break;
+                case 5:
+                    ids[0] = MiAmpParams::gtrDelayTime; ids[1] = MiAmpParams::gtrDelayFb; ids[2] = MiAmpParams::gtrDelayMix;
+                    names[0] = "TIME"; names[1] = "FEEDBACK"; names[2] = "MIX";
+                    kImgs = imgs.phKnob;
+                    break;
+                case 6:
+                default:
+                    ids[0] = MiAmpParams::gtrReverbDec; ids[1] = MiAmpParams::gtrReverbTone; ids[2] = MiAmpParams::gtrReverbMix;
+                    names[0] = "DECAY"; names[1] = "TONE"; names[2] = "MIX";
+                    kImgs = imgs.chKnob;
+                    break;
+            }
         }
 
         for (int i = 0; i < 3; ++i)
         {
-            editorKnobs[i] = std::make_unique<ImageRotaryKnob> (
-                audioProcessor.apvts, ids[i], names[i],
-                kImgs[i], false, [this] (const juce::String& s) { showHud (s); });
-            addAndMakeVisible (*editorKnobs[i]);
+            editorKnobs[i]->setParam (ids[i], names[i], kImgs[i]);
+            editorKnobs[i]->setVisible (true);
         }
         for (int i = 3; i < 7; ++i)
             editorKnobs[i]->setVisible (false);
@@ -1102,9 +1492,35 @@ void MiAmpAudioProcessorEditor::timerCallback()
     if (hudTicks > 0 && --hudTicks == 0)
         hudText.clear();
 
-    const bool cabOn = audioProcessor.apvts.getRawParameterValue (MiAmpParams::ampCabOn)->load() > 0.5f;
-    btnDockCab.setToggleState (cabOn, juce::dontSendNotification);
-    btnFloorCab.setToggleState (cabOn, juce::dontSendNotification);
+    const bool bass = audioProcessor.isBassMode();
+    if (bass)
+    {
+        const bool cabOn = audioProcessor.apvts.getRawParameterValue (MiAmpParams::ampCabOn)->load() > 0.5f;
+        btnDockCab.setButtonText ("CAB 8x10");
+        btnDockCab.setToggleState (cabOn, juce::dontSendNotification);
+        btnFloorCab.setButtonText ("CAB 8x10");
+        btnFloorCab.setToggleState (cabOn, juce::dontSendNotification);
+    }
+    else
+    {
+        const int cab = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrCab)->load()));
+        const char* cabLabels[5] = { "VINT 4x12", "MOD 4x12", "OPEN 2x12", "STUD 1x12", "CAB OFF" };
+        btnDockCab.setButtonText (cabLabels[cab]);
+        btnDockCab.setToggleState (cab < 4, juce::dontSendNotification);
+        btnFloorCab.setButtonText (cabLabels[cab]);
+        btnFloorCab.setToggleState (cab < 4, juce::dontSendNotification);
+
+        const int ch = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrChannel)->load()));
+        btnDockCh.setButtonText ("CH" + juce::String (ch + 1));
+        btnDockCh.setToggleState (true, juce::dontSendNotification);
+
+        const bool os4x = audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrOs4x)->load() > 0.5f;
+        btnDockOs.setToggleState (os4x, juce::dontSendNotification);
+
+        const int gate = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrGate)->load()));
+        btnDockGate.setButtonText (gate <= 0 ? "GATE OFF" : ("GATE " + juce::String (gate)));
+        btnDockGate.setToggleState (gate > 0, juce::dontSendNotification);
+    }
 
     const bool dropOn = audioProcessor.apvts.getRawParameterValue (MiAmpParams::pitchOn)->load() > 0.5f;
     const int semi = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::pitchSemi)->load()));
@@ -1133,8 +1549,8 @@ void MiAmpAudioProcessorEditor::resized()
 
 juce::Rectangle<float> MiAmpAudioProcessorEditor::computeEditorPedalStageRect() const
 {
-    // Inside .edit (left:35, top:28, width:420, height:577)
-    if (selectedPedalType == 1)
+    const bool bass = audioProcessor.isBassMode();
+    if (bass && selectedBassPedal == 1)
     {
         const float w = 365.0f;
         const float h = w * (1131.0f / 1391.0f);
@@ -1145,24 +1561,22 @@ juce::Rectangle<float> MiAmpAudioProcessorEditor::computeEditorPedalStageRect() 
     return { 35.0f + (420.0f - w) * 0.5f, 28.0f + 46.0f, w, h };
 }
 
-std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotRects (int count) const
+std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotRects (bool bassMode, const std::vector<int>& chain) const
 {
     std::vector<juce::Rectangle<float>> rects;
+    const int count = static_cast<int> (chain.size());
     if (count <= 0) return rects;
 
-    // .board-viewport in stage coordinates: left 621, top 153, width 830, height 435
-    // When editor is closed, shift board left like .board-group in Mi-Amp/index.html
     const float offsetX = editorOpen ? 0.0f : -260.0f;
     const float vx = 621.0f + offsetX;
     const float vy = 153.0f;
     const float vw = 830.0f;
     const float vh = 435.0f;
 
-    const float gap = (count >= 5) ? 14.0f : 26.0f;
+    const float gap = (count >= 6) ? 11.0f : (count >= 5 ? 14.0f : 26.0f);
     float totalW = 0.0f;
-    auto chain = audioProcessor.getActiveChain();
     for (int i = 0; i < count; ++i)
-        totalW += (chain[static_cast<size_t> (i)] == 1 ? 210.0f : 124.0f);
+        totalW += (bassMode && chain[static_cast<size_t> (i)] == 1) ? 210.0f : 124.0f;
     totalW += gap * static_cast<float> (juce::jmax (0, count - 1));
 
     const float fitScale = juce::jmin (1.0f, (vw - 24.0f) / juce::jmax (1.0f, totalW));
@@ -1170,7 +1584,7 @@ std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotR
 
     for (int i = 0; i < count; ++i)
     {
-        const bool isXv = (chain[static_cast<size_t> (i)] == 1);
+        const bool isXv = (bassMode && chain[static_cast<size_t> (i)] == 1);
         const float pw = (isXv ? 210.0f : 124.0f) * fitScale;
         const float ph = (isXv ? 171.0f : 207.0f) * fitScale;
         rects.emplace_back (curX, vy + (vh - ph) * 0.5f, pw, ph);
@@ -1179,13 +1593,49 @@ std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotR
     return rects;
 }
 
+int MiAmpAudioProcessorEditor::computeDropInsertIndex (bool bassMode, juce::Point<float> stagePt, int excludePedal) const
+{
+    const float offsetX = editorOpen ? 0.0f : -260.0f;
+    const auto boardHitR = juce::Rectangle<float> (570.0f + offsetX, 85.0f, 950.0f, 520.0f);
+    if (! boardHitR.contains (stagePt))
+        return -1;
+
+    auto chain = audioProcessor.getActiveChain (bassMode);
+    if (chain.empty()) return 0;
+
+    // Build list without excluded pedal for stable index calculation
+    auto slots = computeBoardSlotRects (bassMode, chain);
+    int idx = 0;
+    for (size_t i = 0; i < chain.size(); ++i)
+    {
+        if (chain[i] == excludePedal) continue;
+        if (stagePt.x > slots[i].getCentreX())
+            ++idx;
+    }
+    return idx;
+}
+
 void MiAmpAudioProcessorEditor::layoutAll()
 {
+    const bool bass = audioProcessor.isBassMode();
+
     if (! isFloorMode)
     {
-        // .audio-dock (35, 25, w=368, h=52)
-        btnDockCab.setBounds  (toScreenInt (46, 33, 94, 36));
-        btnDockDrop.setBounds (toScreenInt (308, 33, 84, 36));
+        if (bass)
+        {
+            // .audio-dock (35, 25, w=368, h=52)
+            btnDockCab.setBounds  (toScreenInt (46, 33, 94, 36));
+            btnDockDrop.setBounds (toScreenInt (308, 33, 84, 36));
+        }
+        else
+        {
+            // Expanded Zenbox dock (35, 25, w=638, h=52)
+            btnDockCab.setBounds  (toScreenInt (44,  33, 102, 36));
+            btnDockCh.setBounds   (toScreenInt (152, 33, 52,  36));
+            btnDockOs.setBounds   (toScreenInt (210, 33, 66,  36));
+            btnDockGate.setBounds (toScreenInt (282, 33, 80,  36));
+            btnDockDrop.setBounds (toScreenInt (580, 33, 84,  36));
+        }
 
         // .menu (right: 35, top: 395, width: 225) -> x = 1290
         btnInstGuitar.setBounds  (toScreenInt (1308, 415, 92, 35));
@@ -1194,22 +1644,53 @@ void MiAmpAudioProcessorEditor::layoutAll()
         btnMainTuner.setBounds   (toScreenInt (1305, 513, 195, 41));
         btnMainPedals.setBounds  (toScreenInt (1305, 562, 195, 41));
 
-        // Head knobs & switches transformed with kAmpZoom around (625, 325)
-        const float knobDiam = 58.0f * kAmpZoom;
-        for (int i = 0; i < 5; ++i)
+        if (bass)
         {
-            const float xStage = kHeadKnobX[i] * (kStageW / 1376.0f);
-            const auto pt = ampZoomPt (xStage, kHeadKnobY);
-            headKnobs[i]->setBounds (toScreenInt (pt.x - knobDiam * 0.5f, pt.y - knobDiam * 0.5f, knobDiam, knobDiam));
-        }
+            const float knobDiam = 58.0f * kAmpZoom;
+            for (int i = 0; i < 5; ++i)
+            {
+                const float xStage = kBassHeadKnobX[i] * (kStageW / 1376.0f);
+                const auto pt = ampZoomPt (xStage, kBassHeadKnobY);
+                bassHeadKnobs[i]->setBounds (toScreenInt (pt.x - knobDiam * 0.5f, pt.y - knobDiam * 0.5f, knobDiam, knobDiam));
+            }
 
-        const float swW = 28.0f * kAmpZoom;
-        const float swH = 54.0f * kAmpZoom;
-        for (int i = 0; i < 3; ++i)
+            const float swW = 28.0f * kAmpZoom;
+            const float swH = 54.0f * kAmpZoom;
+            for (int i = 0; i < 3; ++i)
+            {
+                const float xStage = kBassSwitchX[i] * (kStageW / 1376.0f);
+                const auto pt = ampZoomPt (xStage, kBassSwitchY);
+                bassHeadSwitches[i]->setBounds (toScreenInt (pt.x - swW * 0.5f, pt.y - swH * 0.5f, swW, swH));
+            }
+        }
+        else
         {
-            const float xStage = kSwitchX[i] * (kStageW / 1376.0f);
-            const auto pt = ampZoomPt (xStage, kSwitchY);
-            headSwitches[i]->setBounds (toScreenInt (pt.x - swW * 0.5f, pt.y - swH * 0.5f, swW, swH));
+            // Exact index.html formula for Guitar knobs (rad=19, 1.18x)
+            const float wStage = 1.18f * (19.0f * 2.0f * kGtrScX * (kStageW / 1376.0f)) * kAmpZoom;
+            for (int i = 0; i < 9; ++i)
+            {
+                const float cxTop = (183.0f + (kGtrXs[i] - 180.0f) * kGtrScX) * (kStageW / 1376.0f);
+                const float cyTop = 99.0f + (380.0f - 50.0f) * kGtrScY;
+                const auto ptTop = ampZoomPt (cxTop, cyTop);
+                guitarHeadKnobs[i]->setBounds (toScreenInt (ptTop.x - wStage * 0.5f, ptTop.y - wStage * 0.5f, wStage, wStage));
+
+                const float cyBot = 99.0f + (445.0f - 50.0f) * kGtrScY;
+                const auto ptBot = ampZoomPt (cxTop, cyBot);
+                guitarHeadKnobs[9 + i]->setBounds (toScreenInt (ptBot.x - wStage * 0.5f, ptBot.y - wStage * 0.5f, wStage, wStage));
+            }
+            const float cxOut = (183.0f + (960.0f - 180.0f) * kGtrScX) * (kStageW / 1376.0f);
+            const float cyOut = 99.0f + (380.0f - 50.0f) * kGtrScY;
+            const auto ptOut = ampZoomPt (cxOut, cyOut);
+            guitarHeadKnobs[18]->setBounds (toScreenInt (ptOut.x - wStage * 0.5f, ptOut.y - wStage * 0.5f, wStage, wStage));
+
+            for (int i = 0; i < 3; ++i)
+            {
+                const float xStage = kGtrSwitchX[i] * (kStageW / 1376.0f);
+                const auto pt = ampZoomPt (xStage, kGtrSwitchY[i]);
+                const float swW = kGtrSwitchSize[i] * 0.92f * kAmpZoom;
+                const float swH = kGtrSwitchSize[i] * 1.45f * kAmpZoom;
+                guitarHeadSwitches[i]->setBounds (toScreenInt (pt.x - swW * 0.5f, pt.y - swH * 0.5f, swW, swH));
+            }
         }
 
         if (popover->isVisible())
@@ -1224,7 +1705,8 @@ void MiAmpAudioProcessorEditor::layoutAll()
         btnRemovePedal.setBounds (toScreenInt (358, 554, 78, 34));
 
         const auto pedR = computeEditorPedalStageRect();
-        if (selectedPedalType == 1)
+        const int sel = bass ? selectedBassPedal : selectedGuitarPedal;
+        if (bass && sel == 1)
         {
             const float kSz = pedR.getWidth() * 0.116f;
             for (int i = 0; i < 7; ++i)
@@ -1237,9 +1719,18 @@ void MiAmpAudioProcessorEditor::layoutAll()
         else
         {
             const float (*pts)[2] = kCompPoints;
-            float sizeFrac = 0.2133f;
-            if (selectedPedalType == 2 || selectedPedalType == 4) { pts = kChorusPoints; sizeFrac = 0.2484f; }
-            else if (selectedPedalType == 3) { pts = kPhaserPoints; sizeFrac = 0.2185f; }
+            float sizeFrac = 0.213338f;
+            if (bass)
+            {
+                if (sel == 2 || sel == 4) { pts = kChorusPoints; sizeFrac = 0.248418f; }
+                else if (sel == 3)        { pts = kPhaserPoints; sizeFrac = 0.218456f; }
+            }
+            else
+            {
+                if (sel == 1 || sel == 2)      { pts = kDrivePoints;  sizeFrac = 0.208729f; }
+                else if (sel == 3 || sel == 6) { pts = kChorusPoints; sizeFrac = 0.248418f; }
+                else if (sel == 4 || sel == 5) { pts = kPhaserPoints; sizeFrac = 0.218456f; }
+            }
 
             const float kSz = pedR.getWidth() * sizeFrac;
             for (int i = 0; i < 3; ++i)
@@ -1251,18 +1742,29 @@ void MiAmpAudioProcessorEditor::layoutAll()
         }
 
         // .palette (36, 623, 1478, 125)
-        // Left label ~210px -> items start at x=255..1230
-        float px = 268.0f;
-        for (int idx = 0; idx < 5; ++idx)
+        if (bass)
         {
-            const float iw = (idx == 4) ? 145.0f : 104.0f;
-            paletteItems[idx]->setBounds (toScreenInt (px, 635, iw, 100));
-            px += iw + 16.0f;
+            float px = 268.0f;
+            for (int idx = 0; idx < 5; ++idx)
+            {
+                const float iw = (idx == 4) ? 145.0f : 104.0f;
+                paletteItems[idx]->setBounds (toScreenInt (px, 635, iw, 100));
+                px += iw + 16.0f;
+            }
+        }
+        else
+        {
+            float px = 258.0f;
+            for (int idx = 0; idx < 7; ++idx)
+            {
+                const float iw = 122.0f;
+                paletteItems[idx]->setBounds (toScreenInt (px, 635, iw, 100));
+                px += iw + 16.0f;
+            }
         }
 
         btnFloorTunerMute.setBounds (toScreenInt (1055, 666, 155, 39));
 
-        // .palette-nav (right side of .palette, w=250 -> x=1246..1496)
         btnFloorPresets.setBounds (toScreenInt (1246, 630, 122, 34));
         btnFloorTuner.setBounds   (toScreenInt (1374, 630, 122, 34));
         btnFloorCab.setBounds     (toScreenInt (1246, 668, 122, 34));
@@ -1285,9 +1787,9 @@ void MiAmpAudioProcessorEditor::paintGlassPanel (juce::Graphics& g, juce::Rectan
     g.drawRoundedRectangle (r, rad, 1.5f);
 }
 
-void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, int type, juce::Rectangle<float> pedalRect) const
+void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const
 {
-    if (type == 1)
+    if (bassMode && type == 1)
     {
         const float kSz = pedalRect.getWidth() * 0.116f;
         for (int i = 0; i < 7; ++i)
@@ -1320,27 +1822,30 @@ void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, int type
     }
 
     const float (*pts)[2] = kCompPoints;
-    float sizeFrac = 0.2133f;
-    const char* ids[3] = { MiAmpParams::compSustain, MiAmpParams::compAttack, MiAmpParams::compLevel };
+    float sizeFrac = 0.213338f;
+    const char* ids[3] = {};
     const juce::Image* kImgs = imgs.compKnob;
 
-    if (type == 2)
+    if (bassMode)
     {
-        pts = kChorusPoints; sizeFrac = 0.2484f;
-        ids[0] = MiAmpParams::chorusRate; ids[1] = MiAmpParams::chorusDepth; ids[2] = MiAmpParams::chorusMix;
-        kImgs = imgs.chKnob;
+        if (type == 0)      { ids[0] = MiAmpParams::compSustain; ids[1] = MiAmpParams::compAttack; ids[2] = MiAmpParams::compLevel; kImgs = imgs.compKnob; }
+        else if (type == 2) { pts = kChorusPoints; sizeFrac = 0.248418f; ids[0] = MiAmpParams::chorusRate; ids[1] = MiAmpParams::chorusDepth; ids[2] = MiAmpParams::chorusMix; kImgs = imgs.chKnob; }
+        else if (type == 3) { pts = kPhaserPoints; sizeFrac = 0.218456f; ids[0] = MiAmpParams::phaserRate; ids[1] = MiAmpParams::phaserDepth; ids[2] = MiAmpParams::phaserFeedback; kImgs = imgs.phKnob; }
+        else                { pts = kChorusPoints; sizeFrac = 0.248418f; ids[0] = MiAmpParams::reverbDecay; ids[1] = MiAmpParams::reverbTone; ids[2] = MiAmpParams::reverbMix; kImgs = imgs.chKnob; }
     }
-    else if (type == 3)
+    else
     {
-        pts = kPhaserPoints; sizeFrac = 0.2185f;
-        ids[0] = MiAmpParams::phaserRate; ids[1] = MiAmpParams::phaserDepth; ids[2] = MiAmpParams::phaserFeedback;
-        kImgs = imgs.phKnob;
-    }
-    else if (type == 4)
-    {
-        pts = kChorusPoints; sizeFrac = 0.2484f;
-        ids[0] = MiAmpParams::reverbDecay; ids[1] = MiAmpParams::reverbTone; ids[2] = MiAmpParams::reverbMix;
-        kImgs = imgs.chKnob;
+        switch (type)
+        {
+            case 0: ids[0] = MiAmpParams::gtrCompSus; ids[1] = MiAmpParams::gtrCompAtt; ids[2] = MiAmpParams::gtrCompLvl; kImgs = imgs.compKnob; break;
+            case 1: pts = kDrivePoints;  sizeFrac = 0.208729f; ids[0] = MiAmpParams::gtrDriveGain; ids[1] = MiAmpParams::gtrDriveTone; ids[2] = MiAmpParams::gtrDriveLvl; kImgs = imgs.driveKnob; break;
+            case 2: pts = kDrivePoints;  sizeFrac = 0.208729f; ids[0] = MiAmpParams::gtrFuzzFuzz;  ids[1] = MiAmpParams::gtrFuzzTone;  ids[2] = MiAmpParams::gtrFuzzLvl;  kImgs = imgs.driveKnob; break;
+            case 3: pts = kChorusPoints; sizeFrac = 0.248418f; ids[0] = MiAmpParams::gtrChorusRate;ids[1] = MiAmpParams::gtrChorusDepth;ids[2] = MiAmpParams::gtrChorusMix; kImgs = imgs.chKnob; break;
+            case 4: pts = kPhaserPoints; sizeFrac = 0.218456f; ids[0] = MiAmpParams::gtrPhaserRate;ids[1] = MiAmpParams::gtrPhaserDepth;ids[2] = MiAmpParams::gtrPhaserFb;  kImgs = imgs.phKnob; break;
+            case 5: pts = kPhaserPoints; sizeFrac = 0.218456f; ids[0] = MiAmpParams::gtrDelayTime; ids[1] = MiAmpParams::gtrDelayFb;   ids[2] = MiAmpParams::gtrDelayMix; kImgs = imgs.phKnob; break;
+            case 6:
+            default: pts = kChorusPoints; sizeFrac = 0.248418f; ids[0] = MiAmpParams::gtrReverbDec; ids[1] = MiAmpParams::gtrReverbTone; ids[2] = MiAmpParams::gtrReverbMix; kImgs = imgs.chKnob; break;
+        }
     }
 
     const float kSz = pedalRect.getWidth() * sizeFrac;
@@ -1363,19 +1868,22 @@ void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, int type
 
 void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g)
 {
-    // Exact .bass-bg scaled by kAmpZoom around (625, 325)
+    const bool bass = audioProcessor.isBassMode();
     const auto bgStage = juce::Rectangle<float> (
         kAmpOriginX - kAmpOriginX * kAmpZoom,
         kAmpOriginY - kAmpOriginY * kAmpZoom,
         kStageW * kAmpZoom,
         kStageH * kAmpZoom);
-    if (imgs.bassBg.isValid())
-        g.drawImage (imgs.bassBg, toScreen (bgStage.getX(), bgStage.getY(), bgStage.getWidth(), bgStage.getHeight()),
+
+    const auto& bgImg = bass ? imgs.bassBg : imgs.guitarBg;
+    if (bgImg.isValid())
+        g.drawImage (bgImg, toScreen (bgStage.getX(), bgStage.getY(), bgStage.getWidth(), bgStage.getHeight()),
                      juce::RectanglePlacement::stretchToFit);
 
-    // Darken red power LED if Power switch is OFF
-    const bool pwr = audioProcessor.apvts.getRawParameterValue (MiAmpParams::ampPower)->load() > 0.5f;
-    if (! pwr)
+    const bool pwr = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampPower : MiAmpParams::gtrPower)->load() > 0.5f;
+    const bool standby = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampStandby : MiAmpParams::gtrStandby)->load() > 0.5f;
+
+    if (bass && ! pwr)
     {
         const auto pt = ampZoomPt (967.0f, 354.0f);
         const float d = 14.0f * kAmpZoom;
@@ -1383,29 +1891,41 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g)
         g.fillEllipse (toScreen (pt.x, pt.y, d, d));
     }
 
-    // Top-left .audio-dock (35, 25, 368, 52)
-    paintGlassPanel (g, toScreen (35, 25, 368, 52), 15.0f);
+    // Active channel indicator pill on Guitar head (CH1 / CH2 / CH3 subtle glow)
+    const float s = stageScale();
+    if (! bass)
+    {
+        const int ch = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrChannel)->load()));
+        const float chCenterXs[3] = { 445.0f, 653.0f, 838.0f };
+        const float cx = (183.0f + (chCenterXs[ch] - 180.0f) * kGtrScX) * (kStageW / 1376.0f);
+        const float cy = 99.0f + (342.0f - 50.0f) * kGtrScY;
+        const auto pt = ampZoomPt (cx, cy);
+        g.setColour (juce::Colour::fromRGBA (142, 240, 194, 210));
+        g.fillEllipse (toScreen (pt.x - 4.5f, pt.y - 4.5f, 9.0f, 9.0f));
+    }
 
-    // Status LED + IN/OUT meters inside .audio-dock
-    const bool standby = audioProcessor.apvts.getRawParameterValue (MiAmpParams::ampStandby)->load() > 0.5f;
+    // Top-left .audio-dock
+    const float dockW = bass ? 368.0f : 638.0f;
+    const float meterX0 = bass ? 148.0f : 374.0f;
+    paintGlassPanel (g, toScreen (35, 25, dockW, 52), 15.0f);
+
     const bool clip = audioProcessor.isClipping.load();
     const juce::Colour ledCol = clip ? juce::Colour::fromRGB (255, 94, 94)
                                      : (! pwr || standby ? juce::Colour::fromRGB (247, 197, 107)
                                                          : juce::Colour::fromRGB (126, 255, 189));
     g.setColour (ledCol);
-    g.fillEllipse (toScreen (148, 46, 10, 10));
+    g.fillEllipse (toScreen (meterX0, 46, 10, 10));
 
-    const float s = stageScale();
     const float inFrac  = juce::jlimit (0.0f, 1.0f, audioProcessor.inputRms.load() * 3.5f);
     const float outFrac = juce::jlimit (0.0f, 1.0f, audioProcessor.outputRms.load() * 3.5f);
     g.setColour (inkColour().withAlpha (0.78f));
     g.setFont (juce::Font (juce::FontOptions (juce::jmax (8.0f, 9.5f * s), juce::Font::bold)));
-    g.drawText ("IN",  toScreen (170, 36, 24, 12), juce::Justification::centredLeft);
-    g.drawText ("OUT", toScreen (170, 52, 26, 12), juce::Justification::centredLeft);
+    g.drawText ("IN",  toScreen (meterX0 + 22.0f, 36, 24, 12), juce::Justification::centredLeft);
+    g.drawText ("OUT", toScreen (meterX0 + 22.0f, 52, 26, 12), juce::Justification::centredLeft);
 
     auto drawMeter = [&] (float y, float frac)
     {
-        auto tr = toScreen (198, y, 96, 6);
+        auto tr = toScreen (meterX0 + 50.0f, y, 96, 6);
         g.setColour (juce::Colour::fromRGBA (15, 22, 20, 165));
         g.fillRoundedRectangle (tr, 3.0f * s);
         g.setColour (juce::Colour::fromRGBA (255, 244, 212, 56));
@@ -1422,17 +1942,15 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g)
 
     // Right .menu (1290, 395, 225, 226)
     paintGlassPanel (g, toScreen (1290, 395, 225, 226), 22.0f);
-    // .instrument-switch container frame
     auto swBox = toScreen (1305, 412, 195, 41);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, 24));
     g.fillRoundedRectangle (swBox, 8.0f * s);
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, 102));
     g.drawRoundedRectangle (swBox, 8.0f * s, 1.0f);
 
-    // Transient HUD (.knob-hud)
     if (hudText.isNotEmpty())
     {
-        auto hudR = toScreen (35, 92, 210, 36);
+        auto hudR = toScreen (35, 92, 240, 36);
         paintGlassPanel (g, hudR, 11.0f);
         g.setColour (inkColour());
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.0f * s), juce::Font::bold)));
@@ -1442,45 +1960,92 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g)
 
 void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
 {
+    const bool bass = audioProcessor.isBassMode();
     if (imgs.floorBg.isValid())
         g.drawImage (imgs.floorBg, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
 
     const float s = stageScale();
-    auto chain = audioProcessor.getActiveChain();
+    auto chain = audioProcessor.getActiveChain (bass);
+    const int sel = bass ? selectedBassPedal : selectedGuitarPedal;
     const bool showEd = editorOpen && ! chain.empty();
 
-    // Board surface (.board-surface)
     const float boardOffX = showEd ? 0.0f : -260.0f;
     const auto boardR = toScreen (585.79f + boardOffX, 95.73f, 921.48f, 499.54f);
     if (imgs.boardSurface.isValid())
         g.drawImage (imgs.boardSurface, boardR, juce::RectanglePlacement::stretchToFit);
 
+    const auto slots = computeBoardSlotRects (bass, chain);
+
     if (chain.empty())
     {
         g.setColour (juce::Colour::fromRGBA (242, 232, 212, 180));
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (13.0f, 20.0f * s), juce::Font::bold)));
-        g.drawText ("TU PEDALBOARD ESTÁ VACÍA — Hacé clic abajo para agregar un pedal",
+        g.drawText ("TU PEDALBOARD ESTÁ VACÍA — Hacé clic o arrastrá abajo para agregar",
                     boardR, juce::Justification::centred);
     }
     else
     {
-        const auto slots = computeBoardSlotRects (static_cast<int> (chain.size()));
         for (size_t i = 0; i < chain.size(); ++i)
         {
             const int pt = chain[i];
+            const bool isBeingDragged = draggingPedalActive && ! draggingFromPalette && (pt == draggingPedalType);
             const auto sr = toScreen (slots[i].getX(), slots[i].getY(), slots[i].getWidth(), slots[i].getHeight());
-            const bool active = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (pt))->load() > 0.5f;
-            const auto& pImg = pedalImage (pt, active);
+            const bool active = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (bass, pt))->load() > 0.5f;
+            const auto& pImg = pedalImage (bass, pt, active);
+
+            if (isBeingDragged)
+                g.setOpacity (0.28f);
+
             if (pImg.isValid())
                 g.drawImage (pImg, sr, juce::RectanglePlacement::stretchToFit);
 
-            paintMiniPedalKnobs (g, pt, sr);
+            paintMiniPedalKnobs (g, bass, pt, sr);
+            g.setOpacity (1.0f);
 
-            if (pt == selectedPedalType)
+            if (pt == sel && ! isBeingDragged)
             {
                 g.setColour (juce::Colour::fromRGB (255, 223, 152));
                 g.drawRoundedRectangle (sr.expanded (3.0f * s), 8.0f * s, 2.0f * s);
             }
+        }
+    }
+
+    // Drag & Drop live insertion line + floating pedal ghost
+    if (draggingPedalActive && draggingPedalType >= 0)
+    {
+        if (dragInsertIndex >= 0)
+        {
+            float lineXStage = boardR.getCentreX() / s;
+            float lineYStage = 220.0f;
+            float lineHStage = 280.0f;
+
+            if (! slots.empty())
+            {
+                if (dragInsertIndex == 0)
+                    lineXStage = slots.front().getX() - 10.0f;
+                else if (dragInsertIndex >= static_cast<int> (slots.size()))
+                    lineXStage = slots.back().getRight() + 10.0f;
+                else
+                    lineXStage = 0.5f * (slots[static_cast<size_t> (dragInsertIndex - 1)].getRight()
+                                         + slots[static_cast<size_t> (dragInsertIndex)].getX());
+            }
+
+            const auto lr = toScreen (lineXStage - 3.0f, lineYStage, 6.0f, lineHStage);
+            g.setColour (mintBorder().withAlpha (0.95f));
+            g.fillRoundedRectangle (lr, 3.0f * s);
+        }
+
+        const bool isXv = (bass && draggingPedalType == 1);
+        const float gw = isXv ? 175.0f : 110.0f;
+        const float gh = isXv ? 142.0f : 182.0f;
+        const auto ghostR = toScreen (dragStagePos.x - gw * 0.5f, dragStagePos.y - gh * 0.5f, gw, gh);
+        const bool active = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (bass, draggingPedalType))->load() > 0.5f;
+        const auto& gImg = pedalImage (bass, draggingPedalType, active);
+        if (gImg.isValid())
+        {
+            g.setOpacity (0.85f);
+            g.drawImage (gImg, ghostR, juce::RectanglePlacement::stretchToFit);
+            g.setOpacity (1.0f);
         }
     }
 
@@ -1490,17 +2055,17 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         paintGlassPanel (g, toScreen (35, 28, 420, 577), 22.0f);
         g.setColour (inkColour());
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (14.0f, 19.5f * s), juce::Font::bold)));
-        g.drawText (pedalName (selectedPedalType).toUpperCase(),
+        g.drawText (pedalName (bass, sel).toUpperCase(),
                     toScreen (60, 42, 320, 28), juce::Justification::centredLeft);
 
         const auto pedStage = computeEditorPedalStageRect();
         const auto pedR = toScreen (pedStage.getX(), pedStage.getY(), pedStage.getWidth(), pedStage.getHeight());
-        const bool selActive = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (selectedPedalType))->load() > 0.5f;
-        const auto& edImg = pedalImage (selectedPedalType, selActive);
+        const bool selActive = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (bass, sel))->load() > 0.5f;
+        const auto& edImg = pedalImage (bass, sel, selActive);
         if (edImg.isValid())
             g.drawImage (edImg, pedR, juce::RectanglePlacement::stretchToFit);
 
-        if (selectedPedalType == 1)
+        if (bass && sel == 1)
         {
             const int cabIdx = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::xvCab)->load()));
             const auto& cabImg = (cabIdx == 0) ? imgs.xvCabBass : (cabIdx == 1 ? imgs.xvCabPunk : imgs.xvCabClean);
@@ -1515,14 +2080,13 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             }
         }
 
-        // Value readout row & chain position text
-        auto it = std::find (chain.begin(), chain.end(), selectedPedalType);
+        auto it = std::find (chain.begin(), chain.end(), sel);
         const int posIdx = (it != chain.end()) ? static_cast<int> (std::distance (chain.begin(), it)) + 1 : 1;
         g.setColour (inkColour().withAlpha (0.85f));
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 12.0f * s), juce::Font::plain)));
         g.drawText (juce::String (posIdx) + "/" + juce::String (chain.size()),
                     toScreen (96, 554, 52, 34), juce::Justification::centred);
-        g.drawText ("Clic en el switch para bypass · Arrastrá perillas",
+        g.drawText ("Clic switch: bypass · Arrastrá pedales en la board",
                     toScreen (56, 514, 378, 28), juce::Justification::centred);
     }
 
@@ -1535,11 +2099,10 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         g.drawText ("AGREGAR PEDALES", toScreen (56, 650, 195, 24), juce::Justification::centredLeft);
         g.setColour (inkColour().withAlpha (0.82f));
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (9.0f, 11.5f * s), juce::Font::plain)));
-        g.drawText ("Hacé clic para sumar a la board", toScreen (56, 676, 195, 34), juce::Justification::topLeft);
+        g.drawText ("Clic o arrastrá hacia la board", toScreen (56, 676, 195, 34), juce::Justification::topLeft);
     }
     else
     {
-        // Inline #floorTuner inside .palette
         const bool active = tunerReading.hasSignal && tunerReading.freqHz > 20.0f;
         const bool inTune = active && std::fabs (tunerReading.cents) < 6.0f;
         const juce::String noteStr = active ? (juce::String (tunerReading.noteName) + juce::String (tunerReading.octave)) : "--";
@@ -1556,7 +2119,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         g.drawText ("AFINADOR YIN", toScreen (210, 640, 220, 20), juce::Justification::centredLeft);
         const juce::String hzStr = active
             ? (juce::String (tunerReading.freqHz, 1) + " Hz  (" + (tunerReading.cents >= 0 ? "+" : "") + juce::String (tunerReading.cents, 1) + " ct)")
-            : "Tocá una cuerda de tu bajo...";
+            : (bass ? "Tocá una cuerda de tu bajo..." : "Tocá una cuerda de tu guitarra...");
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.0f * s))));
         g.drawText (hzStr, toScreen (650, 640, 360, 20), juce::Justification::centredRight);
 
@@ -1579,7 +2142,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
 
     if (hudText.isNotEmpty())
     {
-        auto hudR = toScreen (475, 28, 220, 36);
+        auto hudR = toScreen (475, 28, 240, 36);
         paintGlassPanel (g, hudR, 11.0f);
         g.setColour (inkColour());
         g.setFont (juce::Font (juce::FontOptions (juce::jmax (10.0f, 13.0f * s), juce::Font::bold)));
@@ -1600,20 +2163,23 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
 {
     const float s = stageScale();
     const auto stagePt = juce::Point<float> (e.position.x / s, e.position.y / s);
+    const bool bass = audioProcessor.isBassMode();
 
     if (! isFloorMode)
     {
-        // Click on LED / meters inside .audio-dock clears CLIP
-        if (juce::Rectangle<float> (140, 25, 165, 52).contains (stagePt))
+        const float meterX0 = bass ? 140.0f : 366.0f;
+        if (juce::Rectangle<float> (meterX0, 25, 165, 52).contains (stagePt))
             audioProcessor.isClipping.store (false, std::memory_order_relaxed);
         return;
     }
 
-    auto chain = audioProcessor.getActiveChain();
+    auto chain = audioProcessor.getActiveChain (bass);
+    int& sel = bass ? selectedBassPedal : selectedGuitarPedal;
+
     if (editorOpen && ! chain.empty())
     {
         const auto pedR = computeEditorPedalStageRect();
-        if (selectedPedalType == 1)
+        if (bass && sel == 1)
         {
             const auto cabR = juce::Rectangle<float> (
                 pedR.getX() + 0.70f * pedR.getWidth(),
@@ -1632,36 +2198,91 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
             }
         }
 
-        const auto swR = (selectedPedalType == 1)
+        const auto swR = (bass && sel == 1)
             ? juce::Rectangle<float> (pedR.getX() + 0.10f * pedR.getWidth(), pedR.getY() + 0.62f * pedR.getHeight(),
                                       0.20f * pedR.getWidth(), 0.24f * pedR.getHeight())
             : juce::Rectangle<float> (pedR.getX() + 0.20f * pedR.getWidth(), pedR.getY() + 0.62f * pedR.getHeight(),
                                       0.60f * pedR.getWidth(), 0.28f * pedR.getHeight());
         if (swR.contains (stagePt))
         {
-            if (auto* p = audioProcessor.apvts.getParameter (pedalBypassParamId (selectedPedalType)))
+            if (auto* p = audioProcessor.apvts.getParameter (pedalBypassParamId (bass, sel)))
             {
                 const bool nxt = p->getValue() < 0.5f;
                 p->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
-                showHud (pedalName (selectedPedalType) + (nxt ? " ON" : " BYPASS"));
+                showHud (pedalName (bass, sel) + (nxt ? " ON" : " BYPASS"));
                 repaint();
                 return;
             }
         }
     }
 
-    const auto slots = computeBoardSlotRects (static_cast<int> (chain.size()));
+    const auto slots = computeBoardSlotRects (bass, chain);
     for (size_t i = 0; i < chain.size(); ++i)
     {
         if (slots[i].contains (stagePt))
         {
-            selectedPedalType = chain[i];
-            editorOpen = true;
-            syncPedalEditorControls();
-            repaint();
+            dragStartPx = e.getPosition();
+            dragStagePos = stagePt;
+            draggingPedalType = chain[i];
+            draggingFromPalette = false;
+            draggingPedalActive = false;
+            dragInsertIndex = -1;
             return;
         }
     }
+
+    draggingPedalType = -1;
+}
+
+void MiAmpAudioProcessorEditor::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! isFloorMode || draggingPedalType < 0 || draggingFromPalette)
+        return;
+
+    if (! draggingPedalActive && e.getPosition().getDistanceFrom (dragStartPx) > 6)
+        draggingPedalActive = true;
+
+    if (draggingPedalActive)
+    {
+        const bool bass = audioProcessor.isBassMode();
+        dragStagePos = editorPtToStage (e.position);
+        dragInsertIndex = computeDropInsertIndex (bass, dragStagePos, draggingPedalType);
+        repaint();
+    }
+}
+
+void MiAmpAudioProcessorEditor::mouseUp (const juce::MouseEvent&)
+{
+    if (! isFloorMode || draggingPedalType < 0 || draggingFromPalette)
+    {
+        draggingPedalType = -1;
+        return;
+    }
+
+    const bool bass = audioProcessor.isBassMode();
+    int& sel = bass ? selectedBassPedal : selectedGuitarPedal;
+
+    if (draggingPedalActive)
+    {
+        if (dragInsertIndex >= 0)
+        {
+            audioProcessor.reorderPedalToIndex (bass, draggingPedalType, dragInsertIndex);
+            sel = draggingPedalType;
+            editorOpen = true;
+            showHud (pedalName (bass, draggingPedalType) + " MOVIDO");
+        }
+    }
+    else
+    {
+        sel = draggingPedalType;
+        editorOpen = true;
+    }
+
+    draggingPedalActive = false;
+    draggingPedalType = -1;
+    dragInsertIndex = -1;
+    syncPedalEditorControls();
+    repaint();
 }
 
 void MiAmpAudioProcessorEditor::mouseDoubleClick (const juce::MouseEvent& e)
@@ -1669,18 +2290,19 @@ void MiAmpAudioProcessorEditor::mouseDoubleClick (const juce::MouseEvent& e)
     if (! isFloorMode) return;
     const float s = stageScale();
     const auto stagePt = juce::Point<float> (e.position.x / s, e.position.y / s);
+    const bool bass = audioProcessor.isBassMode();
 
-    auto chain = audioProcessor.getActiveChain();
-    const auto slots = computeBoardSlotRects (static_cast<int> (chain.size()));
+    auto chain = audioProcessor.getActiveChain (bass);
+    const auto slots = computeBoardSlotRects (bass, chain);
     for (size_t i = 0; i < chain.size(); ++i)
     {
         if (slots[i].contains (stagePt))
         {
-            if (auto* p = audioProcessor.apvts.getParameter (pedalBypassParamId (chain[i])))
+            if (auto* p = audioProcessor.apvts.getParameter (pedalBypassParamId (bass, chain[i])))
             {
                 const bool nxt = p->getValue() < 0.5f;
                 p->setValueNotifyingHost (nxt ? 1.0f : 0.0f);
-                showHud (pedalName (chain[i]) + (nxt ? " ON" : " BYPASS"));
+                showHud (pedalName (bass, chain[i]) + (nxt ? " ON" : " BYPASS"));
                 repaint();
                 return;
             }
