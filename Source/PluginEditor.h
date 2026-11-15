@@ -10,13 +10,19 @@ public:
     ~MiAmpAudioProcessorEditor() override;
 
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
 
+    static juce::String formatNoteName (const char* noteName, int octave, bool useSolfege);
+    static juce::String formatNoteNameOnly (const char* noteName, bool useSolfege);
+
 private:
-    enum class PopoverKind { None, Presets, Tuner, Drop };
+    enum class PopoverKind { None, Presets, Tuner, Drop, Config };
+    enum class KnobKind    { GuitarHead, BassHead, Pedal };
 
     struct Images
     {
+        juce::Image introSky, introLogo, popupsCredit, guitarKnobRing;
         juce::Image guitarBg, bassBg, bassKnobCap, toggleUp, toggleDown;
         juce::Image floorBg, boardSurface;
         juce::Image xvActive, xvBypass, xvKnobPtr, xvCabBass, xvCabPunk, xvCabClean;
@@ -43,7 +49,8 @@ private:
                          const juce::String& paramId,
                          const juce::String& labelText,
                          juce::Image knobImg,
-                         bool isHeadStyle,
+                         juce::Image ringImg,
+                         KnobKind kind,
                          std::function<void(const juce::String&)> onHud,
                          std::function<void()> onInteract = nullptr);
         void paint (juce::Graphics& g) override;
@@ -58,8 +65,8 @@ private:
         juce::AudioProcessorValueTreeState& apvts;
         juce::String pid;
         juce::String label;
-        juce::Image image;
-        bool headStyle = false;
+        juce::Image image, ringImage;
+        KnobKind knobKind = KnobKind::Pedal;
         std::function<void(const juce::String&)> hudCallback;
         std::function<void()> interactCallback;
         float dragStartVal = 50.0f;
@@ -75,17 +82,25 @@ private:
                            const juce::String& labelText,
                            juce::Image upImg,
                            juce::Image downImg,
+                           bool invertDownState,
                            std::function<void(const juce::String&)> onHud);
         void paint (juce::Graphics& g) override;
         void mouseDown (const juce::MouseEvent&) override;
-        void setConfig (const juce::String& newId, const juce::String& newLabel);
 
     private:
         juce::AudioProcessorValueTreeState& apvts;
         juce::String pid;
         juce::String label;
         juce::Image imgUp, imgDown;
+        bool invertDown = false;
         std::function<void(const juce::String&)> hudCallback;
+    };
+
+    class TrashIconButton final : public juce::Button
+    {
+    public:
+        TrashIconButton();
+        void paintButton (juce::Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
     };
 
     class PalettePedalButton final : public juce::Component
@@ -120,6 +135,7 @@ private:
     void loadImages();
     void timerCallback() override;
     void showHud (const juce::String& text);
+    void finishIntro();
     void setFloorMode (bool floor);
     void switchInstrument (bool toBass);
     void togglePopover (PopoverKind kind);
@@ -131,8 +147,10 @@ private:
     juce::Rectangle<float> toScreen (float x, float y, float w, float h) const noexcept;
     juce::Rectangle<int> toScreenInt (float x, float y, float w, float h) const noexcept;
     juce::Point<float> editorPtToStage (juce::Point<float> editorPt) const noexcept;
+    juce::Point<float> applyBoardTransform (juce::Point<float> stagePt) const noexcept;
+    juce::Rectangle<float> applyBoardTransform (juce::Rectangle<float> stageRect) const noexcept;
 
-    void paintHeadScene (juce::Graphics& g);
+    void paintHeadScene (juce::Graphics& g, float yOffsetStage = 0.0f);
     void paintFloorScene (juce::Graphics& g);
     void paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> r, float radius = 22.0f) const;
     void paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const;
@@ -143,6 +161,7 @@ private:
     void mouseDoubleClick (const juce::MouseEvent& e) override;
 
     int computeDropInsertIndex (bool bassMode, juce::Point<float> stagePt, int excludePedal = -1) const;
+    bool isOutsideBoardViewport (juce::Point<float> stagePt) const noexcept;
     static juce::String pedalName (bool bassMode, int type);
     const juce::Image& pedalImage (bool bassMode, int type, bool active) const;
     static const char* pedalBypassParamId (bool bassMode, int type);
@@ -156,27 +175,41 @@ private:
     bool isFloorMode = false;
     bool editorOpen = true;
     bool floorTunerOpen = false;
+    bool useSolfege = false; // false = C D E F G A B, true = Do Re Mi Fa Sol La Si
     PopoverKind activePopover = PopoverKind::None;
     int selectedBassPedal = 1;
     int selectedGuitarPedal = 1;
 
+    // Intro animation (2.9s matching index.html)
+    bool  introRunning = true;
+    float introElapsed = 0.0f;
+    float headSceneYOffsetStage = 0.0f;
+    juce::TextButton btnSkipIntro { "SALTAR" };
+
+    // Brand credit easter egg
+    bool creditOpen = false;
+    juce::TextButton btnCreditClose { "Cerrar" };
+
+    // Smooth board transform animation (.board-group)
+    float boardTx = 0.0f, boardTy = 0.0f, boardScale = 1.0f;
+
     // Drag & Drop state on floor pedalboard
     bool  draggingPedalActive = false;
     bool  draggingFromPalette = false;
+    bool  draggingOutsideBoard = false;
     int   draggingPedalType   = -1;
     int   dragInsertIndex     = -1;
     juce::Point<int>   dragStartPx;
     juce::Point<float> dragStagePos;
 
-    // Head right menu (.menu)
+    // Head right menu (.menu) - TOP RIGHT matching index.html
     juce::TextButton btnInstGuitar { "Guitar" }, btnInstBass { "Bass" };
     juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainPedals { "PEDALES" };
 
-    // Head top-left dock (.audio-dock)
-    juce::TextButton btnDockCab { "CAB" }, btnDockDrop { "DROP" };
-    juce::TextButton btnDockCh  { "CH2" }, btnDockOs { "4x OS" }, btnDockGate { "GATE" };
+    // Head top-left dock (.audio-dock) - exact index.html controls
+    juce::TextButton btnDockDrop { "DROP" }, btnDockConfig { "CONFIG" };
 
-    // Head physical knobs & switches (up to 19 knobs in Guitar mode, 5 in Bass mode)
+    // Head physical knobs & switches
     std::unique_ptr<ImageRotaryKnob> guitarHeadKnobs[19];
     std::unique_ptr<ImageToggleSwitch> guitarHeadSwitches[3];
     std::unique_ptr<ImageRotaryKnob> bassHeadKnobs[5];
@@ -185,15 +218,16 @@ private:
     // Floor Editor controls (.edit)
     std::unique_ptr<ImageRotaryKnob> editorKnobs[7];
     juce::TextButton btnEditClose { "x" };
-    juce::TextButton btnMoveLeft { "<" }, btnMoveRight { ">" }, btnRemovePedal { "Quitar" };
+    juce::TextButton btnMoveLeft { "<" }, btnMoveRight { ">" };
+    TrashIconButton btnTrashPedal;
 
-    // Floor Palette (.palette) - up to 7 pedals in Guitar mode, 5 in Bass mode
+    // Floor Palette (.palette)
     std::unique_ptr<PalettePedalButton> paletteItems[7];
     juce::TextButton btnFloorPresets { "PRESETS" }, btnFloorTuner { "AFINADOR" };
-    juce::TextButton btnFloorCab { "CAB" }, btnFloorDrop { "DROP" }, btnBackToAmp { "VOLVER AL AMPLI" };
-    juce::TextButton btnFloorTunerMute { "MUTE" };
+    juce::TextButton btnFloorDrop { "↕" }, btnFloorConfig { "⚙" }, btnBackToAmp { "VOLVER AL AMPLI" };
+    juce::TextButton btnFloorTunerMute { "MUTE" }, btnFloorTunerNotation { "DO RE MI" };
 
-    // Floating glass popover (.popover)
+    // Floating glass popover (.popover / .floor-popover)
     std::unique_ptr<GlassPopover> popover;
 
     juce::String hudText;

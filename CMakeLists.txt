@@ -64,6 +64,10 @@ target_sources(MiAmp
 juce_add_binary_data(MiAmpAssets
     NAMESPACE BinaryData
     SOURCES
+        Resources/intro_sky.png
+        Resources/intro_logo.png
+        Resources/popups_credit.png
+        Resources/guitar_knob_ring.png
         Resources/main_bg.png
         Resources/bass_bg.png
         Resources/bass_knob_cap.png
