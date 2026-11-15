@@ -39,7 +39,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
 
     // Bass Head
     addBool (MiAmpParams::ampPower,   "Bass Power",    true);
-    addBool (MiAmpParams::ampStandby, "Bass Standby",  true);
+    addBool (MiAmpParams::ampStandby, "Bass Standby",  false);
     addBool (MiAmpParams::ampUltraHi, "Bass Ultra-Hi", false);
     addBool (MiAmpParams::ampCabOn,   "Bass Cab 8x10", true);
     addPct  (MiAmpParams::ampGain,    "Bass Gain",     50.0f);
@@ -99,7 +99,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addBool (MiAmpParams::gtrOs4x,       "Zenbox 4x OS",      true);
     addInt  (MiAmpParams::gtrCab,        "Zenbox Cab",        0, 4, 1);
     addBool (MiAmpParams::gtrPower,      "Zenbox Power",      true);
-    addBool (MiAmpParams::gtrStandby,    "Zenbox Standby",    true);
+    addBool (MiAmpParams::gtrStandby,    "Zenbox Standby",    false);
     addBool (MiAmpParams::gtrModeBright, "Zenbox Bright Cap", true);
     addInt  (MiAmpParams::gtrChannel,    "Zenbox Channel",    0, 2, 1);
     addPct  (MiAmpParams::gtrOutput,     "Zenbox Output",     58.0f);
@@ -272,16 +272,16 @@ zenbox::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const no
     s.ampStandby    = g (MiAmpParams::gtrStandby) >= 0.5f;
     s.ampModeBright = g (MiAmpParams::gtrModeBright) >= 0.5f;
     s.activeChannel = static_cast<int> (std::lround (g (MiAmpParams::gtrChannel)));
-    s.outputLevel   = g (MiAmpParams::gtrOutput);
+    s.outputKnob    = g (MiAmpParams::gtrOutput);
 
-    for (int c = 0; c < 3; ++c)
+    for (size_t c = 0; c < 3; ++c)
     {
-        s.ch[c].gain     = g (MiAmpParams::gtrChGain[c]);
-        s.ch[c].bass     = g (MiAmpParams::gtrChBass[c]);
-        s.ch[c].mid      = g (MiAmpParams::gtrChMid[c]);
-        s.ch[c].treble   = g (MiAmpParams::gtrChTreble[c]);
-        s.ch[c].presence = g (MiAmpParams::gtrChPresence[c]);
-        s.ch[c].master   = g (MiAmpParams::gtrChMaster[c]);
+        s.chGain[c]     = g (MiAmpParams::gtrChGain[c]);
+        s.chBass[c]     = g (MiAmpParams::gtrChBass[c]);
+        s.chMid[c]      = g (MiAmpParams::gtrChMid[c]);
+        s.chTreble[c]   = g (MiAmpParams::gtrChTreble[c]);
+        s.chPresence[c] = g (MiAmpParams::gtrChPresence[c]);
+        s.chMaster[c]   = g (MiAmpParams::gtrChMaster[c]);
     }
 
     s.pitchEnabled   = g (MiAmpParams::pitchOn) >= 0.5f;
@@ -669,7 +669,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
 void MiAmpAudioProcessor::applyPreset (const MiAmpBassPreset& p)
 {
     setParamNormalized (MiAmpParams::ampPower,   1.0f);
-    setParamNormalized (MiAmpParams::ampStandby, 1.0f);
+    setParamNormalized (MiAmpParams::ampStandby, 0.0f);
     setParamNormalized (MiAmpParams::ampCabOn,   1.0f);
     setParamNormalized (MiAmpParams::ampGain,    p.ampGain);
     setParamNormalized (MiAmpParams::ampBass,    p.ampBass);
@@ -719,7 +719,7 @@ void MiAmpAudioProcessor::applyGuitarPreset (const MiAmpGuitarPreset& p)
 {
     const int ch = std::clamp (p.channel, 0, 2);
     setParamNormalized (MiAmpParams::gtrPower,      1.0f);
-    setParamNormalized (MiAmpParams::gtrStandby,    1.0f);
+    setParamNormalized (MiAmpParams::gtrStandby,    0.0f);
     setParamNormalized (MiAmpParams::gtrChannel,    static_cast<float> (ch));
     setParamNormalized (MiAmpParams::gtrCab,        static_cast<float> (std::clamp (p.cab, 0, 4)));
     setParamNormalized (MiAmpParams::gtrModeBright, p.bright ? 1.0f : 0.0f);
@@ -964,13 +964,13 @@ void MiAmpAudioProcessor::saveUserPreset (const juce::String& name)
     else
     {
         auto s = readGuitarSnapshot();
-        const int ch = std::clamp (s.activeChannel, 0, 2);
+        const size_t ch = static_cast<size_t> (std::clamp (s.activeChannel, 0, 2));
         MiAmpGuitarPreset p;
         p.name = name.trim().isEmpty() ? ("Zenbox " + juce::String (guitarUserPresets.size() + 1)) : name.trim();
-        p.channel = ch; p.cab = s.cabIndex; p.bright = s.ampModeBright; p.os4x = s.os4x;
-        p.input = s.inputGain; p.gate = s.gateThresh; p.output = s.outputLevel;
-        p.gain = s.ch[ch].gain; p.bass = s.ch[ch].bass; p.mid = s.ch[ch].mid;
-        p.treble = s.ch[ch].treble; p.presence = s.ch[ch].presence; p.master = s.ch[ch].master;
+        p.channel = static_cast<int> (ch); p.cab = s.cabIndex; p.bright = s.ampModeBright; p.os4x = s.os4x;
+        p.input = s.inputGain; p.gate = s.gateThresh; p.output = s.outputKnob;
+        p.gain = s.chGain[ch]; p.bass = s.chBass[ch]; p.mid = s.chMid[ch];
+        p.treble = s.chTreble[ch]; p.presence = s.chPresence[ch]; p.master = s.chMaster[ch];
         p.slots = s.chainSlots;
         p.compOn = s.compOn; p.compSus = s.compSustain; p.compAtt = s.compAttack; p.compLvl = s.compLevel;
         p.driveOn = s.driveOn; p.driveGain = s.driveGain; p.driveTone = s.driveTone; p.driveLvl = s.driveLevel;
