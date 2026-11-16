@@ -199,6 +199,10 @@ private:
     // Smooth board transform animation (.board-group)
     float boardTx = 0.0f, boardTy = 0.0f, boardScale = 1.0f;
 
+    // Smooth per-pedal slot & pickup animations on floor board
+    std::array<juce::Rectangle<float>, 7> animPedalRects {};
+    std::array<bool, 7> animPedalHasPos {};
+
     // Drag & Drop state on floor pedalboard
     bool  draggingPedalActive = false;
     bool  draggingFromPalette = false;
@@ -207,12 +211,12 @@ private:
     int   dragInsertIndex     = -1;
     juce::Point<int>   dragStartPx;
     juce::Point<float> dragStagePos;
+    juce::Point<float> dragRenderPos;
+    float dragLiftScale = 1.0f;
 
-    // Head right menu (.menu) - TOP RIGHT matching index.html
-    juce::TextButton btnInstGuitar { "Guitar" }, btnInstBass { "Bass" };
+    // Head right menu (.menu) - unified right glass panel
+    juce::TextButton btnInstGuitar { "GUITARRA" }, btnInstBass { "BAJO" };
     juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainPedals { "PEDALES" };
-
-    // Head top-left dock (.audio-dock) - exact index.html controls
     juce::TextButton btnDockDrop { "DROP" }, btnDockConfig { "CONFIG" };
 
     // Head physical knobs & switches
@@ -230,7 +234,7 @@ private:
     // Floor Palette (.palette)
     std::unique_ptr<PalettePedalButton> paletteItems[7];
     juce::TextButton btnFloorPresets { "PRESETS" }, btnFloorTuner { "AFINADOR" };
-    juce::TextButton btnFloorDrop { "" }, btnFloorConfig { "" }, btnBackToAmp { "VOLVER AL AMPLI" };
+    juce::TextButton btnFloorDrop { "DROP" }, btnFloorConfig { "CONFIG" }, btnBackToAmp { "VOLVER AL AMPLI" };
     juce::TextButton btnFloorTunerMute { "MUTE" }, btnFloorTunerNotation { "DO RE MI" };
 
     // Floating glass popover (.popover / .floor-popover)

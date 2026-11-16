@@ -228,40 +228,6 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
         return;
     }
 
-    if (id == "floorDropIcon")
-    {
-        const auto c = bounds.toFloat().getCentre();
-        const float sz = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.28f;
-        g.setColour (juce::Colour::fromRGB (250, 243, 227));
-        juce::Path p;
-        p.startNewSubPath (c.x, c.y - sz);
-        p.lineTo (c.x, c.y + sz);
-        p.startNewSubPath (c.x - sz * 0.55f, c.y - sz * 0.42f);
-        p.lineTo (c.x, c.y - sz);
-        p.lineTo (c.x + sz * 0.55f, c.y - sz * 0.42f);
-        p.startNewSubPath (c.x - sz * 0.55f, c.y + sz * 0.42f);
-        p.lineTo (c.x, c.y + sz);
-        p.lineTo (c.x + sz * 0.55f, c.y + sz * 0.42f);
-        g.strokePath (p, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        return;
-    }
-
-    if (id == "floorCfgIcon")
-    {
-        const auto c = bounds.toFloat().getCentre();
-        const float rOut = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.28f;
-        const float rIn  = rOut * 0.44f;
-        g.setColour (juce::Colour::fromRGB (250, 243, 227));
-        g.drawEllipse (c.x - rIn, c.y - rIn, rIn * 2.0f, rIn * 2.0f, 1.8f);
-        for (int i = 0; i < 8; ++i)
-        {
-            const float a = static_cast<float> (i) * juce::MathConstants<float>::pi * 0.25f;
-            g.drawLine (c.x + std::cos (a) * (rOut * 0.62f), c.y + std::sin (a) * (rOut * 0.62f),
-                        c.x + std::cos (a) * rOut,          c.y + std::sin (a) * rOut, 2.2f);
-        }
-        return;
-    }
-
     const float h = juce::jlimit (9.5f, 13.0f, static_cast<float> (b.getHeight()) * 0.34f);
     g.setFont (sansFont (h, (id == "presetSave" || id == "presetFactory") && b.getToggleState()
                             ? juce::Font::bold : juce::Font::plain));
@@ -694,6 +660,7 @@ void MiAmpAudioProcessorEditor::PalettePedalButton::paint (juce::Graphics& g)
     if (art.isValid())
     {
         auto imgR = r.reduced (6.0f, 4.0f).withTrimmedBottom (16.0f);
+        g.setOpacity (1.0f); // never inherit border alpha onto pedal artwork!
         g.drawImage (art, imgR, juce::RectanglePlacement::centred);
     }
 
@@ -954,17 +921,19 @@ public:
 
         if (kind == PopoverKind::Presets)
         {
-            const auto b = getLocalBounds().toFloat().reduced (18.0f, 14.0f);
+            const float bx = 18.0f;
+            const float bw = static_cast<float> (getWidth()) - 36.0f;
+            const float bottom = static_cast<float> (getHeight()) - 14.0f;
             g.setFont (sansFont (10.0f, juce::Font::bold));
             g.setColour (juce::Colour::fromRGBA (244, 234, 217, 184)); // #f4ead9b8
             g.drawText ("GUARDAR PRESET",
-                        juce::Rectangle<float> (b.getX(), b.getBottom() - 88.0f, b.getWidth(), 16.0f),
+                        juce::Rectangle<float> (bx, bottom - 102.0f, bw, 16.0f),
                         juce::Justification::centredLeft);
             g.setFont (sansFont (11.5f));
             g.setColour (inkColour().withAlpha (0.80f));
-            g.drawText ("Un preset reemplaza la cadena y ajustes actuales.",
-                        juce::Rectangle<float> (b.getX(), b.getBottom() - 24.0f, b.getWidth(), 22.0f),
-                        juce::Justification::centredLeft);
+            g.drawFittedText ("Un preset reemplaza la cadena y ajustes actuales.",
+                              juce::Rectangle<int> (18, getHeight() - 48, getWidth() - 36, 34),
+                              juce::Justification::topLeft, 2);
         }
         else if (kind == PopoverKind::Drop)
         {
@@ -980,16 +949,16 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
-            g.setFont (sansFont (12.0f, juce::Font::bold));
+            g.setFont (sansFont (11.5f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.88f));
             const float x = inner.getX();
             const float w = inner.getWidth();
-            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, inner.getY() + 6.0f, w, 18.0f), juce::Justification::centredLeft);
+            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, inner.getY() + 2.0f, w, 16.0f), juce::Justification::centredLeft);
             if (! bass)
             {
-                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, inner.getY() + 106.0f, w, 18.0f), juce::Justification::centredLeft);
-                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, inner.getY() + 206.0f, w, 18.0f), juce::Justification::centredLeft);
-                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, inner.getY() + 258.0f, w, 18.0f), juce::Justification::centredLeft);
+                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, inner.getY() + 92.0f,  w, 16.0f), juce::Justification::centredLeft);
+                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, inner.getY() + 184.0f, w, 16.0f), juce::Justification::centredLeft);
+                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, inner.getY() + 234.0f, w, 16.0f), juce::Justification::centredLeft);
             }
         }
         else if (kind == PopoverKind::Tuner)
@@ -1055,16 +1024,16 @@ public:
     void resized() override
     {
         btnClose.setBounds (getWidth() - 38, 10, 26, 28);
-        auto inner = getLocalBounds().reduced (18, 46);
+        auto inner = getLocalBounds().reduced (18, 0).withTop (48).withTrimmedBottom (14);
 
         if (kind == PopoverKind::Presets)
         {
-            inner.removeFromBottom (16); // hint text area below .save-row
+            inner.removeFromBottom (38); // 2-line hint text area below .save-row
             auto saveRow = inner.removeFromBottom (41);
             btnSavePreset.setBounds (saveRow.removeFromRight (80));
             saveRow.removeFromRight (6);
             presetNameEdit.setBounds (saveRow);
-            inner.removeFromBottom (26); // space for GUARDAR PRESET section title
+            inner.removeFromBottom (29); // space for GUARDAR PRESET section title (5px gap)
             presetViewport.setBounds (inner);
             layoutPresetButtons();
         }
@@ -1086,21 +1055,21 @@ public:
             if (bass)
             {
                 const int hw = (inner.getWidth() - 6) / 2;
-                cfgCabBtns[0].setBounds (inner.getX(),          inner.getY() + 26, hw, 34);
-                cfgCabBtns[1].setBounds (inner.getX() + hw + 6, inner.getY() + 26, hw, 34);
+                cfgCabBtns[0].setBounds (inner.getX(),          inner.getY() + 22, hw, 34);
+                cfgCabBtns[1].setBounds (inner.getX() + hw + 6, inner.getY() + 22, hw, 34);
             }
             else
             {
                 const int cw = inner.getWidth() / 3;
                 for (int i = 0; i < 5; ++i)
                     cfgCabBtns[i].setBounds (inner.getX() + (i % 3) * cw + 2,
-                                             inner.getY() + 24 + (i / 3) * 34,
-                                             cw - 4, 30);
+                                             inner.getY() + 20 + (i / 3) * 32,
+                                             cw - 4, 28);
                 for (int c = 0; c < 3; ++c)
-                    cfgChBtns[c].setBounds (inner.getX() + c * cw + 2, inner.getY() + 124, cw - 4, 30);
-                btnCfgOs4x.setBounds (inner.getX(), inner.getY() + 162, inner.getWidth(), 32);
-                slGate.setBounds     (inner.getX(), inner.getY() + 224, inner.getWidth(), 24);
-                slInput.setBounds    (inner.getX(), inner.getY() + 276, inner.getWidth(), 24);
+                    cfgChBtns[c].setBounds (inner.getX() + c * cw + 2, inner.getY() + 110, cw - 4, 28);
+                btnCfgOs4x.setBounds (inner.getX(), inner.getY() + 144, inner.getWidth(), 30);
+                slGate.setBounds     (inner.getX(), inner.getY() + 202, inner.getWidth(), 24);
+                slInput.setBounds    (inner.getX(), inner.getY() + 252, inner.getWidth(), 24);
             }
         }
         else if (kind == PopoverKind::Tuner)
@@ -1476,10 +1445,8 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
         repaint();
     };
     addChildComponent (btnFloorDrop);
-    btnFloorDrop.setComponentID ("floorDropIcon");
     btnFloorDrop.onClick = [this] { togglePopover (PopoverKind::Drop); };
     addChildComponent (btnFloorConfig);
-    btnFloorConfig.setComponentID ("floorCfgIcon");
     btnFloorConfig.onClick = [this] { togglePopover (PopoverKind::Config); };
     addChildComponent (btnBackToAmp);
     btnBackToAmp.onClick = [this] { setFloorMode (false); };
@@ -1731,6 +1698,7 @@ void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
     audioProcessor.setInstrumentMode (toBass);
     activePopover = PopoverKind::None;
     popover->setVisible (false);
+    animPedalHasPos.fill (false);
     showHud (juce::String::fromUTF8 (toBass ? u8"BAJO \u00b7 XV EDITION" : u8"GUITARRA \u00b7 ZENBOX / ENEMA"));
     syncHeadControls();
     syncPedalEditorControls();
@@ -1747,6 +1715,8 @@ void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
     activePopover = PopoverKind::None;
     popover->setVisible (false);
     draggingPedalActive = false;
+    dragLiftScale = 1.0f;
+    animPedalHasPos.fill (false);
 
     const bool bass = audioProcessor.isBassMode();
     if (isFloorMode)
@@ -1772,11 +1742,9 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     btnInstGuitar.setToggleState (! bass, juce::dontSendNotification);
     btnInstBass.setToggleState   (bass,   juce::dontSendNotification);
 
-    for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals })
+    for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals,
+                     &btnDockDrop, &btnDockConfig })
         b->setVisible (showHead);
-
-    for (auto* b : { &btnDockDrop, &btnDockConfig })
-        b->setVisible (! isFloorMode && ! introRunning);
 
     for (auto& k : bassHeadKnobs)      k->setVisible (! isFloorMode && ! introRunning && bass);
     for (auto& s : bassHeadSwitches)   s->setVisible (! isFloorMode && ! introRunning && bass);
@@ -1857,11 +1825,20 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
             },
             [this, bass, pt] (juce::Point<float> editorPt)
             {
+                if (! draggingPedalActive)
+                {
+                    dragStagePos = editorPtToStage (editorPt);
+                    dragRenderPos = dragStagePos;
+                    dragLiftScale = 1.0f;
+                }
+                else
+                {
+                    dragStagePos = editorPtToStage (editorPt);
+                }
                 draggingPedalActive = true;
                 draggingFromPalette = true;
                 draggingOutsideBoard = false;
                 draggingPedalType   = pt;
-                dragStagePos = editorPtToStage (editorPt);
                 dragInsertIndex = computeDropInsertIndex (bass, dragStagePos, pt);
                 repaint();
             },
@@ -2030,7 +2007,7 @@ void MiAmpAudioProcessorEditor::timerCallback()
         }
     }
 
-    // Smooth .board-group transition matching CSS transition(.55s cubic-bezier)
+    // Smooth .board-group & per-pedal slot animations at 60Hz
     if (isFloorMode)
     {
         const bool popFloor = (activePopover == PopoverKind::Presets
@@ -2045,6 +2022,62 @@ void MiAmpAudioProcessorEditor::timerCallback()
         boardTx    += 0.16f * (targetTx    - boardTx);
         boardTy    += 0.16f * (targetTy    - boardTy);
         boardScale += 0.16f * (targetScale - boardScale);
+
+        const bool bass = audioProcessor.isBassMode();
+        auto chain = audioProcessor.getActiveChain (bass);
+
+        // Compute target slot for each pedal, opening space smoothly during drag!
+        std::vector<int> layoutChain;
+        if (draggingPedalActive && draggingPedalType >= 0 && ! draggingOutsideBoard && dragInsertIndex >= 0)
+        {
+            for (int pt : chain)
+                if (pt != draggingPedalType)
+                    layoutChain.push_back (pt);
+            const int ins = juce::jlimit (0, static_cast<int> (layoutChain.size()), dragInsertIndex);
+            layoutChain.insert (layoutChain.begin() + ins, draggingPedalType);
+        }
+        else
+        {
+            layoutChain = chain;
+        }
+
+        const auto targetSlots = computeBoardSlotRects (bass, layoutChain);
+        std::array<bool, 7> seen {};
+        for (size_t i = 0; i < layoutChain.size(); ++i)
+        {
+            const int pt = layoutChain[i];
+            if (pt < 0 || pt >= 7) continue;
+            seen[static_cast<size_t> (pt)] = true;
+            const auto& tr = targetSlots[i];
+            if (! animPedalHasPos[static_cast<size_t> (pt)])
+            {
+                animPedalRects[static_cast<size_t> (pt)] = tr;
+                animPedalHasPos[static_cast<size_t> (pt)] = true;
+            }
+            else
+            {
+                auto& cur = animPedalRects[static_cast<size_t> (pt)];
+                cur = juce::Rectangle<float> (
+                    cur.getX()      + 0.24f * (tr.getX()      - cur.getX()),
+                    cur.getY()      + 0.24f * (tr.getY()      - cur.getY()),
+                    cur.getWidth()  + 0.24f * (tr.getWidth()  - cur.getWidth()),
+                    cur.getHeight() + 0.24f * (tr.getHeight() - cur.getHeight()));
+            }
+        }
+        for (size_t k = 0; k < 7; ++k)
+            if (! seen[k])
+                animPedalHasPos[k] = false;
+
+        if (draggingPedalActive)
+        {
+            dragRenderPos.x += 0.48f * (dragStagePos.x - dragRenderPos.x);
+            dragRenderPos.y += 0.48f * (dragStagePos.y - dragRenderPos.y);
+            dragLiftScale   += 0.28f * (1.09f - dragLiftScale);
+        }
+        else
+        {
+            dragLiftScale   += 0.28f * (1.0f - dragLiftScale);
+        }
     }
 
     tunerReading = audioProcessor.tuner.analyze();
@@ -2196,16 +2229,14 @@ void MiAmpAudioProcessorEditor::layoutAll()
 
     if (! isFloorMode)
     {
-        // .audio-dock (35, 25, w=368, h=52) - exact index.html size for both Guitar & Bass!
-        btnDockDrop.setBounds   (toScreenInt (240, 33, 72, 36));
-        btnDockConfig.setBounds (toScreenInt (318, 33, 74, 36));
-
-        // .menu TOP RIGHT (1290, 25, 225, 226) matching index.html!
-        btnInstGuitar.setBounds  (toScreenInt (1308, 45,  92, 35));
-        btnInstBass.setBounds    (toScreenInt (1404, 45,  92, 35));
-        btnMainPresets.setBounds (toScreenInt (1305, 94,  195, 41));
-        btnMainTuner.setBounds   (toScreenInt (1305, 143, 195, 41));
-        btnMainPedals.setBounds  (toScreenInt (1305, 192, 195, 41));
+        // Unified right glass panel (.menu 1290, 25, 225, 294) — no top-left bar!
+        btnInstGuitar.setBounds  (toScreenInt (1308, 45,  93, 34));
+        btnInstBass.setBounds    (toScreenInt (1404, 45,  93, 34));
+        btnMainPresets.setBounds (toScreenInt (1305, 90,  195, 38));
+        btnMainTuner.setBounds   (toScreenInt (1305, 134, 195, 38));
+        btnMainPedals.setBounds  (toScreenInt (1305, 178, 195, 38));
+        btnDockDrop.setBounds    (toScreenInt (1305, 222, 94,  34));
+        btnDockConfig.setBounds  (toScreenInt (1406, 222, 94,  34));
 
         if (bass)
         {
@@ -2253,9 +2284,9 @@ void MiAmpAudioProcessorEditor::layoutAll()
             }
         }
 
-        // .popover sits BELOW .menu (right: 35 -> x=1215, top: 269, w=300, h=474)
+        // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 294)
         if (popover->isVisible())
-            popover->setBounds (toScreenInt (1215, 269, 300, 474));
+            popover->setBounds (toScreenInt (1215, 331, 300, 422));
     }
     else
     {
@@ -2450,27 +2481,41 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     if (introRunning)
         return;
 
-    // Top-left .audio-dock (35, 25, 368, 52) — identical in Guitar & Bass!
-    paintGlassPanel (g, toScreen (35, 25, 368, 52), 15.0f);
+    const float s = stageScale();
+
+    // Unified right glass panel (.menu 1290, 25, 225, 294) — clean head with no top-left bar!
+    paintGlassPanel (g, toScreen (1290, 25, 225, 294), 22.0f);
+
+    auto swBox = toScreen (1305, 42, 195, 40);
+    g.setColour (juce::Colour::fromRGBA (255, 255, 255, 24));
+    g.fillRoundedRectangle (swBox, 8.0f * s);
+    g.setColour (juce::Colour::fromRGBA (241, 224, 190, 102));
+    g.drawRoundedRectangle (swBox, 8.0f * s, 1.0f);
+
+    // Integrated status LED + IN / OUT meters inside right panel (1305, 264, 195, 38)
+    auto meterBox = toScreen (1305, 264, 195, 38);
+    g.setColour (juce::Colour::fromRGBA (255, 255, 255, 16));
+    g.fillRoundedRectangle (meterBox, 8.0f * s);
+    g.setColour (juce::Colour::fromRGBA (241, 224, 190, 74));
+    g.drawRoundedRectangle (meterBox, 8.0f * s, 1.0f);
 
     const bool clip = audioProcessor.isClipping.load();
     const juce::Colour ledCol = clip ? juce::Colour::fromRGB (255, 94, 94)
                                      : (! pwr || standby ? juce::Colour::fromRGB (247, 197, 107)
                                                          : juce::Colour::fromRGB (126, 255, 189));
     g.setColour (ledCol);
-    g.fillEllipse (toScreen (50, 46, 10, 10));
+    g.fillEllipse (toScreen (1316, 278, 9, 9));
 
-    const float s = stageScale();
     const float inFrac  = juce::jlimit (0.0f, 1.0f, audioProcessor.inputRms.load() * 3.5f);
     const float outFrac = juce::jlimit (0.0f, 1.0f, audioProcessor.outputRms.load() * 3.5f);
-    g.setColour (inkColour().withAlpha (0.78f));
-    g.setFont (sansFont (juce::jmax (8.0f, 9.5f * s), juce::Font::bold));
-    g.drawText ("IN",  toScreen (72, 36, 24, 12), juce::Justification::centredLeft);
-    g.drawText ("OUT", toScreen (72, 52, 26, 12), juce::Justification::centredLeft);
+    g.setColour (inkColour().withAlpha (0.80f));
+    g.setFont (sansFont (juce::jmax (7.5f, 9.0f * s), juce::Font::bold));
+    g.drawText ("IN",  toScreen (1332, 270, 22, 11), juce::Justification::centredLeft);
+    g.drawText ("OUT", toScreen (1332, 284, 24, 11), juce::Justification::centredLeft);
 
     auto drawMeter = [&] (float y, float frac)
     {
-        auto tr = toScreen (100, y, 128, 6);
+        auto tr = toScreen (1360, y, 128, 5.5f);
         g.setColour (juce::Colour::fromRGBA (15, 22, 20, 165));
         g.fillRoundedRectangle (tr, 3.0f * s);
         g.setColour (juce::Colour::fromRGBA (255, 244, 212, 56));
@@ -2482,20 +2527,12 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
             g.fillRoundedRectangle (tr.withWidth (tr.getWidth() * frac), 3.0f * s);
         }
     };
-    drawMeter (39.0f, inFrac);
-    drawMeter (55.0f, outFrac);
-
-    // Right .menu TOP RIGHT (1290, 25, 225, 226)
-    paintGlassPanel (g, toScreen (1290, 25, 225, 226), 22.0f);
-    auto swBox = toScreen (1305, 42, 195, 41);
-    g.setColour (juce::Colour::fromRGBA (255, 255, 255, 24));
-    g.fillRoundedRectangle (swBox, 8.0f * s);
-    g.setColour (juce::Colour::fromRGBA (241, 224, 190, 102));
-    g.drawRoundedRectangle (swBox, 8.0f * s, 1.0f);
+    drawMeter (273.0f, inFrac);
+    drawMeter (287.0f, outFrac);
 
     if (hudText.isNotEmpty())
     {
-        auto hudR = toScreen (35, 92, 245, 34);
+        auto hudR = toScreen (35, 25, 245, 36);
         paintGlassPanel (g, hudR, 11.0f);
         g.setColour (inkColour());
         g.setFont (sansFont (juce::jmax (10.0f, 12.5f * s), juce::Font::bold));
@@ -2535,7 +2572,10 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         {
             const int pt = chain[i];
             const bool isBeingDragged = draggingPedalActive && ! draggingFromPalette && (pt == draggingPedalType);
-            const auto slotT = applyBoardTransform (slots[i]);
+            const auto& baseSlot = (pt >= 0 && pt < 7 && animPedalHasPos[static_cast<size_t> (pt)])
+                                       ? animPedalRects[static_cast<size_t> (pt)]
+                                       : slots[i];
+            const auto slotT = applyBoardTransform (baseSlot);
             const auto sr = toScreen (slotT.getX(), slotT.getY(), slotT.getWidth(), slotT.getHeight());
             const bool active = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (bass, pt))->load() > 0.5f;
             const auto& pImg = pedalImage (bass, pt, active);
@@ -2549,10 +2589,8 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
                 artR = juce::Rectangle<float> (sr.getX(), sr.getCentreY() - artH * 0.5f, artW, artH);
             }
 
-            if (isBeingDragged)
-                g.setOpacity (0.30f);
-            else if (! active)
-                g.setOpacity (0.65f); // .unit.off brightness(.65)
+            // Retain full vivid pedal color even in bypass (only LED goes dark, matching index.html!)
+            g.setOpacity (isBeingDragged ? 0.25f : 1.0f);
 
             if (pImg.isValid())
                 g.drawImage (pImg, artR, juce::RectanglePlacement::stretchToFit);
@@ -2568,53 +2606,37 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         }
     }
 
-    // Drag & Drop insertion line + floating pedal ghost + SOLTÁ PARA QUITAR
+    // Smooth Drag & Drop insertion indicator + lifted floating pedal with drop shadow
     if (draggingPedalActive && draggingPedalType >= 0)
     {
         if (dragInsertIndex >= 0 && ! draggingOutsideBoard)
         {
-            const auto vpT = applyBoardTransform (juce::Rectangle<float> (621.0f, 153.0f, 830.0f, 435.0f));
-            float lineX = vpT.getCentreX();
-            float lineY = vpT.getY() + 25.0f;
-            float lineH = 180.0f * boardScale;
-
-            if (! slots.empty())
-            {
-                if (dragInsertIndex == 0)
-                {
-                    const auto r0 = applyBoardTransform (slots.front());
-                    lineX = r0.getX() - 10.0f;
-                    lineY = r0.getY();
-                }
-                else if (dragInsertIndex >= static_cast<int> (slots.size()))
-                {
-                    const auto rl = applyBoardTransform (slots.back());
-                    lineX = rl.getRight() + 10.0f;
-                    lineY = rl.getY();
-                }
-                else
-                {
-                    const auto ra = applyBoardTransform (slots[static_cast<size_t> (dragInsertIndex - 1)]);
-                    const auto rb = applyBoardTransform (slots[static_cast<size_t> (dragInsertIndex)]);
-                    lineX = 0.5f * (ra.getRight() + rb.getX());
-                    lineY = rb.getY();
-                }
-            }
-            const auto lr = toScreen (lineX - 3.0f, lineY, 6.0f, lineH);
-            g.setColour (mintBorder().withAlpha (0.95f));
-            g.fillRoundedRectangle (lr, 3.0f * s);
+            const auto& guideRect = (draggingPedalType < 7 && animPedalHasPos[static_cast<size_t> (draggingPedalType)])
+                                        ? applyBoardTransform (animPedalRects[static_cast<size_t> (draggingPedalType)])
+                                        : applyBoardTransform (juce::Rectangle<float> (621.0f, 153.0f, 123.0f, 192.0f));
+            const auto gr = toScreen (guideRect.getX(), guideRect.getY(), guideRect.getWidth(), guideRect.getHeight());
+            g.setColour (mintBorder().withAlpha (0.28f));
+            g.fillRoundedRectangle (gr, 8.0f * s);
+            g.setColour (mintBorder().withAlpha (0.85f));
+            g.drawRoundedRectangle (gr, 8.0f * s, 2.0f * s);
         }
 
         const bool isXv = (bass && draggingPedalType == 1);
-        const float gw = (isXv ? 224.0f : 123.0f) * boardScale;
-        const float gh = (isXv ? 182.0f : 176.0f) * boardScale;
-        const auto ghostR = toScreen (dragStagePos.x - gw * 0.5f, dragStagePos.y - gh * 0.5f, gw, gh);
+        const float gw = (isXv ? 224.0f : 123.0f) * boardScale * dragLiftScale;
+        const float gh = (isXv ? 182.0f : 176.0f) * boardScale * dragLiftScale;
+        const auto ghostR = toScreen (dragRenderPos.x - gw * 0.5f, dragRenderPos.y - gh * 0.5f - (dragLiftScale - 1.0f) * 65.0f, gw, gh);
+
+        // Soft elevation shadow underneath lifted pedal
+        g.setColour (juce::Colour::fromRGBA (0, 0, 0, 105));
+        g.fillRoundedRectangle (ghostR.translated (4.0f * s, 12.0f * s).reduced (4.0f * s), 10.0f * s);
+
         const bool active = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (bass, draggingPedalType))->load() > 0.5f;
         const auto& gImg = pedalImage (bass, draggingPedalType, active);
         if (gImg.isValid())
         {
-            g.setOpacity (0.90f);
+            g.setOpacity (0.96f);
             g.drawImage (gImg, ghostR, juce::RectanglePlacement::stretchToFit);
+            paintMiniPedalKnobs (g, bass, draggingPedalType, ghostR);
             g.setOpacity (1.0f);
         }
 
@@ -2905,8 +2927,8 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
     {
         if (introRunning) return;
 
-        // Clear CLIP on meter click
-        if (juce::Rectangle<float> (45, 25, 190, 52).contains (stagePt))
+        // Clear CLIP on meter click inside unified right panel
+        if (juce::Rectangle<float> (1305, 264, 195, 38).contains (stagePt))
         {
             audioProcessor.isClipping.store (false, std::memory_order_relaxed);
             return;
@@ -2969,11 +2991,17 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
     const auto slots = computeBoardSlotRects (bass, chain);
     for (size_t i = 0; i < chain.size(); ++i)
     {
-        if (applyBoardTransform (slots[i]).contains (stagePt))
+        const int pt = chain[i];
+        const auto& hitRect = (pt >= 0 && pt < 7 && animPedalHasPos[static_cast<size_t> (pt)])
+                                  ? animPedalRects[static_cast<size_t> (pt)]
+                                  : slots[i];
+        if (applyBoardTransform (hitRect).contains (stagePt))
         {
             dragStartPx = e.getPosition();
             dragStagePos = stagePt;
-            draggingPedalType = chain[i];
+            dragRenderPos = stagePt;
+            dragLiftScale = 1.0f;
+            draggingPedalType = pt;
             draggingFromPalette = false;
             draggingPedalActive = false;
             draggingOutsideBoard = false;
