@@ -30,11 +30,45 @@ jobs:
       - name: Build NSIS Windows Installer (.exe)
         shell: pwsh
         run: |
-          if (!(Get-Command makensis -ErrorAction SilentlyContinue)) {
-            choco install nsis -y --no-progress
+          function Find-MakeNsis {
+            $cmd = Get-Command makensis -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+            foreach ($p in @(
+              "C:\Program Files (x86)\NSIS\makensis.exe",
+              "C:\Program Files\NSIS\makensis.exe",
+              "C:\ProgramData\chocolatey\bin\makensis.exe",
+              "C:\nsis\nsis-3.10\makensis.exe",
+              "C:\nsis\makensis.exe"
+            )) {
+              if (Test-Path $p) { return $p }
+            }
+            return $null
           }
-          $nsis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
-          if (!$nsis) { $nsis = "C:\Program Files (x86)\NSIS\makensis.exe" }
+
+          $nsis = Find-MakeNsis
+          if (!$nsis) {
+            Write-Host "Trying choco install nsis..."
+            try { choco install nsis -y --no-progress --limit-output } catch {}
+            $global:LASTEXITCODE = 0
+            $nsis = Find-MakeNsis
+          }
+          if (!$nsis) {
+            Write-Host "Choco failed or not on PATH, trying winget..."
+            try { winget install --id NSIS.NSIS -e --silent --accept-package-agreements --accept-source-agreements } catch {}
+            $global:LASTEXITCODE = 0
+            $nsis = Find-MakeNsis
+          }
+          if (!$nsis) {
+            Write-Host "Winget failed, downloading NSIS portable zip..."
+            $zip = "$env:TEMP\nsis.zip"
+            Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.10/nsis-3.10.zip" -OutFile $zip -UserAgent "Mozilla/5.0" -UseBasicParsing
+            Expand-Archive -Path $zip -DestinationPath "C:\nsis" -Force
+            $nsis = Find-MakeNsis
+          }
+          if (!$nsis -or !(Test-Path $nsis)) {
+            throw "Could not locate or install makensis.exe"
+          }
+          Write-Host "Using NSIS: $nsis"
           & $nsis installer_win64.nsi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -50,11 +84,11 @@ jobs:
         shell: pwsh
         run: |
           $tag = "v1.0.0-win"
-          $notes = "Instalador oficial de MI AMP para Windows 64-bit (VST3 + App Standalone): Cabezal 8x10, Pedalboard de 5 pedales (XV Bass, Compresor, Chorus, Phaser, Reverb), Drop Tuner, Afinador YIN y 15 Presets."
+          $notes = "Instalador oficial de MI AMP para Windows 64-bit (VST3 + App Standalone): Cabezal Guitarra/Bajo, Pedalboard completo, Tone Finder, Exportador NAM/AIDA-X/Proteus/IR, Drop Tuner y Afinador YIN."
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag Instalar_MI_AMP_Windows_x64.exe --clobber
           } else {
-            gh release create $tag Instalar_MI_AMP_Windows_x64.exe --title "MI AMP Bass Edition v1.0.0 (Windows x64 Installer)" --notes $notes --latest
+            gh release create $tag Instalar_MI_AMP_Windows_x64.exe --title "MI AMP v1.0.0 (Windows x64 Installer)" --notes $notes --latest
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
