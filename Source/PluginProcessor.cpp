@@ -55,18 +55,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::pitchMix,   "Pitch Mix",     100.0f);
     addBool (MiAmpParams::tunerMuted, "Tuner Mute",    false);
 
-    // Bass Pedalboard Slots
-    addInt (MiAmpParams::slot0, "Bass Slot 1", -1, 4, 1);
-    addInt (MiAmpParams::slot1, "Bass Slot 2", -1, 4, -1);
-    addInt (MiAmpParams::slot2, "Bass Slot 3", -1, 4, -1);
-    addInt (MiAmpParams::slot3, "Bass Slot 4", -1, 4, -1);
-    addInt (MiAmpParams::slot4, "Bass Slot 5", -1, 4, -1);
+    // Bass Pedalboard Slots (10 slots, Default: XV Preamp at index 1)
+    addInt (MiAmpParams::slot[0], "Bass Slot 1", -1, 13, 1);
+    for (int s = 1; s < 10; ++s)
+        addInt (MiAmpParams::slot[s], "Bass Slot " + juce::String (s + 1), -1, 13, -1);
 
     // Bass Pedals
     addBool (MiAmpParams::compOn,      "Comp On",       true);
-    addPct  (MiAmpParams::compSustain, "Comp Sustain",  50.0f);
+    addPct  (MiAmpParams::compSustain, "Comp Ratio",    50.0f);
     addPct  (MiAmpParams::compAttack,  "Comp Attack",   50.0f);
-    addPct  (MiAmpParams::compLevel,   "Comp Level",    50.0f);
+    addPct  (MiAmpParams::compLevel,   "Comp Output",   50.0f);
+    addPct  (MiAmpParams::compRelease, "Comp Release",  45.0f);
+    addPct  (MiAmpParams::compInput,   "Comp Input",    55.0f);
 
     addBool (MiAmpParams::xvOn,        "XV Bass On",    true);
     addPct  (MiAmpParams::xvLevel,     "XV Level",      56.0f);
@@ -82,16 +82,79 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::chorusRate,  "Chorus Rate",   50.0f);
     addPct  (MiAmpParams::chorusDepth, "Chorus Depth",  50.0f);
     addPct  (MiAmpParams::chorusMix,   "Chorus Mix",    50.0f);
+    addPct  (MiAmpParams::chorusLoCut, "Chorus Lo-Cut", 40.0f);
+    addBool (MiAmpParams::chorusXOver, "Chorus X-Over", false);
 
     addBool (MiAmpParams::phaserOn,       "Phaser On",       true);
     addPct  (MiAmpParams::phaserRate,     "Phaser Rate",     50.0f);
     addPct  (MiAmpParams::phaserDepth,    "Phaser Depth",    50.0f);
     addPct  (MiAmpParams::phaserFeedback, "Phaser Feedback", 50.0f);
+    addPct  (MiAmpParams::phaserStage,    "Phaser Stage",    45.0f);
 
     addBool (MiAmpParams::reverbOn,    "Reverb On",     true);
     addPct  (MiAmpParams::reverbDecay, "Reverb Decay",  50.0f);
     addPct  (MiAmpParams::reverbTone,  "Reverb Tone",   50.0f);
     addPct  (MiAmpParams::reverbMix,   "Reverb Mix",    50.0f);
+    addPct  (MiAmpParams::reverbMode,  "Reverb Mode",   35.0f);
+
+    // New Bass Boutique Pedals
+    addBool (MiAmpParams::goldOn,    "Gold Drive On",    true);
+    addPct  (MiAmpParams::goldLevel, "Gold Drive Level", 56.0f);
+    addPct  (MiAmpParams::goldEq,    "Gold Drive EQ",    54.0f);
+    addPct  (MiAmpParams::goldBlend, "Gold Drive Blend", 58.0f);
+    addPct  (MiAmpParams::goldGain,  "Gold Drive Gain",  52.0f);
+
+    addBool (MiAmpParams::bfOn,     "Bass Food On",     true);
+    addPct  (MiAmpParams::bfVol,    "Bass Food Vol",    58.0f);
+    addPct  (MiAmpParams::bfTreble, "Bass Food Treble", 54.0f);
+    addPct  (MiAmpParams::bfDrive,  "Bass Food Drive",  42.0f);
+    addPct  (MiAmpParams::bfBlend,  "Bass Food Blend",  55.0f);
+    addBool (MiAmpParams::bfPad,    "Bass Food Pad",    false);
+
+    addBool (MiAmpParams::bddiOn,       "BDDI On",       true);
+    addPct  (MiAmpParams::bddiLevel,    "BDDI Level",    58.0f);
+    addPct  (MiAmpParams::bddiBlend,    "BDDI Blend",    62.0f);
+    addPct  (MiAmpParams::bddiTreble,   "BDDI Treble",   56.0f);
+    addPct  (MiAmpParams::bddiPresence, "BDDI Presence", 65.0f);
+    addPct  (MiAmpParams::bddiDrive,    "BDDI Drive",    48.0f);
+    addPct  (MiAmpParams::bddiBass,     "BDDI Bass",     60.0f);
+    addBool (MiAmpParams::bddiXlrPad,   "BDDI XLR Pad",  false);
+    addBool (MiAmpParams::bddiInBoost,  "BDDI In +10dB", false);
+    addBool (MiAmpParams::bddiOutBoost, "BDDI Out +10dB",false);
+
+    addBool (MiAmpParams::oliveOn,      "Olive Fuzz On",      true);
+    addPct  (MiAmpParams::oliveVol,     "Olive Fuzz Vol",     55.0f);
+    addPct  (MiAmpParams::oliveTone,    "Olive Fuzz Tone",    52.0f);
+    addPct  (MiAmpParams::oliveSustain, "Olive Fuzz Sustain", 62.0f);
+    addInt  (MiAmpParams::oliveMode,    "Olive Fuzz Mode",    0, 2, 1);
+
+    addBool (MiAmpParams::bassFlangeOn,     "Bass Flange On",     true);
+    addPct  (MiAmpParams::bassFlangeManual, "Bass Flange Manual", 48.0f);
+    addPct  (MiAmpParams::bassFlangeRes,    "Bass Flange Res",    45.0f);
+    addPct  (MiAmpParams::bassFlangeDepth,  "Bass Flange Depth",  55.0f);
+    addPct  (MiAmpParams::bassFlangeRate,   "Bass Flange Rate",   36.0f);
+    addInt  (MiAmpParams::bassFlangeMode,   "Bass Flange Mode",   0, 2, 0);
+
+    addBool (MiAmpParams::bassDelayOn,     "Bass Delay On",     true);
+    addPct  (MiAmpParams::bassDelayTime,   "Bass Delay Time",   42.0f);
+    addPct  (MiAmpParams::bassDelayFb,     "Bass Delay Fb",     36.0f);
+    addPct  (MiAmpParams::bassDelayMix,    "Bass Delay Mix",    35.0f);
+    addPct  (MiAmpParams::bassDelayMode,   "Bass Delay Mode",   30.0f);
+    addBool (MiAmpParams::bassDelaySubdiv, "Bass Delay Subdiv", false);
+
+    addBool (MiAmpParams::bassGateOn,     "Bass Gate On",     true);
+    addPct  (MiAmpParams::bassGateThresh, "Bass Gate Thresh", 32.0f);
+    addPct  (MiAmpParams::bassGateDecay,  "Bass Gate Decay",  40.0f);
+    addPct  (MiAmpParams::bassGateMode,   "Bass Gate Mode",   50.0f);
+
+    addBool (MiAmpParams::bassOctOn,  "Bass Oct On",  true);
+    addPct  (MiAmpParams::bassOctDry, "Bass Oct Dry", 85.0f);
+    addPct  (MiAmpParams::bassOctSub, "Bass Oct Sub", 58.0f);
+    addPct  (MiAmpParams::bassOctUp,  "Bass Oct Up",  28.0f);
+
+    addBool (MiAmpParams::bassEqOn, "Bass EQ On", true);
+    for (int b = 0; b < 7; ++b)
+        addPct (MiAmpParams::bassEqBand[b], "Bass EQ Band " + juce::String (b + 1), 50.0f);
 
     // Guitar Head (Zenbox + Dual-Amp Edition)
     addPct  (MiAmpParams::gtrInput,      "Zenbox Input",      56.0f);
@@ -122,21 +185,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
         addPct (MiAmpParams::gtrChMaster[c],   pfx + "Master",   defMast[c]);
     }
 
-    // Guitar Pedalboard Slots (Default: Drive)
-    addInt (MiAmpParams::gtrSlot[0], "Guitar Slot 1", -1, 6, 1);
-    for (int s = 1; s < 7; ++s)
-        addInt (MiAmpParams::gtrSlot[s], "Guitar Slot " + juce::String (s + 1), -1, 6, -1);
+    // Guitar Pedalboard Slots (10 slots, Default: Overdrive at index 1)
+    addInt (MiAmpParams::gtrSlot[0], "Guitar Slot 1", -1, 12, 1);
+    for (int s = 1; s < 10; ++s)
+        addInt (MiAmpParams::gtrSlot[s], "Guitar Slot " + juce::String (s + 1), -1, 12, -1);
 
     // Guitar Pedals
     addBool (MiAmpParams::gtrCompOn,   "Gtr Comp On",   true);
     addPct  (MiAmpParams::gtrCompSus,  "Gtr Comp Sus",  50.0f);
     addPct  (MiAmpParams::gtrCompAtt,  "Gtr Comp Att",  45.0f);
     addPct  (MiAmpParams::gtrCompLvl,  "Gtr Comp Lvl",  52.0f);
+    addPct  (MiAmpParams::gtrCompTone, "Gtr Comp Tone", 52.0f);
 
     addBool (MiAmpParams::gtrDriveOn,   "Gtr Drive On",   true);
     addPct  (MiAmpParams::gtrDriveGain, "Gtr Drive Gain", 18.0f);
     addPct  (MiAmpParams::gtrDriveTone, "Gtr Drive Tone", 66.0f);
     addPct  (MiAmpParams::gtrDriveLvl,  "Gtr Drive Lvl",  64.0f);
+    addBool (MiAmpParams::gtrDriveClip, "Gtr Drive Clip", false);
 
     addBool (MiAmpParams::gtrFuzzOn,   "Gtr Fuzz On",   true);
     addPct  (MiAmpParams::gtrFuzzFuzz, "Gtr Fuzz Fuzz", 65.0f);
@@ -147,21 +212,61 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::gtrChorusRate,  "Gtr Chorus Rate",  42.0f);
     addPct  (MiAmpParams::gtrChorusDepth, "Gtr Chorus Depth", 48.0f);
     addPct  (MiAmpParams::gtrChorusMix,   "Gtr Chorus Mix",   44.0f);
+    addPct  (MiAmpParams::gtrChorusEq,    "Gtr Chorus EQ",    55.0f);
+    addInt  (MiAmpParams::gtrChorusMode,  "Gtr Chorus Mode",  0, 2, 0);
 
     addBool (MiAmpParams::gtrPhaserOn,    "Gtr Phaser On",    true);
     addPct  (MiAmpParams::gtrPhaserRate,  "Gtr Phaser Rate",  38.0f);
     addPct  (MiAmpParams::gtrPhaserDepth, "Gtr Phaser Depth", 55.0f);
     addPct  (MiAmpParams::gtrPhaserFb,    "Gtr Phaser Fb",    48.0f);
 
-    addBool (MiAmpParams::gtrDelayOn,   "Gtr Delay On",   true);
-    addPct  (MiAmpParams::gtrDelayTime, "Gtr Delay Time", 42.0f);
-    addPct  (MiAmpParams::gtrDelayFb,   "Gtr Delay Fb",   36.0f);
-    addPct  (MiAmpParams::gtrDelayMix,  "Gtr Delay Mix",  32.0f);
+    addBool (MiAmpParams::gtrDelayOn,     "Gtr Delay On",     true);
+    addPct  (MiAmpParams::gtrDelayTime,   "Gtr Delay Time",   42.0f);
+    addPct  (MiAmpParams::gtrDelayFb,     "Gtr Delay Fb",     36.0f);
+    addPct  (MiAmpParams::gtrDelayMix,    "Gtr Delay Mix",    32.0f);
+    addPct  (MiAmpParams::gtrDelayMode,   "Gtr Delay Mode",   30.0f);
+    addBool (MiAmpParams::gtrDelaySubdiv, "Gtr Delay Subdiv", false);
 
     addBool (MiAmpParams::gtrReverbOn,   "Gtr Reverb On",   true);
     addPct  (MiAmpParams::gtrReverbDec,  "Gtr Reverb Dec",  46.0f);
     addPct  (MiAmpParams::gtrReverbTone, "Gtr Reverb Tone", 56.0f);
     addPct  (MiAmpParams::gtrReverbMix,  "Gtr Reverb Mix",  28.0f);
+    addPct  (MiAmpParams::gtrReverbMode, "Gtr Reverb Mode", 35.0f);
+
+    addBool (MiAmpParams::gtrDistOn,    "Gtr Dist On",    true);
+    addPct  (MiAmpParams::gtrDistTone,  "Gtr Dist Tone",  52.0f);
+    addPct  (MiAmpParams::gtrDistLevel, "Gtr Dist Level", 60.0f);
+    addPct  (MiAmpParams::gtrDistDrive, "Gtr Dist Drive", 62.0f);
+
+    addBool (MiAmpParams::gtrDualOn,     "Gtr Dual On",     true);
+    addPct  (MiAmpParams::gtrDualOutput, "Gtr Dual Output", 55.0f);
+    addPct  (MiAmpParams::gtrDualGain,   "Gtr Dual Gain",   58.0f);
+    addPct  (MiAmpParams::gtrDualBlend,  "Gtr Dual Blend",  50.0f);
+    addPct  (MiAmpParams::gtrDualTone,   "Gtr Dual Tone",   56.0f);
+    addPct  (MiAmpParams::gtrDualDrive,  "Gtr Dual Drive",  60.0f);
+    addBool (MiAmpParams::gtrDualScoop,  "Gtr Dual Scoop",  false);
+
+    addBool (MiAmpParams::gtrFlangeOn,     "Gtr Flange On",     true);
+    addPct  (MiAmpParams::gtrFlangeManual, "Gtr Flange Manual", 48.0f);
+    addPct  (MiAmpParams::gtrFlangeRes,    "Gtr Flange Res",    45.0f);
+    addPct  (MiAmpParams::gtrFlangeDepth,  "Gtr Flange Depth",  55.0f);
+    addPct  (MiAmpParams::gtrFlangeRate,   "Gtr Flange Rate",   36.0f);
+    addInt  (MiAmpParams::gtrFlangeMode,   "Gtr Flange Mode",   0, 2, 0);
+
+    addBool (MiAmpParams::gtrGateOn,     "Gtr Gate On",     true);
+    addPct  (MiAmpParams::gtrGateThresh, "Gtr Gate Thresh", 32.0f);
+    addPct  (MiAmpParams::gtrGateDecay,  "Gtr Gate Decay",  40.0f);
+    addPct  (MiAmpParams::gtrGateMode,   "Gtr Gate Mode",   50.0f);
+
+    addBool (MiAmpParams::gtrOctOn,     "Gtr Oct On",     true);
+    addPct  (MiAmpParams::gtrOctDirect, "Gtr Oct Direct", 85.0f);
+    addPct  (MiAmpParams::gtrOctUp,     "Gtr Oct Up",     25.0f);
+    addPct  (MiAmpParams::gtrOctSub1,   "Gtr Oct -1",     55.0f);
+    addPct  (MiAmpParams::gtrOctSub2,   "Gtr Oct -2",     20.0f);
+
+    addBool (MiAmpParams::gtrEqOn, "Gtr EQ On", true);
+    for (int b = 0; b < 7; ++b)
+        addPct (MiAmpParams::gtrEqBand[b], "Gtr EQ Band " + juce::String (b + 1), 50.0f);
 
     return { p.begin(), p.end() };
 }
@@ -221,16 +326,15 @@ miamp::BassControlSnapshot MiAmpAudioProcessor::readBassSnapshot() const noexcep
     s.pitchMix       = g (MiAmpParams::pitchMix);
     s.tunerMuted     = g (MiAmpParams::tunerMuted) >= 0.5f;
 
-    s.chainSlots[0] = static_cast<int> (std::lround (g (MiAmpParams::slot0)));
-    s.chainSlots[1] = static_cast<int> (std::lround (g (MiAmpParams::slot1)));
-    s.chainSlots[2] = static_cast<int> (std::lround (g (MiAmpParams::slot2)));
-    s.chainSlots[3] = static_cast<int> (std::lround (g (MiAmpParams::slot3)));
-    s.chainSlots[4] = static_cast<int> (std::lround (g (MiAmpParams::slot4)));
+    for (int i = 0; i < 10; ++i)
+        s.chainSlots[static_cast<size_t> (i)] = static_cast<int> (std::lround (g (MiAmpParams::slot[i])));
 
     s.compOn      = g (MiAmpParams::compOn) >= 0.5f;
     s.compSustain = g (MiAmpParams::compSustain);
     s.compAttack  = g (MiAmpParams::compAttack);
     s.compLevel   = g (MiAmpParams::compLevel);
+    s.compRelease = g (MiAmpParams::compRelease);
+    s.compInput   = g (MiAmpParams::compInput);
 
     s.xvOn       = g (MiAmpParams::xvOn) >= 0.5f;
     s.xvLevel    = g (MiAmpParams::xvLevel);
@@ -246,16 +350,78 @@ miamp::BassControlSnapshot MiAmpAudioProcessor::readBassSnapshot() const noexcep
     s.chorusRate  = g (MiAmpParams::chorusRate);
     s.chorusDepth = g (MiAmpParams::chorusDepth);
     s.chorusMix   = g (MiAmpParams::chorusMix);
+    s.chorusLoCut = g (MiAmpParams::chorusLoCut);
+    s.chorusXOver = g (MiAmpParams::chorusXOver) >= 0.5f;
 
     s.phaserOn       = g (MiAmpParams::phaserOn) >= 0.5f;
     s.phaserRate     = g (MiAmpParams::phaserRate);
     s.phaserDepth    = g (MiAmpParams::phaserDepth);
     s.phaserFeedback = g (MiAmpParams::phaserFeedback);
+    s.phaserStage    = g (MiAmpParams::phaserStage);
 
     s.reverbOn    = g (MiAmpParams::reverbOn) >= 0.5f;
     s.reverbDecay = g (MiAmpParams::reverbDecay);
     s.reverbTone  = g (MiAmpParams::reverbTone);
     s.reverbMix   = g (MiAmpParams::reverbMix);
+    s.reverbMode  = g (MiAmpParams::reverbMode);
+
+    s.bddiOn       = g (MiAmpParams::bddiOn) >= 0.5f;
+    s.bddiLevel    = g (MiAmpParams::bddiLevel);
+    s.bddiBlend    = g (MiAmpParams::bddiBlend);
+    s.bddiTreble   = g (MiAmpParams::bddiTreble);
+    s.bddiPresence = g (MiAmpParams::bddiPresence);
+    s.bddiDrive    = g (MiAmpParams::bddiDrive);
+    s.bddiBass     = g (MiAmpParams::bddiBass);
+    s.bddiXlrPad   = g (MiAmpParams::bddiXlrPad) >= 0.5f;
+    s.bddiInBoost  = g (MiAmpParams::bddiInBoost) >= 0.5f;
+    s.bddiOutBoost = g (MiAmpParams::bddiOutBoost) >= 0.5f;
+
+    s.goldOn    = g (MiAmpParams::goldOn) >= 0.5f;
+    s.goldLevel = g (MiAmpParams::goldLevel);
+    s.goldEq    = g (MiAmpParams::goldEq);
+    s.goldBlend = g (MiAmpParams::goldBlend);
+    s.goldGain  = g (MiAmpParams::goldGain);
+
+    s.foodOn     = g (MiAmpParams::bfOn) >= 0.5f;
+    s.foodVol    = g (MiAmpParams::bfVol);
+    s.foodTreble = g (MiAmpParams::bfTreble);
+    s.foodDrive  = g (MiAmpParams::bfDrive);
+    s.foodBlend  = g (MiAmpParams::bfBlend);
+    s.foodPad    = g (MiAmpParams::bfPad) >= 0.5f;
+
+    s.oliveOn      = g (MiAmpParams::oliveOn) >= 0.5f;
+    s.oliveVol     = g (MiAmpParams::oliveVol);
+    s.oliveTone    = g (MiAmpParams::oliveTone);
+    s.oliveSustain = g (MiAmpParams::oliveSustain);
+    s.oliveMode    = static_cast<int> (std::lround (g (MiAmpParams::oliveMode)));
+
+    s.flangeOn     = g (MiAmpParams::bassFlangeOn) >= 0.5f;
+    s.flangeManual = g (MiAmpParams::bassFlangeManual);
+    s.flangeRes    = g (MiAmpParams::bassFlangeRes);
+    s.flangeDepth  = g (MiAmpParams::bassFlangeDepth);
+    s.flangeRate   = g (MiAmpParams::bassFlangeRate);
+    s.flangeMode   = static_cast<int> (std::lround (g (MiAmpParams::bassFlangeMode)));
+
+    s.delayOn     = g (MiAmpParams::bassDelayOn) >= 0.5f;
+    s.delayTime   = g (MiAmpParams::bassDelayTime);
+    s.delayFb     = g (MiAmpParams::bassDelayFb);
+    s.delayMix    = g (MiAmpParams::bassDelayMix);
+    s.delayMode   = g (MiAmpParams::bassDelayMode);
+    s.delaySubdiv = g (MiAmpParams::bassDelaySubdiv) >= 0.5f;
+
+    s.gateOn     = g (MiAmpParams::bassGateOn) >= 0.5f;
+    s.gateThresh = g (MiAmpParams::bassGateThresh);
+    s.gateDecay  = g (MiAmpParams::bassGateDecay);
+    s.gateMode   = g (MiAmpParams::bassGateMode);
+
+    s.octOn  = g (MiAmpParams::bassOctOn) >= 0.5f;
+    s.octDry = g (MiAmpParams::bassOctDry);
+    s.octSub = g (MiAmpParams::bassOctSub);
+    s.octUp  = g (MiAmpParams::bassOctUp);
+
+    s.eqOn = g (MiAmpParams::bassEqOn) >= 0.5f;
+    for (int b = 0; b < 7; ++b)
+        s.eqBands[static_cast<size_t> (b)] = g (MiAmpParams::bassEqBand[b]);
     return s;
 }
 
@@ -290,18 +456,20 @@ zenbox::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const no
     s.pitchMix       = g (MiAmpParams::pitchMix);
     s.tunerMuted     = g (MiAmpParams::tunerMuted) >= 0.5f;
 
-    for (int i = 0; i < 7; ++i)
+    for (int i = 0; i < 10; ++i)
         s.chainSlots[static_cast<size_t> (i)] = static_cast<int> (std::lround (g (MiAmpParams::gtrSlot[i])));
 
     s.compOn      = g (MiAmpParams::gtrCompOn) >= 0.5f;
     s.compSustain = g (MiAmpParams::gtrCompSus);
     s.compAttack  = g (MiAmpParams::gtrCompAtt);
     s.compLevel   = g (MiAmpParams::gtrCompLvl);
+    s.compTone    = g (MiAmpParams::gtrCompTone);
 
     s.driveOn    = g (MiAmpParams::gtrDriveOn) >= 0.5f;
     s.driveGain  = g (MiAmpParams::gtrDriveGain);
     s.driveTone  = g (MiAmpParams::gtrDriveTone);
     s.driveLevel = g (MiAmpParams::gtrDriveLvl);
+    s.driveClip  = g (MiAmpParams::gtrDriveClip) >= 0.5f;
 
     s.fuzzOn    = g (MiAmpParams::gtrFuzzOn) >= 0.5f;
     s.fuzzFuzz  = g (MiAmpParams::gtrFuzzFuzz);
@@ -312,6 +480,8 @@ zenbox::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const no
     s.chorusRate  = g (MiAmpParams::gtrChorusRate);
     s.chorusDepth = g (MiAmpParams::gtrChorusDepth);
     s.chorusMix   = g (MiAmpParams::gtrChorusMix);
+    s.chorusEq    = g (MiAmpParams::gtrChorusEq);
+    s.chorusMode  = static_cast<int> (std::lround (g (MiAmpParams::gtrChorusMode)));
 
     s.phaserOn       = g (MiAmpParams::gtrPhaserOn) >= 0.5f;
     s.phaserRate     = g (MiAmpParams::gtrPhaserRate);
@@ -322,11 +492,49 @@ zenbox::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const no
     s.delayTime     = g (MiAmpParams::gtrDelayTime);
     s.delayFeedback = g (MiAmpParams::gtrDelayFb);
     s.delayMix      = g (MiAmpParams::gtrDelayMix);
+    s.delayMode     = g (MiAmpParams::gtrDelayMode);
+    s.delaySubdiv   = g (MiAmpParams::gtrDelaySubdiv) >= 0.5f;
 
     s.reverbOn    = g (MiAmpParams::gtrReverbOn) >= 0.5f;
     s.reverbDecay = g (MiAmpParams::gtrReverbDec);
     s.reverbTone  = g (MiAmpParams::gtrReverbTone);
     s.reverbMix   = g (MiAmpParams::gtrReverbMix);
+    s.reverbMode  = g (MiAmpParams::gtrReverbMode);
+
+    s.distOn    = g (MiAmpParams::gtrDistOn) >= 0.5f;
+    s.distTone  = g (MiAmpParams::gtrDistTone);
+    s.distLevel = g (MiAmpParams::gtrDistLevel);
+    s.distDrive = g (MiAmpParams::gtrDistDrive);
+
+    s.dualOn     = g (MiAmpParams::gtrDualOn) >= 0.5f;
+    s.dualOutput = g (MiAmpParams::gtrDualOutput);
+    s.dualGain   = g (MiAmpParams::gtrDualGain);
+    s.dualBlend  = g (MiAmpParams::gtrDualBlend);
+    s.dualTone   = g (MiAmpParams::gtrDualTone);
+    s.dualDrive  = g (MiAmpParams::gtrDualDrive);
+    s.dualScoop  = g (MiAmpParams::gtrDualScoop) >= 0.5f;
+
+    s.flangeOn     = g (MiAmpParams::gtrFlangeOn) >= 0.5f;
+    s.flangeManual = g (MiAmpParams::gtrFlangeManual);
+    s.flangeRes    = g (MiAmpParams::gtrFlangeRes);
+    s.flangeDepth  = g (MiAmpParams::gtrFlangeDepth);
+    s.flangeRate   = g (MiAmpParams::gtrFlangeRate);
+    s.flangeMode   = static_cast<int> (std::lround (g (MiAmpParams::gtrFlangeMode)));
+
+    s.gatePedalOn     = g (MiAmpParams::gtrGateOn) >= 0.5f;
+    s.gatePedalThresh = g (MiAmpParams::gtrGateThresh);
+    s.gatePedalDecay  = g (MiAmpParams::gtrGateDecay);
+    s.gatePedalMode   = g (MiAmpParams::gtrGateMode);
+
+    s.octOn     = g (MiAmpParams::gtrOctOn) >= 0.5f;
+    s.octDirect = g (MiAmpParams::gtrOctDirect);
+    s.octUp     = g (MiAmpParams::gtrOctUp);
+    s.octSub1   = g (MiAmpParams::gtrOctSub1);
+    s.octSub2   = g (MiAmpParams::gtrOctSub2);
+
+    s.eqOn = g (MiAmpParams::gtrEqOn) >= 0.5f;
+    for (int b = 0; b < 7; ++b)
+        s.eqBands[static_cast<size_t> (b)] = g (MiAmpParams::gtrEqBand[b]);
     return s;
 }
 
@@ -364,9 +572,15 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     tuner.pushSamples (monoScratch.data(), numSamples);
 
     if (isBassMode())
+    {
         bassDsp.process (buffer, readBassSnapshot());
+        bassCompGrDb.store (bassDsp.getLastCompGrDb());
+    }
     else
+    {
         guitarDsp.process (buffer, readGuitarSnapshot());
+        bassCompGrDb.store (0.0f);
+    }
 
     double outSq = 0.0;
     float peak = 0.0f;
@@ -387,48 +601,33 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 std::vector<int> MiAmpAudioProcessor::getActiveChain (bool forBass) const
 {
     std::vector<int> out;
-    if (forBass)
+    const int maxTypes = forBass ? static_cast<int> (miamp::PedalType::Count)
+                                 : static_cast<int> (zenbox::GuitarPedalType::Count);
+    for (int i = 0; i < 10; ++i)
     {
-        const char* ids[5] = { MiAmpParams::slot0, MiAmpParams::slot1, MiAmpParams::slot2, MiAmpParams::slot3, MiAmpParams::slot4 };
-        for (int i = 0; i < 5; ++i)
-        {
-            const int v = static_cast<int> (std::lround (apvts.getRawParameterValue (ids[i])->load()));
-            if (v >= 0 && v < 5 && std::find (out.begin(), out.end(), v) == out.end())
-                out.push_back (v);
-        }
-    }
-    else
-    {
-        for (int i = 0; i < 7; ++i)
-        {
-            const int v = static_cast<int> (std::lround (apvts.getRawParameterValue (MiAmpParams::gtrSlot[i])->load()));
-            if (v >= 0 && v < 7 && std::find (out.begin(), out.end(), v) == out.end())
-                out.push_back (v);
-        }
+        const char* id = forBass ? MiAmpParams::slot[i] : MiAmpParams::gtrSlot[i];
+        const int v = static_cast<int> (std::lround (apvts.getRawParameterValue (id)->load()));
+        if (v >= 0 && v < maxTypes && std::find (out.begin(), out.end(), v) == out.end())
+            out.push_back (v);
     }
     return out;
 }
 
 void MiAmpAudioProcessor::setActiveChain (bool forBass, const std::vector<int>& order)
 {
-    if (forBass)
+    for (int i = 0; i < 10; ++i)
     {
-        const char* ids[5] = { MiAmpParams::slot0, MiAmpParams::slot1, MiAmpParams::slot2, MiAmpParams::slot3, MiAmpParams::slot4 };
-        for (int i = 0; i < 5; ++i)
-            setParamNormalized (ids[i], i < static_cast<int> (order.size()) ? static_cast<float> (order[static_cast<size_t> (i)]) : -1.0f);
-    }
-    else
-    {
-        for (int i = 0; i < 7; ++i)
-            setParamNormalized (MiAmpParams::gtrSlot[i], i < static_cast<int> (order.size()) ? static_cast<float> (order[static_cast<size_t> (i)]) : -1.0f);
+        const char* id = forBass ? MiAmpParams::slot[i] : MiAmpParams::gtrSlot[i];
+        setParamNormalized (id, i < static_cast<int> (order.size()) ? static_cast<float> (order[static_cast<size_t> (i)]) : -1.0f);
     }
 }
 
 bool MiAmpAudioProcessor::addPedalToChain (bool forBass, int pedalType, int insertAt)
 {
     auto chain = getActiveChain (forBass);
-    const int maxPedals = forBass ? 5 : 7;
-    if (pedalType < 0 || pedalType >= maxPedals) return false;
+    const int maxTypes = forBass ? static_cast<int> (miamp::PedalType::Count)
+                                 : static_cast<int> (zenbox::GuitarPedalType::Count);
+    if (pedalType < 0 || pedalType >= maxTypes) return false;
 
     auto it = std::find (chain.begin(), chain.end(), pedalType);
     if (it != chain.end())
@@ -441,7 +640,7 @@ bool MiAmpAudioProcessor::addPedalToChain (bool forBass, int pedalType, int inse
         return false;
     }
 
-    if (static_cast<int> (chain.size()) >= maxPedals) return false;
+    if (static_cast<int> (chain.size()) >= 10) return false;
     if (insertAt < 0 || insertAt >= static_cast<int> (chain.size()))
         chain.push_back (pedalType);
     else
@@ -498,7 +697,7 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
         MiAmpBassPreset p;
         p.name = juce::String::fromUTF8 (nameUtf8); p.isXvFactory = true; p.hint = juce::String::fromUTF8 (hintUtf8);
         p.ampGain = 50.0f; p.ampBass = 50.0f; p.ampMid = 50.0f; p.ampFreq = 50.0f; p.ampTreble = 50.0f; p.ampUltraHi = false;
-        p.slots = { 1, -1, -1, -1, -1 };
+        p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.xvOn = true; p.xvLvl = lvl * 10.0f; p.xvDrv = drv * 10.0f;
         p.xvLow = dbToXvKnob (lowDb); p.xvHigh = dbToXvKnob (highDb);
         p.xvBlend = blendPct; p.xvMid = dbToXvKnob (midDb); p.xvPres = dbToXvKnob (presDb);
@@ -523,7 +722,7 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
         p.name = "SVT Puro (8x10 Clasico)";
         p.hint = "Cabezal SVT caliente + Compresor suave, sin XV";
         p.ampGain = 62.0f; p.ampBass = 58.0f; p.ampMid = 54.0f; p.ampFreq = 46.0f; p.ampTreble = 56.0f; p.ampUltraHi = false;
-        p.slots = { 0, -1, -1, -1, -1 };
+        p.slots = { 0, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 48.0f; p.compAtt = 42.0f; p.compLvl = 56.0f;
         list.push_back (p);
     }
@@ -532,7 +731,7 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
         p.name = "Dream Chorus 80s";
         p.hint = "Compresor + Chorus ancho + Reverb de estudio";
         p.ampGain = 48.0f; p.ampBass = 52.0f; p.ampMid = 48.0f; p.ampFreq = 58.0f; p.ampTreble = 60.0f; p.ampUltraHi = true;
-        p.slots = { 0, 2, 4, -1, -1 };
+        p.slots = { 0, 2, 4, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 54.0f; p.compAtt = 38.0f; p.compLvl = 55.0f;
         p.chorusOn = true; p.chRate = 38.0f; p.chDepth = 62.0f; p.chMix = 52.0f;
         p.reverbOn = true; p.rvDec = 48.0f; p.rvTone = 62.0f; p.rvMix = 32.0f;
@@ -543,7 +742,7 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
         p.name = "Funk Phaser Groove";
         p.hint = "Compresor tight + Phaser profundo";
         p.ampGain = 52.0f; p.ampBass = 56.0f; p.ampMid = 44.0f; p.ampFreq = 64.0f; p.ampTreble = 62.0f; p.ampUltraHi = true;
-        p.slots = { 0, 3, -1, -1, -1 };
+        p.slots = { 0, 3, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 64.0f; p.compAtt = 28.0f; p.compLvl = 58.0f;
         p.phaserOn = true; p.phRate = 44.0f; p.phDepth = 68.0f; p.phFb = 58.0f;
         list.push_back (p);
@@ -553,7 +752,7 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
         p.name = "Full Rig Arena";
         p.hint = "Comp + XV Punk + Chorus + Reverb";
         p.ampGain = 54.0f; p.ampBass = 52.0f; p.ampMid = 50.0f; p.ampFreq = 52.0f; p.ampTreble = 55.0f;
-        p.slots = { 0, 1, 2, 4, -1 };
+        p.slots = { 0, 1, 2, 4, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 50.0f; p.compAtt = 40.0f; p.compLvl = 54.0f;
         p.xvOn = true; p.xvLvl = 56.0f; p.xvDrv = 48.0f; p.xvLow = 64.0f; p.xvHigh = 56.0f; p.xvBlend = 62.0f; p.xvMid = 30.0f; p.xvPres = 80.0f; p.xvCab = 1;
         p.chorusOn = true; p.chRate = 34.0f; p.chDepth = 45.0f; p.chMix = 30.0f;
@@ -573,7 +772,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 28.0f; p.output = 58.0f;
         p.gain = 68.0f; p.bass = 56.0f; p.mid = 60.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 60.0f;
-        p.slots = { 1, -1, -1, -1, -1, -1, -1 };
+        p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = true; p.driveGain = 18.0f; p.driveTone = 66.0f; p.driveLvl = 64.0f;
         p.hint = "Triple Rectifier Vintage + JCM900 Cranked + Mesa 4x12 V30/GB";
         list.push_back (p);
@@ -584,7 +783,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
         p.input = 52.0f; p.gate = 10.0f; p.output = 60.0f;
         p.gain = 28.0f; p.bass = 44.0f; p.mid = 54.0f; p.treble = 68.0f; p.presence = 62.0f; p.master = 64.0f;
-        p.slots = { 0, 6, -1, -1, -1, -1, -1 };
+        p.slots = { 0, 6, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 52.0f; p.compAtt = 35.0f; p.compLvl = 56.0f;
         p.reverbOn = true; p.rvDec = 38.0f; p.rvTone = 64.0f; p.rvMix = 20.0f;
         p.hint = "What's My Age Again / Adam's Song: JCM900 limpio + Comp + Room";
@@ -596,7 +795,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 26.0f; p.output = 58.0f;
         p.gain = 74.0f; p.bass = 58.0f; p.mid = 56.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 58.0f;
-        p.slots = { 1, 3, 5, 6, -1, -1, -1 };
+        p.slots = { 1, 3, 5, 6, -1, -1, -1, -1, -1, -1 };
         p.driveOn = true; p.driveGain = 26.0f; p.driveTone = 64.0f; p.driveLvl = 64.0f;
         p.chorusOn = true; p.chRate = 34.0f; p.chDepth = 48.0f; p.chMix = 28.0f;
         p.delayOn = false; p.dlTime = 38.0f; p.dlFb = 30.0f; p.dlMix = 22.0f;
@@ -611,7 +810,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 1; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 52.0f; p.gate = 18.0f; p.output = 58.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 60.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
-        p.slots = { 1, -1, -1, -1, -1, -1, -1 };
+        p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = false; p.driveGain = 42.0f; p.driveTone = 58.0f; p.driveLvl = 62.0f;
         p.hint = "CH2 Crunch 70s clasico tipo Zenbox + Modern 4x12";
         list.push_back (p);
@@ -622,7 +821,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 55.0f; p.gate = 28.0f; p.output = 56.0f;
         p.gain = 72.0f; p.bass = 56.0f; p.mid = 62.0f; p.treble = 64.0f; p.presence = 62.0f; p.master = 56.0f;
-        p.slots = { 1, -1, -1, -1, -1, -1, -1 };
+        p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = true; p.driveGain = 36.0f; p.driveTone = 64.0f; p.driveLvl = 64.0f;
         p.hint = "Drive empujando CH3 para acordes rapidos con definicion";
         list.push_back (p);
@@ -633,7 +832,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 0; p.cab = 0; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 12.0f; p.output = 60.0f;
         p.gain = 46.0f; p.bass = 52.0f; p.mid = 56.0f; p.treble = 58.0f; p.presence = 54.0f; p.master = 62.0f;
-        p.slots = { 6, -1, -1, -1, -1, -1, -1 };
+        p.slots = { 6, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.reverbOn = true; p.rvDec = 42.0f; p.rvTone = 58.0f; p.rvMix = 24.0f;
         p.hint = "Edge of breakup calido con Vintage 4x12 y Bright Cap";
         list.push_back (p);
@@ -644,7 +843,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
         p.input = 48.0f; p.gate = 10.0f; p.output = 62.0f;
         p.gain = 26.0f; p.bass = 50.0f; p.mid = 52.0f; p.treble = 62.0f; p.presence = 58.0f; p.master = 64.0f;
-        p.slots = { 0, 3, 6, -1, -1, -1, -1 };
+        p.slots = { 0, 3, 6, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 48.0f; p.compAtt = 42.0f; p.compLvl = 54.0f;
         p.chorusOn = true; p.chRate = 38.0f; p.chDepth = 56.0f; p.chMix = 46.0f;
         p.reverbOn = true; p.rvDec = 52.0f; p.rvTone = 64.0f; p.rvMix = 32.0f;
@@ -657,7 +856,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 2; p.cab = 0; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 32.0f; p.output = 56.0f;
         p.gain = 78.0f; p.bass = 54.0f; p.mid = 68.0f; p.treble = 60.0f; p.presence = 60.0f; p.master = 58.0f;
-        p.slots = { 1, 5, 6, -1, -1, -1, -1 };
+        p.slots = { 1, 5, 6, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = true; p.driveGain = 48.0f; p.driveTone = 60.0f; p.driveLvl = 66.0f;
         p.delayOn = true; p.dlTime = 44.0f; p.dlFb = 34.0f; p.dlMix = 28.0f;
         p.reverbOn = true; p.rvDec = 46.0f; p.rvTone = 55.0f; p.rvMix = 24.0f;
@@ -670,7 +869,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 1; p.cab = 0; p.bright = false; p.os4x = true;
         p.input = 54.0f; p.gate = 28.0f; p.output = 55.0f;
         p.gain = 64.0f; p.bass = 66.0f; p.mid = 58.0f; p.treble = 50.0f; p.presence = 48.0f; p.master = 60.0f;
-        p.slots = { 2, 4, -1, -1, -1, -1, -1 };
+        p.slots = { 2, 4, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.fuzzOn = true; p.fuzzFuzz = 74.0f; p.fuzzTone = 48.0f; p.fuzzLvl = 58.0f;
         p.phaserOn = true; p.phRate = 28.0f; p.phDepth = 62.0f; p.phFb = 54.0f;
         p.hint = "Fuzz gordo + Phaser lento sobre CH2";
@@ -682,7 +881,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 1; p.cab = 3; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 16.0f; p.output = 58.0f;
         p.gain = 48.0f; p.bass = 50.0f; p.mid = 62.0f; p.treble = 60.0f; p.presence = 58.0f; p.master = 58.0f;
-        p.slots = { 4, 5, 6, -1, -1, -1, -1 };
+        p.slots = { 4, 5, 6, -1, -1, -1, -1, -1, -1, -1 };
         p.phaserOn = true; p.phRate = 36.0f; p.phDepth = 45.0f; p.phFb = 40.0f;
         p.delayOn = true; p.dlTime = 38.0f; p.dlFb = 38.0f; p.dlMix = 34.0f;
         p.reverbOn = true; p.rvDec = 54.0f; p.rvTone = 60.0f; p.rvMix = 32.0f;
@@ -695,7 +894,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.channel = 1; p.cab = 4; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 20.0f; p.output = 56.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 58.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
-        p.slots = { 1, -1, -1, -1, -1, -1, -1 };
+        p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = false;
         p.hint = "Salida directa del cabezal sin cabina para usar tu IR propio";
         list.push_back (p);
@@ -716,9 +915,8 @@ void MiAmpAudioProcessor::applyPreset (const MiAmpBassPreset& p)
     setParamNormalized (MiAmpParams::ampTreble,  p.ampTreble);
     setParamNormalized (MiAmpParams::ampUltraHi, p.ampUltraHi ? 1.0f : 0.0f);
 
-    const char* sIds[5] = { MiAmpParams::slot0, MiAmpParams::slot1, MiAmpParams::slot2, MiAmpParams::slot3, MiAmpParams::slot4 };
-    for (int i = 0; i < 5; ++i)
-        setParamNormalized (sIds[i], static_cast<float> (p.slots[static_cast<size_t> (i)]));
+    for (int i = 0; i < 10; ++i)
+        setParamNormalized (MiAmpParams::slot[i], static_cast<float> (p.slots[static_cast<size_t> (i)]));
 
     setParamNormalized (MiAmpParams::compOn,      p.compOn ? 1.0f : 0.0f);
     setParamNormalized (MiAmpParams::compSustain, p.compSus);
@@ -773,7 +971,7 @@ void MiAmpAudioProcessor::applyGuitarPreset (const MiAmpGuitarPreset& p)
     setParamNormalized (MiAmpParams::gtrChPresence[ch], p.presence);
     setParamNormalized (MiAmpParams::gtrChMaster[ch],   p.master);
 
-    for (int i = 0; i < 7; ++i)
+    for (int i = 0; i < 10; ++i)
         setParamNormalized (MiAmpParams::gtrSlot[i], static_cast<float> (p.slots[static_cast<size_t> (i)]));
 
     setParamNormalized (MiAmpParams::gtrCompOn,  p.compOn ? 1.0f : 0.0f);
@@ -842,7 +1040,7 @@ void MiAmpAudioProcessor::loadUserPresetsFromDisk()
                 p.ampFreq    = static_cast<float> (child->getDoubleAttribute ("ampFreq", 50.0));
                 p.ampTreble  = static_cast<float> (child->getDoubleAttribute ("ampTreble", 50.0));
                 p.ampUltraHi = child->getBoolAttribute ("ampUltraHi", false);
-                for (int i = 0; i < 5; ++i)
+                for (int i = 0; i < 10; ++i)
                     p.slots[static_cast<size_t> (i)] = child->getIntAttribute ("slot" + juce::String (i), -1);
                 p.compOn   = child->getBoolAttribute ("compOn", true);
                 p.compSus  = static_cast<float> (child->getDoubleAttribute ("compSus", 50.0));
@@ -888,7 +1086,7 @@ void MiAmpAudioProcessor::loadUserPresetsFromDisk()
                 p.treble   = static_cast<float> (child->getDoubleAttribute ("treble", 58.0));
                 p.presence = static_cast<float> (child->getDoubleAttribute ("presence", 56.0));
                 p.master   = static_cast<float> (child->getDoubleAttribute ("master", 58.0));
-                for (int i = 0; i < 7; ++i)
+                for (int i = 0; i < 10; ++i)
                     p.slots[static_cast<size_t> (i)] = child->getIntAttribute ("slot" + juce::String (i), -1);
                 p.compOn   = child->getBoolAttribute ("compOn", false);
                 p.compSus  = static_cast<float> (child->getDoubleAttribute ("compSus", 50.0));
@@ -934,7 +1132,7 @@ void MiAmpAudioProcessor::saveUserPresetsToDisk() const
         e->setAttribute ("ampGain", p.ampGain); e->setAttribute ("ampBass", p.ampBass);
         e->setAttribute ("ampMid", p.ampMid);   e->setAttribute ("ampFreq", p.ampFreq);
         e->setAttribute ("ampTreble", p.ampTreble); e->setAttribute ("ampUltraHi", p.ampUltraHi);
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 10; ++i)
             e->setAttribute ("slot" + juce::String (i), p.slots[static_cast<size_t> (i)]);
         e->setAttribute ("compOn", p.compOn); e->setAttribute ("compSus", p.compSus);
         e->setAttribute ("compAtt", p.compAtt); e->setAttribute ("compLvl", p.compLvl);
@@ -961,7 +1159,7 @@ void MiAmpAudioProcessor::saveUserPresetsToDisk() const
         e->setAttribute ("gain", p.gain);       e->setAttribute ("bass", p.bass);
         e->setAttribute ("mid", p.mid);         e->setAttribute ("treble", p.treble);
         e->setAttribute ("presence", p.presence); e->setAttribute ("master", p.master);
-        for (int i = 0; i < 7; ++i)
+        for (int i = 0; i < 10; ++i)
             e->setAttribute ("slot" + juce::String (i), p.slots[static_cast<size_t> (i)]);
         e->setAttribute ("compOn", p.compOn); e->setAttribute ("compSus", p.compSus);
         e->setAttribute ("compAtt", p.compAtt); e->setAttribute ("compLvl", p.compLvl);

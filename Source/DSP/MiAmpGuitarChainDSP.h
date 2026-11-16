@@ -7,20 +7,27 @@
 #include "XVBassDSP.h"
 #include "XVPitchShifter.h"
 #include "ZenboxCabIRs.h"
+#include "MiAmpBoutiquePedalsDSP.h"
 
 namespace zenbox
 {
 
 enum class GuitarPedalType : int
 {
-    Compresor = 0,
-    Drive     = 1,
-    Fuzz      = 2,
-    Chorus    = 3,
-    Phaser    = 4,
-    Delay     = 5,
-    Reverb    = 6,
-    Count     = 7
+    Compresor  = 0,  // MI ICE COMP
+    Drive      = 1,  // MI GREEN DRIVE
+    Fuzz       = 2,  // MI SUSTAIN
+    Chorus     = 3,  // MI SKY CHORUS
+    Phaser     = 4,  // MI PHASER
+    Delay      = 5,  // MI PEARL
+    Reverb     = 6,  // MI STUDIO
+    Distortion = 7,  // MI ORANGE
+    DualCrunch = 8,  // MI DUAL CRUNCH
+    Flanger    = 9,  // MI VIOLET
+    NoiseGate  = 10, // MI SILENT
+    Octaver    = 11, // MI SUB OCTAVE
+    GraphicEq  = 12, // MI GRAPHIC EQ
+    Count      = 13
 };
 
 struct GuitarControlSnapshot
@@ -53,23 +60,35 @@ struct GuitarControlSnapshot
     float pitchMix       = 100.0f;
     bool  tunerMuted     = false;
 
-    // Pedalboard slots (-1 = empty, 0..6 = GuitarPedalType)
-    std::array<int, 7> chainSlots { 1, -1, -1, -1, -1, -1, -1 };
+    // Pedalboard slots (-1 = empty, 0..12 = GuitarPedalType)
+    std::array<int, 10> chainSlots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
-    // Compresor
-    bool  compOn = true; float compSustain = 50.0f, compAttack = 45.0f, compLevel = 52.0f;
-    // Drive (Zenbox classic screaming overdrive)
-    bool  driveOn = false; float driveGain = 42.0f, driveTone = 58.0f, driveLevel = 62.0f;
-    // Fuzz
+    // 0: MI ICE COMP
+    bool  compOn = true; float compSustain = 50.0f, compAttack = 45.0f, compLevel = 52.0f, compTone = 52.0f;
+    // 1: MI GREEN DRIVE
+    bool  driveOn = false; float driveGain = 42.0f, driveTone = 58.0f, driveLevel = 62.0f; bool driveClip = false;
+    // 2: MI SUSTAIN
     bool  fuzzOn = false; float fuzzFuzz = 65.0f, fuzzTone = 52.0f, fuzzLevel = 55.0f;
-    // Chorus
-    bool  chorusOn = false; float chorusRate = 42.0f, chorusDepth = 48.0f, chorusMix = 44.0f;
-    // Phaser
-    bool  phaserOn = false; float phaserRate = 38.0f, phaserDepth = 55.0f, phaserFeedback = 48.0f;
-    // Delay
-    bool  delayOn = false; float delayTime = 42.0f, delayFeedback = 36.0f, delayMix = 32.0f;
-    // Reverb
-    bool  reverbOn = false; float reverbDecay = 46.0f, reverbTone = 56.0f, reverbMix = 28.0f;
+    // 3: MI SKY CHORUS
+    bool  chorusOn = false; float chorusRate = 42.0f, chorusDepth = 48.0f, chorusMix = 44.0f, chorusEq = 55.0f; int chorusMode = 0;
+    // 4: MI PHASER (1-knob Speed; depth/fb fixed warm classic or preset compat)
+    bool  phaserOn = false; float phaserRate = 38.0f, phaserDepth = 62.0f, phaserFeedback = 48.0f;
+    // 5: MI PEARL (Delay)
+    bool  delayOn = false; float delayTime = 42.0f, delayFeedback = 36.0f, delayMix = 32.0f, delayMode = 30.0f; bool delaySubdiv = false;
+    // 6: MI STUDIO (Reverb)
+    bool  reverbOn = false; float reverbDecay = 46.0f, reverbTone = 56.0f, reverbMix = 28.0f, reverbMode = 35.0f;
+    // 7: MI ORANGE (Distortion)
+    bool  distOn = false; float distTone = 52.0f, distLevel = 60.0f, distDrive = 62.0f;
+    // 8: MI DUAL CRUNCH (Preamp)
+    bool  dualOn = false; float dualOutput = 55.0f, dualGain = 58.0f, dualBlend = 50.0f, dualTone = 56.0f, dualDrive = 60.0f; bool dualScoop = false;
+    // 9: MI VIOLET (Flanger)
+    bool  flangeOn = false; float flangeManual = 48.0f, flangeRes = 45.0f, flangeDepth = 55.0f, flangeRate = 36.0f; int flangeMode = 0;
+    // 10: MI SILENT (Noise Gate)
+    bool  gatePedalOn = false; float gatePedalThresh = 32.0f, gatePedalDecay = 40.0f, gatePedalMode = 50.0f;
+    // 11: MI SUB OCTAVE (Octaver)
+    bool  octOn = false; float octDirect = 85.0f, octUp = 25.0f, octSub1 = 55.0f, octSub2 = 20.0f;
+    // 12: MI GRAPHIC EQ (7-Band)
+    bool  eqOn = false; std::array<float, 7> eqBands { 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f };
 };
 
 //==============================================================================
@@ -141,11 +160,12 @@ public:
         sr = std::max (22050.0, sampleRate);
         relCoeff = std::exp (-1.0f / static_cast<float> (0.14 * sr));
         env = 0.0f; bypassSmooth = 0.0f;
-        lastSus = lastAtt = -1.0f;
+        lastSus = lastAtt = lastTone = -1.0f;
+        toneShelf.reset();
     }
-    void reset() noexcept { env = 0.0f; }
+    void reset() noexcept { env = 0.0f; toneShelf.reset(); }
 
-    inline float process (float x, bool enabled, float sustain, float attack, float level) noexcept
+    inline float process (float x, bool enabled, float sustain, float attack, float level, float tone = 50.0f) noexcept
     {
         bypassSmooth += 0.008f * ((enabled ? 0.0f : 1.0f) - bypassSmooth);
         if (std::fabs (sustain - lastSus) > 0.25f || std::fabs (attack - lastAtt) > 0.25f)
@@ -158,6 +178,11 @@ public:
             ratio    = 2.0f + sus * 8.0f;
             makeup   = 1.0f + sus * 0.55f;
         }
+        if (std::fabs (tone - lastTone) > 0.25f)
+        {
+            lastTone = tone;
+            toneShelf.setHighShelf (sr, 2200.0, (std::clamp (tone * 0.01, 0.0, 1.0) - 0.5) * 10.0, 0.7071);
+        }
         const float ax = std::fabs (x);
         env = (ax > env) ? (attCoeff * env + (1.0f - attCoeff) * ax)
                          : (relCoeff * env + (1.0f - relCoeff) * ax);
@@ -168,18 +193,19 @@ public:
             gr = std::pow (10.0f, -(overDb * (1.0f - 1.0f / ratio)) / 20.0f);
         }
         const float outG = (0.6f + std::clamp (level * 0.01f, 0.0f, 1.0f) * 1.25f) * makeup;
-        const float wet = x * gr * outG;
+        const float wet = toneShelf.processSample (x * gr * outG);
         return wet * (1.0f - bypassSmooth) + x * bypassSmooth;
     }
 
 private:
     double sr = 48000.0;
+    xvdsp::Biquad toneShelf;
     float relCoeff = 0.9998f, env = 0.0f, bypassSmooth = 0.0f;
-    float lastSus = -1.0f, lastAtt = -1.0f, attCoeff = 0.99f, thresh = 0.1f, ratio = 4.0f, makeup = 1.2f;
+    float lastSus = -1.0f, lastAtt = -1.0f, lastTone = -1.0f, attCoeff = 0.99f, thresh = 0.1f, ratio = 4.0f, makeup = 1.2f;
 };
 
 //==============================================================================
-// Zenbox Screamer / Classic Overdrive Pedal
+// Zenbox Screamer / Classic Overdrive Pedal (MI GREEN DRIVE)
 class GuitarDriveFX
 {
 public:
@@ -194,7 +220,7 @@ public:
     }
     void reset() noexcept { preHpf.reset(); midHump.reset(); postLpf.reset(); }
 
-    inline float process (float x, bool enabled, float gain, float tone, float level) noexcept
+    inline float process (float x, bool enabled, float gain, float tone, float level, bool asymClip = false) noexcept
     {
         bypassSmooth += 0.008f * ((enabled ? 0.0f : 1.0f) - bypassSmooth);
         if (std::fabs (tone - lastTone) > 0.25f)
@@ -209,8 +235,9 @@ public:
         float d = midHump.processSample (preHpf.processSample (x));
         const float drv = 1.8f + g * 18.0f;
         const float s = d * drv;
-        // Asymmetric silicon/LED soft clipping preserving pick punch
-        float clip = (s >= 0.0f) ? std::tanh (s * 1.15f) : (std::tanh (s * 0.92f) * 0.95f);
+        float clip = asymClip
+            ? ((s >= 0.0f) ? std::tanh (s * 1.35f) : (std::tanh (s * 0.78f) * 0.88f))
+            : std::tanh (s * 1.05f);
         clip = postLpf.processSample (clip * 0.55f + d * 0.18f);
         const float wet = clip * (0.55f + l * 1.45f);
         return wet * (1.0f - bypassSmooth) + x * bypassSmooth;
@@ -274,22 +301,30 @@ public:
         bufSize = std::max (1024, static_cast<int> (0.06 * sr));
         buf.assign (static_cast<size_t> (bufSize), 0.0f);
         writePos = 0; phase = 0.0; bypassSmooth = 0.0f;
+        eqShelf.reset(); lastEq = -1.0f;
     }
-    void reset() noexcept { std::fill (buf.begin(), buf.end(), 0.0f); writePos = 0; }
+    void reset() noexcept { std::fill (buf.begin(), buf.end(), 0.0f); writePos = 0; eqShelf.reset(); }
 
-    inline float process (float x, bool enabled, float rate, float depth, float mix, int chIdx) noexcept
+    inline float process (float x, bool enabled, float rate, float depth, float mix, int chIdx,
+                          float eq = 55.0f, int mode = 0) noexcept
     {
         bypassSmooth += 0.008f * ((enabled ? 0.0f : 1.0f) - bypassSmooth);
         const float rt = std::clamp (rate  * 0.01f, 0.0f, 1.0f);
         const float dp = std::clamp (depth * 0.01f, 0.0f, 1.0f);
         const float mx = std::clamp (mix   * 0.01f, 0.0f, 1.0f);
 
+        if (std::fabs (eq - lastEq) > 0.25f)
+        {
+            lastEq = eq;
+            eqShelf.setHighShelf (sr, 2400.0, (std::clamp (eq * 0.01, 0.0, 1.0) - 0.5) * 10.0, 0.7071);
+        }
+
         const double hz = 0.18 + rt * 3.8;
         phase += 2.0 * xvdsp::kPi * hz / sr;
         if (phase >= 2.0 * xvdsp::kPi) phase -= 2.0 * xvdsp::kPi;
 
         const double lfo = std::sin (phase + (chIdx == 1 ? 1.5707963 : 0.0));
-        const double dMs = 11.0 + lfo * (dp * 5.2);
+        const double dMs = (mode == 1 ? 14.5 : 11.0) + lfo * (dp * 5.2);
         const double dSmp = std::clamp (dMs * 0.001 * sr, 1.0, static_cast<double> (bufSize - 3));
 
         buf[static_cast<size_t> (writePos)] = x;
@@ -298,18 +333,21 @@ public:
         const int i0 = static_cast<int> (rPos);
         const int i1 = (i0 + 1) % bufSize;
         const float frac = static_cast<float> (rPos - static_cast<double> (i0));
-        const float delayed = buf[static_cast<size_t> (i0)] * (1.0f - frac) + buf[static_cast<size_t> (i1)] * frac;
+        const float delayed = eqShelf.processSample (buf[static_cast<size_t> (i0)] * (1.0f - frac) + buf[static_cast<size_t> (i1)] * frac);
         if (++writePos >= bufSize) writePos = 0;
 
-        const float wet = x * (1.0f - mx * 0.35f) + delayed * (mx * 0.72f);
+        const float wet = (mode == 2)
+            ? (x * (1.0f - mx * 0.85f) + delayed * (mx * 0.95f))
+            : (x * (1.0f - mx * 0.35f) + delayed * (mx * 0.72f));
         return wet * (1.0f - bypassSmooth) + x * bypassSmooth;
     }
 
 private:
     double sr = 48000.0, phase = 0.0;
     std::vector<float> buf;
+    xvdsp::Biquad eqShelf;
     int bufSize = 2880, writePos = 0;
-    float bypassSmooth = 0.0f;
+    float bypassSmooth = 0.0f, lastEq = -1.0f;
 };
 
 //==============================================================================
@@ -374,14 +412,17 @@ public:
     }
     void reset() noexcept { std::fill (buf.begin(), buf.end(), 0.0f); writePos = 0; fbLp.reset(); }
 
-    inline float process (float x, bool enabled, float time, float feedback, float mix) noexcept
+    inline float process (float x, bool enabled, float time, float feedback, float mix,
+                          float mode = 30.0f, bool subdiv = false) noexcept
     {
         bypassSmooth += 0.008f * ((enabled ? 0.0f : 1.0f) - bypassSmooth);
         const float tm = std::clamp (time     * 0.01f, 0.0f, 1.0f);
         const float fb = std::clamp (feedback * 0.01f, 0.0f, 1.0f) * 0.80f;
         const float mx = std::clamp (mix      * 0.01f, 0.0f, 1.0f);
+        const int   mIdx = std::clamp (static_cast<int> (std::round (mode * 0.02f)), 0, 2);
 
-        const double dSmp = std::clamp ((0.065 + tm * 0.685) * sr, 1.0, static_cast<double> (bufSize - 4));
+        const double subScale = subdiv ? 0.75 : 1.0;
+        const double dSmp = std::clamp ((0.065 + tm * 0.685) * subScale * sr, 1.0, static_cast<double> (bufSize - 4));
         double rPos = static_cast<double> (writePos) - dSmp;
         while (rPos < 0.0) rPos += static_cast<double> (bufSize);
         const int i0 = static_cast<int> (rPos);
@@ -389,8 +430,8 @@ public:
         const float frac = static_cast<float> (rPos - static_cast<double> (i0));
         const float tap = buf[static_cast<size_t> (i0)] * (1.0f - frac) + buf[static_cast<size_t> (i1)] * frac;
 
-        const float fbSig = fbLp.processSample (tap);
-        buf[static_cast<size_t> (writePos)] = std::tanh (x + fbSig * fb);
+        const float fbSig = (mIdx == 0) ? tap : fbLp.processSample (tap);
+        buf[static_cast<size_t> (writePos)] = std::tanh (x + fbSig * fb * (mIdx == 2 ? 0.96f : 1.0f));
         if (++writePos >= bufSize) writePos = 0;
 
         const float wet = x * (1.0f - mx * 0.15f) + tap * (mx * 0.85f);
@@ -435,18 +476,20 @@ public:
         cLp.fill (0.0f); toneLp.reset();
     }
 
-    inline float process (float x, bool enabled, float decay, float tone, float mix) noexcept
+    inline float process (float x, bool enabled, float decay, float tone, float mix, float mode = 35.0f) noexcept
     {
         bypassSmooth += 0.008f * ((enabled ? 0.0f : 1.0f) - bypassSmooth);
         const float dec = std::clamp (decay * 0.01f, 0.0f, 1.0f);
         const float tn  = std::clamp (tone  * 0.01f, 0.0f, 1.0f);
         const float mx  = std::clamp (mix   * 0.01f, 0.0f, 1.0f);
+        const int   mIdx = std::clamp (static_cast<int> (std::round (mode * 0.02f)), 0, 2);
         if (std::fabs (tn - lastTone) > 0.01f)
         {
             lastTone = tn;
             toneLp.setLowPass (sr, 1100.0 * std::pow (8.5, static_cast<double> (tn)), 0.7071);
         }
-        const float roomFb = 0.65f + dec * 0.27f;
+        const float modeBoost = (mIdx == 0) ? -0.05f : (mIdx == 1 ? 0.03f : 0.01f);
+        const float roomFb = std::clamp (0.65f + dec * 0.27f + modeBoost, 0.45f, 0.94f);
         const float damp = 0.34f - tn * 0.22f;
         const float feed = x * 0.18f;
         float acc = 0.0f;
@@ -739,6 +782,12 @@ public:
         phaser.prepare (sampleRate);
         delay.prepare (sampleRate);
         reverb.prepare (sampleRate);
+        dist.prepare (sampleRate, false);
+        dualCrunch.prepare (sampleRate);
+        flanger.prepare (sampleRate);
+        gatePedal.prepare (sampleRate);
+        octaver.prepare (sampleRate);
+        eq7.prepare (sampleRate, false);
         head.prepare (sampleRate);
     }
 
@@ -747,6 +796,8 @@ public:
         pitcher.reset(); gate.reset();
         comp.reset(); drive.reset(); fuzz.reset();
         chorus.reset(); phaser.reset(); delay.reset(); reverb.reset();
+        dist.reset(); dualCrunch.reset(); flanger.reset();
+        gatePedal.reset(); octaver.reset(); eq7.reset();
         head.reset();
     }
 
@@ -760,33 +811,51 @@ public:
         pitcher.setParameters (snap.pitchEnabled, snap.pitchSemitones, snap.pitchCents, snap.pitchMix);
         s = pitcher.processSample (s);
 
-        bool seen[7] = { false, false, false, false, false, false, false };
+        std::array<bool, 13> seen {};
         for (int slot : snap.chainSlots)
         {
-            if (slot < 0 || slot >= 7 || seen[slot]) continue;
-            seen[slot] = true;
+            if (slot < 0 || slot >= 13 || seen[static_cast<size_t> (slot)]) continue;
+            seen[static_cast<size_t> (slot)] = true;
             switch (static_cast<GuitarPedalType> (slot))
             {
                 case GuitarPedalType::Compresor:
-                    s = comp.process (s, snap.compOn, snap.compSustain, snap.compAttack, snap.compLevel);
+                    s = comp.process (s, snap.compOn, snap.compSustain, snap.compAttack, snap.compLevel, snap.compTone);
                     break;
                 case GuitarPedalType::Drive:
-                    s = drive.process (s, snap.driveOn, snap.driveGain, snap.driveTone, snap.driveLevel);
+                    s = drive.process (s, snap.driveOn, snap.driveGain, snap.driveTone, snap.driveLevel, snap.driveClip);
                     break;
                 case GuitarPedalType::Fuzz:
                     s = fuzz.process (s, snap.fuzzOn, snap.fuzzFuzz, snap.fuzzTone, snap.fuzzLevel);
                     break;
                 case GuitarPedalType::Chorus:
-                    s = chorus.process (s, snap.chorusOn, snap.chorusRate, snap.chorusDepth, snap.chorusMix, chIdx);
+                    s = chorus.process (s, snap.chorusOn, snap.chorusRate, snap.chorusDepth, snap.chorusMix, chIdx, snap.chorusEq, snap.chorusMode);
                     break;
                 case GuitarPedalType::Phaser:
                     s = phaser.process (s, snap.phaserOn, snap.phaserRate, snap.phaserDepth, snap.phaserFeedback);
                     break;
                 case GuitarPedalType::Delay:
-                    s = delay.process (s, snap.delayOn, snap.delayTime, snap.delayFeedback, snap.delayMix);
+                    s = delay.process (s, snap.delayOn, snap.delayTime, snap.delayFeedback, snap.delayMix, snap.delayMode, snap.delaySubdiv);
                     break;
                 case GuitarPedalType::Reverb:
-                    s = reverb.process (s, snap.reverbOn, snap.reverbDecay, snap.reverbTone, snap.reverbMix);
+                    s = reverb.process (s, snap.reverbOn, snap.reverbDecay, snap.reverbTone, snap.reverbMix, snap.reverbMode);
+                    break;
+                case GuitarPedalType::Distortion:
+                    s = dist.process (s, snap.distOn, snap.distTone, snap.distLevel, snap.distDrive);
+                    break;
+                case GuitarPedalType::DualCrunch:
+                    s = dualCrunch.process (s, snap.dualOn, snap.dualOutput, snap.dualGain, snap.dualBlend, snap.dualTone, snap.dualDrive, snap.dualScoop);
+                    break;
+                case GuitarPedalType::Flanger:
+                    s = flanger.process (s, snap.flangeOn, snap.flangeManual, snap.flangeRes, snap.flangeDepth, snap.flangeRate, snap.flangeMode);
+                    break;
+                case GuitarPedalType::NoiseGate:
+                    s = gatePedal.process (s, snap.gatePedalOn, snap.gatePedalThresh, snap.gatePedalDecay, snap.gatePedalMode);
+                    break;
+                case GuitarPedalType::Octaver:
+                    s = octaver.process (s, snap.octOn, snap.octDirect, snap.octUp, snap.octSub1, snap.octSub2);
+                    break;
+                case GuitarPedalType::GraphicEq:
+                    s = eq7.process (s, snap.eqOn, snap.eqBands);
                     break;
                 default:
                     break;
@@ -807,6 +876,12 @@ private:
     GuitarPhaserFX phaser;
     GuitarDelayFX delay;
     GuitarReverbFX reverb;
+    mipedals::BoutiqueDistortionFX dist;
+    mipedals::BoutiqueDualCrunchFX dualCrunch;
+    mipedals::BoutiqueFlangerFX flanger;
+    mipedals::BoutiqueNoiseGateFX gatePedal;
+    mipedals::BoutiqueOctaverFX octaver;
+    mipedals::Boutique7BandEQFX eq7;
     ZenboxHeadProcessor head;
 };
 

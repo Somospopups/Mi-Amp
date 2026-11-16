@@ -26,18 +26,18 @@ namespace MiAmpParams
     inline constexpr const char* pitchMix    = "pitch_mix";
     inline constexpr const char* tunerMuted  = "tuner_muted";
 
-    // Bass Pedalboard Slots (-1 = Empty, 0 = Compresor, 1 = XV, 2 = Chorus, 3 = Phaser, 4 = Reverb)
-    inline constexpr const char* slot0       = "slot_0";
-    inline constexpr const char* slot1       = "slot_1";
-    inline constexpr const char* slot2       = "slot_2";
-    inline constexpr const char* slot3       = "slot_3";
-    inline constexpr const char* slot4       = "slot_4";
+    // Bass Pedalboard Slots (-1 = Empty, 0..13 = miamp::PedalType)
+    inline constexpr const char* slot[10] = {
+        "slot_0", "slot_1", "slot_2", "slot_3", "slot_4", "slot_5", "slot_6", "slot_7", "slot_8", "slot_9"
+    };
 
     // Bass Pedals
     inline constexpr const char* compOn      = "comp_on";
     inline constexpr const char* compSustain = "comp_sustain";
     inline constexpr const char* compAttack  = "comp_attack";
     inline constexpr const char* compLevel   = "comp_level";
+    inline constexpr const char* compRelease = "comp_release";
+    inline constexpr const char* compInput   = "comp_input";
 
     inline constexpr const char* xvOn        = "xv_on";
     inline constexpr const char* xvLevel     = "xv_level";
@@ -53,16 +53,32 @@ namespace MiAmpParams
     inline constexpr const char* chorusRate  = "chorus_rate";
     inline constexpr const char* chorusDepth = "chorus_depth";
     inline constexpr const char* chorusMix   = "chorus_mix";
+    inline constexpr const char* chorusLoCut = "chorus_locut";
+    inline constexpr const char* chorusXOver = "chorus_xover";
 
     inline constexpr const char* phaserOn       = "phaser_on";
     inline constexpr const char* phaserRate     = "phaser_rate";
     inline constexpr const char* phaserDepth    = "phaser_depth";
     inline constexpr const char* phaserFeedback = "phaser_feedback";
+    inline constexpr const char* phaserStage    = "phaser_stage";
 
     inline constexpr const char* reverbOn    = "reverb_on";
     inline constexpr const char* reverbDecay = "reverb_decay";
     inline constexpr const char* reverbTone  = "reverb_tone";
     inline constexpr const char* reverbMix   = "reverb_mix";
+    inline constexpr const char* reverbMode  = "reverb_mode";
+
+    // New Bass Boutique Pedals
+    inline constexpr const char* goldOn        = "bass_gold_on",   *goldLevel     = "bass_gold_level", *goldEq = "bass_gold_eq", *goldBlend = "bass_gold_blend", *goldGain = "bass_gold_gain";
+    inline constexpr const char* bfOn          = "bf_on",          *bfVol         = "bf_vol",          *bfTreble = "bf_treble",   *bfDrive = "bf_drive",         *bfBlend = "bf_blend", *bfPad = "bf_pad";
+    inline constexpr const char* bddiOn        = "bddi_on",        *bddiLevel     = "bddi_level",      *bddiBlend = "bddi_blend",   *bddiTreble = "bddi_treble",   *bddiPresence = "bddi_presence", *bddiDrive = "bddi_drive", *bddiBass = "bddi_bass", *bddiXlrPad = "bddi_xlr_pad", *bddiInBoost = "bddi_in_boost", *bddiOutBoost = "bddi_out_boost";
+    inline constexpr const char* oliveOn       = "bass_olive_on",  *oliveVol      = "bass_olive_vol",  *oliveTone = "bass_olive_tone", *oliveSustain = "bass_olive_sustain", *oliveMode = "bass_olive_mode";
+    inline constexpr const char* bassFlangeOn  = "bass_flange_on", *bassFlangeManual = "bass_flange_manual", *bassFlangeRes = "bass_flange_res", *bassFlangeDepth = "bass_flange_depth", *bassFlangeRate = "bass_flange_rate", *bassFlangeMode = "bass_flange_mode";
+    inline constexpr const char* bassDelayOn   = "bass_delay_on",  *bassDelayTime = "bass_delay_time", *bassDelayFb  = "bass_delay_fb",   *bassDelayMix = "bass_delay_mix", *bassDelayMode = "bass_delay_mode", *bassDelaySubdiv = "bass_delay_subdiv";
+    inline constexpr const char* bassGateOn    = "bass_gate_on",   *bassGateThresh= "bass_gate_thresh", *bassGateDecay = "bass_gate_decay", *bassGateMode = "bass_gate_mode";
+    inline constexpr const char* bassOctOn     = "bass_oct_on",    *bassOctDry    = "bass_oct_dry",    *bassOctSub    = "bass_oct_sub",    *bassOctUp   = "bass_oct_up";
+    inline constexpr const char* bassEqOn      = "bass_eq_on";
+    inline constexpr const char* bassEqBand[7] = { "bass_eq_0", "bass_eq_1", "bass_eq_2", "bass_eq_3", "bass_eq_4", "bass_eq_5", "bass_eq_6" };
 
     // Guitar Head (Zenbox Edition)
     inline constexpr const char* gtrInput      = "gtr_input";
@@ -82,18 +98,26 @@ namespace MiAmpParams
     inline constexpr const char* gtrChPresence[3] = { "gtr_ch1_presence", "gtr_ch2_presence", "gtr_ch3_presence" };
     inline constexpr const char* gtrChMaster[3]   = { "gtr_ch1_master",   "gtr_ch2_master",   "gtr_ch3_master" };
 
-    // Guitar Pedalboard Slots (-1 = Empty, 0=Comp, 1=Drive, 2=Fuzz, 3=Chorus, 4=Phaser, 5=Delay, 6=Reverb)
-    inline constexpr const char* gtrSlot[7] = {
-        "gtr_slot_0", "gtr_slot_1", "gtr_slot_2", "gtr_slot_3", "gtr_slot_4", "gtr_slot_5", "gtr_slot_6"
+    // Guitar Pedalboard Slots (-1 = Empty, 0..12 = zenbox::GuitarPedalType)
+    inline constexpr const char* gtrSlot[10] = {
+        "gtr_slot_0", "gtr_slot_1", "gtr_slot_2", "gtr_slot_3", "gtr_slot_4",
+        "gtr_slot_5", "gtr_slot_6", "gtr_slot_7", "gtr_slot_8", "gtr_slot_9"
     };
 
-    inline constexpr const char* gtrCompOn = "gtr_comp_on", *gtrCompSus = "gtr_comp_sus", *gtrCompAtt = "gtr_comp_att", *gtrCompLvl = "gtr_comp_lvl";
-    inline constexpr const char* gtrDriveOn = "gtr_drive_on", *gtrDriveGain = "gtr_drive_gain", *gtrDriveTone = "gtr_drive_tone", *gtrDriveLvl = "gtr_drive_lvl";
-    inline constexpr const char* gtrFuzzOn = "gtr_fuzz_on", *gtrFuzzFuzz = "gtr_fuzz_fuzz", *gtrFuzzTone = "gtr_fuzz_tone", *gtrFuzzLvl = "gtr_fuzz_lvl";
-    inline constexpr const char* gtrChorusOn = "gtr_chorus_on", *gtrChorusRate = "gtr_chorus_rate", *gtrChorusDepth = "gtr_chorus_depth", *gtrChorusMix = "gtr_chorus_mix";
-    inline constexpr const char* gtrPhaserOn = "gtr_phaser_on", *gtrPhaserRate = "gtr_phaser_rate", *gtrPhaserDepth = "gtr_phaser_depth", *gtrPhaserFb = "gtr_phaser_fb";
-    inline constexpr const char* gtrDelayOn = "gtr_delay_on", *gtrDelayTime = "gtr_delay_time", *gtrDelayFb = "gtr_delay_fb", *gtrDelayMix = "gtr_delay_mix";
-    inline constexpr const char* gtrReverbOn = "gtr_reverb_on", *gtrReverbDec = "gtr_reverb_dec", *gtrReverbTone = "gtr_reverb_tone", *gtrReverbMix = "gtr_reverb_mix";
+    inline constexpr const char* gtrCompOn     = "gtr_comp_on",     *gtrCompSus    = "gtr_comp_sus",    *gtrCompAtt = "gtr_comp_att",    *gtrCompLvl = "gtr_comp_lvl", *gtrCompTone = "gtr_comp_tone";
+    inline constexpr const char* gtrDriveOn    = "gtr_drive_on",    *gtrDriveGain  = "gtr_drive_gain",  *gtrDriveTone = "gtr_drive_tone", *gtrDriveLvl = "gtr_drive_lvl", *gtrDriveClip = "gtr_drive_clip";
+    inline constexpr const char* gtrFuzzOn     = "gtr_fuzz_on",     *gtrFuzzFuzz   = "gtr_fuzz_fuzz",   *gtrFuzzTone = "gtr_fuzz_tone",  *gtrFuzzLvl = "gtr_fuzz_lvl";
+    inline constexpr const char* gtrChorusOn   = "gtr_chorus_on",   *gtrChorusRate = "gtr_chorus_rate", *gtrChorusDepth = "gtr_chorus_depth", *gtrChorusMix = "gtr_chorus_mix", *gtrChorusEq = "gtr_chorus_eq", *gtrChorusMode = "gtr_chorus_mode";
+    inline constexpr const char* gtrPhaserOn   = "gtr_phaser_on",   *gtrPhaserRate = "gtr_phaser_rate", *gtrPhaserDepth = "gtr_phaser_depth", *gtrPhaserFb = "gtr_phaser_fb";
+    inline constexpr const char* gtrDelayOn    = "gtr_delay_on",    *gtrDelayTime  = "gtr_delay_time",  *gtrDelayFb = "gtr_delay_fb",   *gtrDelayMix = "gtr_delay_mix", *gtrDelayMode = "gtr_delay_mode", *gtrDelaySubdiv = "gtr_delay_subdiv";
+    inline constexpr const char* gtrReverbOn   = "gtr_reverb_on",   *gtrReverbDec  = "gtr_reverb_dec",  *gtrReverbTone = "gtr_reverb_tone", *gtrReverbMix = "gtr_reverb_mix", *gtrReverbMode = "gtr_reverb_mode";
+    inline constexpr const char* gtrDistOn     = "gtr_dist_on",     *gtrDistTone   = "gtr_dist_tone",   *gtrDistLevel = "gtr_dist_level", *gtrDistDrive = "gtr_dist_drive";
+    inline constexpr const char* gtrDualOn     = "gtr_dual_on",     *gtrDualOutput = "gtr_dual_output", *gtrDualGain = "gtr_dual_gain", *gtrDualBlend = "gtr_dual_blend", *gtrDualTone = "gtr_dual_tone", *gtrDualDrive = "gtr_dual_drive", *gtrDualScoop = "gtr_dual_scoop";
+    inline constexpr const char* gtrFlangeOn   = "gtr_flange_on",   *gtrFlangeManual = "gtr_flange_manual", *gtrFlangeRes = "gtr_flange_res", *gtrFlangeDepth = "gtr_flange_depth", *gtrFlangeRate = "gtr_flange_rate", *gtrFlangeMode = "gtr_flange_mode";
+    inline constexpr const char* gtrGateOn     = "gtr_gate_on",     *gtrGateThresh = "gtr_gate_thresh", *gtrGateDecay = "gtr_gate_decay", *gtrGateMode = "gtr_gate_mode";
+    inline constexpr const char* gtrOctOn      = "gtr_oct_on",      *gtrOctDirect  = "gtr_oct_direct",  *gtrOctUp = "gtr_oct_up",       *gtrOctSub1 = "gtr_oct_sub1", *gtrOctSub2 = "gtr_oct_sub2";
+    inline constexpr const char* gtrEqOn       = "gtr_eq_on";
+    inline constexpr const char* gtrEqBand[7]  = { "gtr_eq_0", "gtr_eq_1", "gtr_eq_2", "gtr_eq_3", "gtr_eq_4", "gtr_eq_5", "gtr_eq_6" };
 }
 
 struct MiAmpBassPreset
@@ -102,7 +126,7 @@ struct MiAmpBassPreset
     bool  isXvFactory = false;
     float ampGain = 50.0f, ampBass = 50.0f, ampMid = 50.0f, ampFreq = 50.0f, ampTreble = 50.0f;
     bool  ampUltraHi = false;
-    std::array<int, 5> slots { 1, -1, -1, -1, -1 };
+    std::array<int, 10> slots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
     bool  compOn = true; float compSus = 50.0f, compAtt = 50.0f, compLvl = 50.0f;
     bool  xvOn = true; float xvLvl = 56.0f, xvDrv = 40.8f, xvLow = 65.4f, xvHigh = 53.5f, xvBlend = 57.6f, xvMid = 25.8f, xvPres = 80.4f; int xvCab = 1;
@@ -122,7 +146,7 @@ struct MiAmpGuitarPreset
     bool  os4x = true;
     float input = 50.0f, gate = 18.0f, output = 58.0f;
     float gain = 56.0f, bass = 54.0f, mid = 58.0f, treble = 58.0f, presence = 56.0f, master = 58.0f;
-    std::array<int, 7> slots { 1, -1, -1, -1, -1, -1, -1 };
+    std::array<int, 10> slots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
     bool  compOn = false;  float compSus = 50.0f, compAtt = 45.0f, compLvl = 52.0f;
     bool  driveOn = false; float driveGain = 42.0f, driveTone = 58.0f, driveLvl = 62.0f;
     bool  fuzzOn = false;  float fuzzFuzz = 65.0f, fuzzTone = 52.0f, fuzzLvl = 55.0f;
@@ -197,6 +221,7 @@ public:
     std::atomic<float> inputRms  { 0.0f };
     std::atomic<float> outputRms { 0.0f };
     std::atomic<bool>  isClipping { false };
+    std::atomic<float> bassCompGrDb { 0.0f };
 
     juce::AudioProcessorValueTreeState apvts;
 

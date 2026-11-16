@@ -19,6 +19,13 @@ public:
 private:
     enum class PopoverKind { None, Presets, Tuner, Drop, Config };
     enum class KnobKind    { GuitarHead, BassHead, Pedal };
+    enum class ArtKey
+    {
+        MiOrange = 0, MiGreenDrive, MiDualCrunch, MiSustain, MiIceComp, MiPhaser,
+        MiSkyChorus, MiViolet, MiPearl, MiSilent, MiSubOctave, MiGraphicEq, MiStudio,
+        MiGold, BassFood, MiBassDriver, MiOlive, Mi87, MiLimePhase, MiDeepChorus,
+        MiPolyOctave, MiBassEq, Count
+    };
 
     struct Images
     {
@@ -26,9 +33,9 @@ private:
         juce::Image guitarBg, bassBg, bassKnobCap, toggleUp, toggleDown;
         juce::Image floorBg, boardSurface;
         juce::Image xvActive, xvBypass, xvKnobPtr, xvCabBass, xvCabPunk, xvCabClean;
-        juce::Image compActive, compOff, driveActive, driveOff, fuzzActive, fuzzOff;
-        juce::Image chActive, chOff, phActive, phOff, delayActive, delayOff, rvActive, rvOff;
-        juce::Image compKnob[3], driveKnob[3], chKnob[3], phKnob[3];
+        juce::Image pedBodies[static_cast<int> (ArtKey::Count)];
+        juce::Image pedKnobs[static_cast<int> (ArtKey::Count)];
+        juce::Image pedSliderCap;
     };
 
     class GlassLookAndFeel final : public juce::LookAndFeel_V4
@@ -124,7 +131,8 @@ private:
         void setData (const juce::String& title, juce::Image img,
                       std::function<void()> onClick,
                       std::function<void(juce::Point<float>)> onDragMove,
-                      std::function<void(juce::Point<float>)> onDragEnd);
+                      std::function<void(juce::Point<float>)> onDragEnd,
+                      std::function<void(juce::Graphics&, juce::Rectangle<float>)> onPaintArt = nullptr);
 
     private:
         juce::String name;
@@ -134,6 +142,53 @@ private:
         juce::Point<int> downPos;
         std::function<void()> clickFn;
         std::function<void(juce::Point<float>)> dragMoveFn, dragEndFn;
+        std::function<void(juce::Graphics&, juce::Rectangle<float>)> paintArtFn;
+    };
+
+    class PedalToggleOverlay final : public juce::Component
+    {
+    public:
+        PedalToggleOverlay (juce::AudioProcessorValueTreeState& state,
+                            juce::Image upImg, juce::Image downImg,
+                            std::function<void(const juce::String&)> onHud);
+        void setConfig (const juce::String& paramId, const juce::String& labelText, bool isThreeWay,
+                        const juce::String& opt0, const juce::String& opt1, const juce::String& opt2);
+        void paint (juce::Graphics& g) override;
+        void mouseDown (const juce::MouseEvent&) override;
+
+    private:
+        juce::AudioProcessorValueTreeState& apvts;
+        juce::Image imgUp, imgDown;
+        juce::String pid, label;
+        juce::String opts[3];
+        bool threeWay = false;
+        std::function<void(const juce::String&)> hudCallback;
+    };
+
+    class EqFader final : public juce::Component
+    {
+    public:
+        EqFader (juce::AudioProcessorValueTreeState& state,
+                 juce::Image capImg,
+                 std::function<void(const juce::String&)> onHud);
+        void setParam (const juce::String& paramId, const juce::String& bandLabel);
+        void paint (juce::Graphics& g) override;
+        void mouseDown (const juce::MouseEvent& e) override;
+        void mouseDrag (const juce::MouseEvent& e) override;
+        void mouseUp (const juce::MouseEvent&) override;
+        void mouseDoubleClick (const juce::MouseEvent&) override;
+        void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+
+    private:
+        juce::AudioProcessorValueTreeState& apvts;
+        juce::Image capImage;
+        juce::String pid, label;
+        std::function<void(const juce::String&)> hudCallback;
+        bool dragging = false;
+        float dragStartVal = 50.0f;
+        int dragStartY = 0;
+        void setFromY (int yPx);
+        juce::String formatDb (float val) const;
     };
 
     class GlassPopover;
@@ -160,6 +215,7 @@ private:
     void paintFloorScene (juce::Graphics& g);
     void paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> r, float radius = 22.0f) const;
     void paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const;
+    void paintPedalStateOverlays (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect, bool active) const;
 
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseDrag (const juce::MouseEvent& e) override;
@@ -200,8 +256,8 @@ private:
     float boardTx = 0.0f, boardTy = 0.0f, boardScale = 1.0f;
 
     // Smooth per-pedal slot & pickup animations on floor board
-    std::array<juce::Rectangle<float>, 7> animPedalRects {};
-    std::array<bool, 7> animPedalHasPos {};
+    std::array<juce::Rectangle<float>, 14> animPedalRects {};
+    std::array<bool, 14> animPedalHasPos {};
 
     // Drag & Drop state on floor pedalboard
     bool  draggingPedalActive = false;
@@ -227,12 +283,14 @@ private:
 
     // Floor Editor controls (.edit)
     std::unique_ptr<ImageRotaryKnob> editorKnobs[7];
+    std::unique_ptr<EqFader> eqFaders[7];
+    std::unique_ptr<PedalToggleOverlay> pedalToggles[3];
     juce::TextButton btnEditClose { juce::String::fromUTF8 (u8"\u00d7") };
     juce::TextButton btnMoveLeft { "<" }, btnMoveRight { ">" };
     TrashIconButton btnTrashPedal;
 
-    // Floor Palette (.palette)
-    std::unique_ptr<PalettePedalButton> paletteItems[7];
+    // Floor Palette (.palette) - up to 14 pedals in one row
+    std::unique_ptr<PalettePedalButton> paletteItems[14];
     juce::TextButton btnFloorPresets { "PRESETS" }, btnFloorTuner { "AFINADOR" };
     juce::TextButton btnFloorDrop { "DROP" }, btnFloorConfig { "CONFIG" }, btnBackToAmp { "VOLVER AL AMPLI" };
     juce::TextButton btnFloorTunerMute { "MUTE" }, btnFloorTunerNotation { "DO RE MI" };

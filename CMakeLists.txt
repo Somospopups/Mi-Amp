@@ -52,8 +52,10 @@ target_sources(MiAmp
         Source/PluginProcessor.h
         Source/PluginEditor.cpp
         Source/PluginEditor.h
+        Source/PedalCatalogSpecs.h
         Source/DSP/MiAmpBassChainDSP.h
         Source/DSP/MiAmpGuitarChainDSP.h
+        Source/DSP/MiAmpBoutiquePedalsDSP.h
         Source/DSP/ZenboxCabIRs.h
         Source/DSP/XVBassDSP.h
         Source/DSP/XVCabIRs.h
@@ -81,32 +83,49 @@ juce_add_binary_data(MiAmpAssets
         Resources/xv_cab_bass.png
         Resources/xv_cab_punk.png
         Resources/xv_cab_clean.png
-        Resources/pedal_compresor_active.png
-        Resources/pedal_compresor_off.png
-        Resources/pedal_drive_active.png
-        Resources/pedal_drive_off.png
-        Resources/pedal_fuzz_active.png
-        Resources/pedal_fuzz_off.png
-        Resources/pedal_chorus_active.png
-        Resources/pedal_chorus_off.png
-        Resources/pedal_phaser_active.png
-        Resources/pedal_phaser_off.png
-        Resources/pedal_delay_active.png
-        Resources/pedal_delay_off.png
-        Resources/pedal_reverb_active.png
-        Resources/pedal_reverb_off.png
-        Resources/knob_compresor_0.png
-        Resources/knob_compresor_1.png
-        Resources/knob_compresor_2.png
-        Resources/knob_drive_0.png
-        Resources/knob_drive_1.png
-        Resources/knob_drive_2.png
-        Resources/knob_chorus_0.png
-        Resources/knob_chorus_1.png
-        Resources/knob_chorus_2.png
-        Resources/knob_phaser_0.png
-        Resources/knob_phaser_1.png
-        Resources/knob_phaser_2.png
+        Resources/ped2_bass_food_body.png
+        Resources/ped2_bass_food_knob.png
+        Resources/ped2_mi_87_body.png
+        Resources/ped2_mi_87_knob.png
+        Resources/ped2_mi_bass_driver_body.png
+        Resources/ped2_mi_bass_driver_knob.png
+        Resources/ped2_mi_bass_eq_body.png
+        Resources/ped2_mi_deep_chorus_body.png
+        Resources/ped2_mi_deep_chorus_knob.png
+        Resources/ped2_mi_dual_crunch_body.png
+        Resources/ped2_mi_dual_crunch_knob.png
+        Resources/ped2_mi_gold_body.png
+        Resources/ped2_mi_gold_knob.png
+        Resources/ped2_mi_graphic_eq_body.png
+        Resources/ped2_mi_green_drive_body.png
+        Resources/ped2_mi_green_drive_knob.png
+        Resources/ped2_mi_ice_comp_body.png
+        Resources/ped2_mi_ice_comp_knob.png
+        Resources/ped2_mi_lime_phase_body.png
+        Resources/ped2_mi_lime_phase_knob.png
+        Resources/ped2_mi_olive_body.png
+        Resources/ped2_mi_olive_knob.png
+        Resources/ped2_mi_orange_body.png
+        Resources/ped2_mi_orange_knob.png
+        Resources/ped2_mi_pearl_body.png
+        Resources/ped2_mi_pearl_knob.png
+        Resources/ped2_mi_phaser_body.png
+        Resources/ped2_mi_phaser_knob.png
+        Resources/ped2_mi_poly_octave_body.png
+        Resources/ped2_mi_poly_octave_knob.png
+        Resources/ped2_mi_silent_body.png
+        Resources/ped2_mi_silent_knob.png
+        Resources/ped2_mi_sky_chorus_body.png
+        Resources/ped2_mi_sky_chorus_knob.png
+        Resources/ped2_mi_studio_body.png
+        Resources/ped2_mi_studio_knob.png
+        Resources/ped2_mi_sub_octave_body.png
+        Resources/ped2_mi_sub_octave_knob.png
+        Resources/ped2_mi_sustain_body.png
+        Resources/ped2_mi_sustain_knob.png
+        Resources/ped2_mi_violet_body.png
+        Resources/ped2_mi_violet_knob.png
+        Resources/ped2_slider_eq_cap.png
 )
 
 target_compile_definitions(MiAmp
