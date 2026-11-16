@@ -233,6 +233,11 @@ public:
     void deleteUserPreset (int index);
     void loadUserPreset (int index);
 
+    miamp::BassControlSnapshot getBassSnapshot() const noexcept { return readBassSnapshot(); }
+    zenbox::GuitarControlSnapshot getGuitarSnapshot() const noexcept { return readGuitarSnapshot(); }
+    juce::String exportStateAsXmlString (const juce::String& presetName);
+    bool importStateFromXmlString (const juce::String& xmlText);
+
     xvdsp::XVBassTuner tuner;
     std::atomic<float> inputRms  { 0.0f };
     std::atomic<float> outputRms { 0.0f };

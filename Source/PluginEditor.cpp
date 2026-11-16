@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PedalCatalogSpecs.h"
+#include "PresetExporter.h"
 #include <BinaryData.h>
 #include <algorithm>
 #include <cmath>
@@ -140,15 +141,18 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
         return;
     }
 
-    if (id == "presetDelete")
+    if (id == "presetDelete" || id == "presetExport")
     {
         const float diam = juce::jmin (r.getWidth(), r.getHeight());
         const auto cr = r.withSizeKeepingCentre (diam, diam);
+        const bool isDel = (id == "presetDelete");
         if (highlighted || down)
         {
-            g.setColour (juce::Colour::fromRGBA (198, 120, 97, down ? 140 : 102));
+            g.setColour (isDel ? juce::Colour::fromRGBA (198, 120, 97, down ? 140 : 102)
+                               : juce::Colour::fromRGBA (142, 208, 180, down ? 128 : 90));
             g.fillEllipse (cr);
-            g.setColour (juce::Colour::fromRGB (255, 222, 209));
+            g.setColour (isDel ? juce::Colour::fromRGB (255, 222, 209)
+                               : juce::Colour::fromRGB (222, 255, 238));
             g.drawEllipse (cr, 1.1f);
         }
         else
@@ -204,9 +208,38 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
 
     if (id == "presetDelete")
     {
-        g.setFont (sansFont (18.0f, juce::Font::plain));
-        g.setColour (juce::Colour::fromRGB (255, 244, 230));
-        g.drawText (juce::String::fromUTF8 (u8"\u00d7"), bounds.toFloat(), juce::Justification::centred);
+        // Crisp vector trash can icon for deleting saved presets
+        const auto r = bounds.toFloat();
+        const float cx = r.getCentreX();
+        const float cy = r.getCentreY();
+        const float u  = juce::jmin (r.getWidth(), r.getHeight()) * 0.036f;
+        const float lw = juce::jmax (1.2f, 1.4f * u);
+        g.setColour (juce::Colour::fromRGB (255, 235, 224));
+        g.drawLine (cx - 5.4f * u, cy - 3.2f * u, cx + 5.4f * u, cy - 3.2f * u, lw);
+        g.drawRect (cx - 2.2f * u, cy - 5.4f * u, 4.4f * u, 2.2f * u, lw * 0.85f);
+        g.drawLine (cx - 4.0f * u, cy - 3.2f * u, cx - 3.2f * u, cy + 5.4f * u, lw);
+        g.drawLine (cx + 4.0f * u, cy - 3.2f * u, cx + 3.2f * u, cy + 5.4f * u, lw);
+        g.drawLine (cx - 3.2f * u, cy + 5.4f * u, cx + 3.2f * u, cy + 5.4f * u, lw);
+        g.drawLine (cx - 1.3f * u, cy - 1.0f * u, cx - 1.3f * u, cy + 3.4f * u, lw * 0.85f);
+        g.drawLine (cx + 1.3f * u, cy - 1.0f * u, cx + 1.3f * u, cy + 3.4f * u, lw * 0.85f);
+        return;
+    }
+
+    if (id == "presetExport")
+    {
+        // Crisp vector download tray + arrow icon
+        const auto r = bounds.toFloat();
+        const float cx = r.getCentreX();
+        const float cy = r.getCentreY();
+        const float u  = juce::jmin (r.getWidth(), r.getHeight()) * 0.036f;
+        const float lw = juce::jmax (1.3f, 1.5f * u);
+        g.setColour (juce::Colour::fromRGB (228, 255, 240));
+        g.drawLine (cx, cy - 5.4f * u, cx, cy + 2.2f * u, lw);
+        g.drawLine (cx - 3.2f * u, cy - 0.8f * u, cx, cy + 2.5f * u, lw);
+        g.drawLine (cx + 3.2f * u, cy - 0.8f * u, cx, cy + 2.5f * u, lw);
+        g.drawLine (cx - 5.2f * u, cy + 3.2f * u, cx - 5.2f * u, cy + 5.4f * u, lw);
+        g.drawLine (cx - 5.2f * u, cy + 5.4f * u, cx + 5.2f * u, cy + 5.4f * u, lw);
+        g.drawLine (cx + 5.2f * u, cy + 3.2f * u, cx + 5.2f * u, cy + 5.4f * u, lw);
         return;
     }
 
@@ -1021,6 +1054,33 @@ public:
             if (changedFn) changedFn();
         };
 
+        addChildComponent (btnImportPreset);
+        btnImportPreset.setButtonText ("IMPORTAR .MIAMP");
+        btnImportPreset.onClick = [this]
+        {
+            activeChooser = std::make_unique<juce::FileChooser> (
+                "Importar preset de MI AMP (.miamp)",
+                juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                "*.miamp;*.xml");
+            juce::Component::SafePointer<GlassPopover> safeThis (this);
+            activeChooser->launchAsync (
+                juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                [safeThis] (const juce::FileChooser& fc)
+                {
+                    if (safeThis == nullptr) return;
+                    const auto f = fc.getResult();
+                    if (f.getFullPathName().isNotEmpty())
+                    {
+                        const auto txt = f.loadFileAsString();
+                        if (safeThis->processor.importStateFromXmlString (txt))
+                        {
+                            safeThis->rebuildPresetList();
+                            if (safeThis->changedFn) safeThis->changedFn();
+                        }
+                    }
+                });
+        };
+
         addChildComponent (presetViewport);
         presetViewport.setViewedComponent (&presetListHolder, false);
         presetViewport.setScrollBarsShown (true, false);
@@ -1315,6 +1375,7 @@ public:
 
         presetNameEdit.setVisible (isP);
         btnSavePreset.setVisible (isP);
+        btnImportPreset.setVisible (isP);
         presetViewport.setVisible (isP);
 
         btnDropToggle.setVisible (showDrop);
@@ -1397,11 +1458,6 @@ public:
             g.drawText ("GUARDAR PRESET",
                         juce::Rectangle<float> (bx, bottom - 102.0f, bw, 16.0f),
                         juce::Justification::centredLeft);
-            g.setFont (sansFont (11.5f));
-            g.setColour (inkColour().withAlpha (0.80f));
-            g.drawFittedText ("Un preset reemplaza la cadena y ajustes actuales.",
-                              juce::Rectangle<int> (18, getHeight() - 48, getWidth() - 36, 34),
-                              juce::Justification::topLeft, 2);
         }
         else if (kind == PopoverKind::Drop)
         {
@@ -1595,7 +1651,9 @@ public:
 
         if (kind == PopoverKind::Presets)
         {
-            inner.removeFromBottom (38); // 2-line hint text area below .save-row
+            auto importRow = inner.removeFromBottom (26);
+            btnImportPreset.setBounds (importRow);
+            inner.removeFromBottom (10);
             auto saveRow = inner.removeFromBottom (41);
             btnSavePreset.setBounds (saveRow.removeFromRight (80));
             saveRow.removeFromRight (6);
@@ -1747,9 +1805,17 @@ private:
         presetListHolder.removeAllChildren();
 
         auto addRow = [this] (const juce::String& text, bool isActive, bool isUserRow,
+                              std::function<void()> applyOnly,
                               std::function<void()> onLoad, std::function<void()> onDel)
         {
             auto row = std::make_unique<PresetRow> (text, isActive, isUserRow, std::move (onLoad), std::move (onDel));
+            auto* rowPtr = row.get();
+            row->onExport = [this, text, applyOnly, rowPtr]
+            {
+                if (applyOnly) applyOnly();
+                if (changedFn) changedFn();
+                showExportFormatMenu (text, &rowPtr->btnExport);
+            };
             presetListHolder.addAndMakeVisible (*row);
             presetRows.push_back (std::move (row));
         };
@@ -1762,12 +1828,14 @@ private:
             {
                 const auto& up = userList[static_cast<size_t> (i)];
                 addRow (up.name, up.name == activeName, true,
+                    [this, i] { processor.loadUserPreset (i); },
                     [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
             }
             for (const auto& fp : MiAmpAudioProcessor::getFactoryPresets())
             {
                 addRow (fp.name, fp.name == activeName, false,
+                    [this, fp] { processor.applyPreset (fp); },
                     [this, fp] { processor.applyPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     nullptr);
             }
@@ -1779,18 +1847,67 @@ private:
             {
                 const auto& up = userList[static_cast<size_t> (i)];
                 addRow (up.name, up.name == activeName, true,
+                    [this, i] { processor.loadUserPreset (i); },
                     [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
             }
             for (const auto& fp : MiAmpAudioProcessor::getGuitarFactoryPresets())
             {
                 addRow (fp.name, fp.name == activeName, false,
+                    [this, fp] { processor.applyGuitarPreset (fp); },
                     [this, fp] { processor.applyGuitarPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     nullptr);
             }
         }
 
         layoutPresetButtons();
+    }
+
+    void showExportFormatMenu (const juce::String& presetName, juce::Component* target)
+    {
+        juce::PopupMenu m;
+        m.addSectionHeader (juce::String::fromUTF8 (u8"\u00bfEn qu\u00e9 formato quer\u00e9s descargarlo?"));
+        m.addItem (1, "IR Cabina + EQ (.wav 44.1kHz 24-bit) - M-Vave Blackbox / Universal");
+        m.addItem (2, "Line 6 Helix / HX Stomp / POD Go (.hlx)");
+        m.addItem (3, "Headrush (.rig)");
+        m.addItem (4, juce::String::fromUTF8 (u8"Gu\u00eda M-Vave Blackbox y Pedaleras (.txt)"));
+        m.addSeparator();
+        m.addItem (5, "Preset Portable MI AMP (.miamp)");
+
+        juce::Component::SafePointer<GlassPopover> safeThis (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target),
+            [safeThis, presetName] (int choice)
+            {
+                if (safeThis == nullptr || choice <= 0)
+                    return;
+
+                const juce::String clean = mipedals::PresetExporter::sanitizeFileName (presetName);
+                const char* ext = (choice == 1) ? ".wav"
+                                : (choice == 2) ? ".hlx"
+                                : (choice == 3) ? ".rig"
+                                : (choice == 4) ? ".txt"
+                                                : ".miamp";
+                const auto initFile = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                          .getChildFile (clean + ext);
+                safeThis->activeChooser = std::make_unique<juce::FileChooser> (
+                    "Descargar preset para pedalera (" + juce::String (ext) + ")",
+                    initFile,
+                    "*" + juce::String (ext));
+                safeThis->activeChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [safeThis, choice, presetName] (const juce::FileChooser& fc)
+                    {
+                        if (safeThis == nullptr) return;
+                        const auto out = fc.getResult();
+                        if (out.getFullPathName().isEmpty()) return;
+
+                        if (choice == 1)      mipedals::PresetExporter::exportIrWav44k24Bit (safeThis->processor, out);
+                        else if (choice == 2) mipedals::PresetExporter::exportHelixHlx (safeThis->processor, presetName, out);
+                        else if (choice == 3) mipedals::PresetExporter::exportHeadrushRig (safeThis->processor, presetName, out);
+                        else if (choice == 4) mipedals::PresetExporter::exportBlackboxGuideTxt (safeThis->processor, presetName, out);
+                        else if (choice == 5) mipedals::PresetExporter::exportMiAmpXml (safeThis->processor, presetName, out);
+                    });
+            });
     }
 
     void layoutPresetButtons()
@@ -1817,11 +1934,17 @@ private:
             btnLoad.setButtonText (title);
             btnLoad.setToggleState (active, juce::dontSendNotification);
             btnLoad.onClick = std::move (loadCb);
+
+            addAndMakeVisible (btnExport);
+            btnExport.setComponentID ("presetExport");
+            btnExport.setTooltip ("Descargar preset para pedalera digital");
+            btnExport.onClick = [this] { if (onExport) onExport(); };
+
             if (delCb)
             {
                 addAndMakeVisible (btnDel);
                 btnDel.setComponentID ("presetDelete");
-                btnDel.setButtonText (juce::String::fromUTF8 (u8"\u00d7"));
+                btnDel.setTooltip ("Eliminar preset guardado");
                 btnDel.onClick = std::move (delCb);
             }
         }
@@ -1842,16 +1965,19 @@ private:
             auto b = getLocalBounds();
             if (isUser)
                 b = b.reduced (6, 2);
+            const int sz = juce::jmin (30, b.getHeight());
             if (btnDel.isVisible())
             {
-                const int sz = juce::jmin (32, b.getHeight());
                 btnDel.setBounds (b.removeFromRight (sz).withSizeKeepingCentre (sz, sz));
                 b.removeFromRight (4);
             }
+            btnExport.setBounds (b.removeFromRight (sz).withSizeKeepingCentre (sz, sz));
+            b.removeFromRight (4);
             btnLoad.setBounds (b);
         }
         bool isUser = false;
-        juce::TextButton btnLoad, btnDel;
+        juce::TextButton btnLoad, btnExport, btnDel;
+        std::function<void()> onExport;
     };
 
     void runToneSearch (const juce::String& rawQuery)
@@ -1957,10 +2083,11 @@ private:
 
     juce::TextButton btnClose;
     juce::TextEditor presetNameEdit;
-    juce::TextButton btnSavePreset;
+    juce::TextButton btnSavePreset, btnImportPreset;
     juce::Viewport presetViewport;
     juce::Component presetListHolder;
     std::vector<std::unique_ptr<PresetRow>> presetRows;
+    std::unique_ptr<juce::FileChooser> activeChooser;
 
     juce::TextButton btnDropToggle;
     juce::TextButton dropChips[6];

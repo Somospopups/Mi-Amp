@@ -1389,6 +1389,32 @@ void MiAmpAudioProcessor::setStateInformation (const void* data, int sizeInBytes
     }
 }
 
+juce::String MiAmpAudioProcessor::exportStateAsXmlString (const juce::String& presetName)
+{
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    if (! xml)
+        return {};
+    xml->setAttribute ("exportedPresetName", presetName);
+    xml->setAttribute ("activeBassPresetName", isBassMode() ? presetName : activeBassPresetName);
+    xml->setAttribute ("activeGuitarPresetName", isBassMode() ? activeGuitarPresetName : presetName);
+    return xml->toString();
+}
+
+bool MiAmpAudioProcessor::importStateFromXmlString (const juce::String& xmlText)
+{
+    std::unique_ptr<juce::XmlElement> xml (juce::XmlDocument::parse (xmlText));
+    if (! xml || ! xml->hasTagName (apvts.state.getType()))
+        return false;
+    activeBassPresetName   = xml->getStringAttribute ("activeBassPresetName", activeBassPresetName);
+    activeGuitarPresetName = xml->getStringAttribute ("activeGuitarPresetName", activeGuitarPresetName);
+    apvts.replaceState (juce::ValueTree::fromXml (*xml));
+    const juce::String impName = xml->getStringAttribute ("exportedPresetName", "").trim();
+    if (impName.isNotEmpty())
+        saveUserPreset (impName);
+    return true;
+}
+
 juce::AudioProcessorEditor* MiAmpAudioProcessor::createEditor()
 {
     return new MiAmpAudioProcessorEditor (*this);

@@ -54,6 +54,7 @@ target_sources(MiAmp
         Source/PluginEditor.h
         Source/PedalCatalogSpecs.h
         Source/ToneFinderEngine.h
+        Source/PresetExporter.h
         Source/DSP/MiAmpBassChainDSP.h
         Source/DSP/MiAmpGuitarChainDSP.h
         Source/DSP/MiAmpBoutiquePedalsDSP.h
