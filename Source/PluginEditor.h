@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#include "PluginProcessor.h"
+#include "ToneFinderEngine.h"
 
 class MiAmpAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                         private juce::Timer
@@ -17,7 +17,7 @@ public:
     static juce::String formatNoteNameOnly (const char* noteName, bool useSolfege);
 
 private:
-    enum class PopoverKind { None, Presets, Tuner, Drop, Config };
+    enum class PopoverKind { None, Presets, Tuner, Drop, Config, ToneFinder };
     enum class KnobKind    { GuitarHead, BassHead, Pedal };
     enum class ArtKey
     {
@@ -202,6 +202,7 @@ private:
     void togglePopover (PopoverKind kind);
     void syncHeadControls();
     void syncPedalEditorControls();
+    void syncPalettePositions();
     void layoutAll();
 
     float stageScale() const noexcept { return static_cast<float> (getWidth()) / 1550.0f; }
@@ -221,6 +222,7 @@ private:
     void mouseDrag (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
 
     int computeDropInsertIndex (bool bassMode, juce::Point<float> stagePt, int excludePedal = -1) const;
     bool isOutsideBoardViewport (juce::Point<float> stagePt) const noexcept;
@@ -272,7 +274,7 @@ private:
 
     // Head right menu (.menu) - unified right glass panel
     juce::TextButton btnInstGuitar { "GUITARRA" }, btnInstBass { "BAJO" };
-    juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainPedals { "PEDALES" };
+    juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainToneFinder { "BUSCAR TONO" }, btnMainPedals { "PEDALES" };
     juce::TextButton btnDockDrop { "DROP" }, btnDockConfig { "CONFIG" };
 
     // Head physical knobs & switches
@@ -289,10 +291,18 @@ private:
     juce::TextButton btnMoveLeft { "<" }, btnMoveRight { ">" };
     TrashIconButton btnTrashPedal;
 
-    // Floor Palette (.palette) - up to 14 pedals in one row
+    // Floor top-right Amp vs Pedals-Only switch
+    juce::TextButton btnHeadModeAmp { "CON AMPLI" };
+    juce::TextButton btnHeadModePedals { "SOLO PEDALES" };
+
+    // Floor Palette (.palette) - smooth scrollable horizontal carousel
+    juce::Component paletteStrip;
+    juce::TextButton btnPaletteLeft { "<" }, btnPaletteRight { ">" };
+    float paletteScrollTarget = 0.0f;
+    float paletteScrollCur    = 0.0f;
     std::unique_ptr<PalettePedalButton> paletteItems[14];
     juce::TextButton btnFloorPresets { "PRESETS" }, btnFloorTuner { "AFINADOR" };
-    juce::TextButton btnFloorDrop { "DROP" }, btnFloorConfig { "CONFIG" }, btnBackToAmp { "VOLVER AL AMPLI" };
+    juce::TextButton btnFloorToneFinder { "BUSCAR TONO" }, btnFloorDrop { "DROP" }, btnFloorConfig { "CONFIG" }, btnBackToAmp { "VOLVER AL AMPLI" };
     juce::TextButton btnFloorTunerMute { "MUTE" }, btnFloorTunerNotation { "DO RE MI" };
 
     // Floating glass popover (.popover / .floor-popover)

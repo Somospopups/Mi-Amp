@@ -50,8 +50,9 @@ struct BassControlSnapshot
     float ampFreq    = 50.0f;
     float ampTreble  = 50.0f;
 
-    // Tuner Mute
+    // Tuner Mute & Direct Pedalboard Mode (Head Bypass)
     bool  tunerMuted = false;
+    bool  headBypass = false;
 
     // Pedalboard order: up to 10 slots (-1 = empty, 0..13 = PedalType)
     std::array<int, 10> chainSlots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -603,6 +604,8 @@ public:
         pitcher.reset(); goldDist.reset(); bassFood.reset(); bassDriver.reset(); xv.reset();
         oliveFuzz.reset(); comp.reset(); phaser.reset(); chorus.reset(); flanger.reset();
         delay.reset(); gate.reset(); octaver.reset(); eq7.reset(); reverb.reset(); head.reset();
+        headBypassSmooth = 0.0f;
+        directMuteSmooth = 1.0f;
     }
 
     float getCompGrDb() const noexcept { return comp.getGrDb(); }
@@ -691,10 +694,17 @@ public:
         }
 
         const bool useHeadCab = snap.ampCabOn && ! xvCabActive;
-        return head.process (s, snap, useHeadCab);
+        const float ampOut = head.process (s, snap, useHeadCab);
+
+        directMuteSmooth += 0.006f * ((snap.tunerMuted ? 0.0f : 1.0f) - directMuteSmooth);
+        headBypassSmooth += 0.008f * ((snap.headBypass ? 1.0f : 0.0f) - headBypassSmooth);
+        const float directOut = s * directMuteSmooth;
+        return ampOut * (1.0f - headBypassSmooth) + directOut * headBypassSmooth;
     }
 
 private:
+    float headBypassSmooth = 0.0f;
+    float directMuteSmooth = 1.0f;
     xvdsp::XVBassPitchShifter pitcher;
     mipedals::BoutiqueDistortionFX goldDist;
     mipedals::BoutiqueBassFoodFX   bassFood;

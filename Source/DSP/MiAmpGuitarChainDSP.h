@@ -53,12 +53,13 @@ struct GuitarControlSnapshot
     std::array<float, 3> chMaster   { 62.0f, 58.0f, 56.0f };
     float outputKnob = 58.0f;
 
-    // Pre-FX Pitch Shifter & Tuner Mute
+    // Pre-FX Pitch Shifter, Tuner Mute & Direct Pedalboard Mode (Head Bypass)
     bool  pitchEnabled   = false;
     int   pitchSemitones = 0;
     float pitchCents     = 0.0f;
     float pitchMix       = 100.0f;
     bool  tunerMuted     = false;
+    bool  headBypass     = false;
 
     // Pedalboard slots (-1 = empty, 0..12 = GuitarPedalType)
     std::array<int, 10> chainSlots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -799,6 +800,8 @@ public:
         dist.reset(); dualCrunch.reset(); flanger.reset();
         gatePedal.reset(); octaver.reset(); eq7.reset();
         head.reset();
+        headBypassSmooth = 0.0f;
+        directMuteSmooth = 1.0f;
     }
 
     inline float processSample (float x, const GuitarControlSnapshot& snap) noexcept
@@ -862,10 +865,16 @@ public:
             }
         }
 
-        return head.process (s, snap);
+        const float ampOut = head.process (s, snap);
+        directMuteSmooth += 0.006f * ((snap.tunerMuted ? 0.0f : 1.0f) - directMuteSmooth);
+        headBypassSmooth += 0.008f * ((snap.headBypass ? 1.0f : 0.0f) - headBypassSmooth);
+        const float directOut = s * directMuteSmooth;
+        return ampOut * (1.0f - headBypassSmooth) + directOut * headBypassSmooth;
     }
 
 private:
+    float headBypassSmooth = 0.0f;
+    float directMuteSmooth = 1.0f;
     int chIdx = 0;
     xvdsp::XVBassPitchShifter pitcher;
     GuitarNoiseGate gate;

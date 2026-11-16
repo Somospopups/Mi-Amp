@@ -34,19 +34,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
         p.push_back (std::make_unique<juce::AudioParameterInt> (juce::ParameterID { id, 1 }, name, minV, maxV, def));
     };
 
-    // Instrument selector (0 = Guitarra Zenbox, 1 = Bajo XV)
+    // Instrument selector (0 = Guitarra, 1 = Bajo XV)
     addInt (MiAmpParams::instrument, "Instrument", 0, 1, 0);
 
     // Bass Head
-    addBool (MiAmpParams::ampPower,   "Bass Power",    true);
-    addBool (MiAmpParams::ampStandby, "Bass Standby",  false);
-    addBool (MiAmpParams::ampUltraHi, "Bass Ultra-Hi", false);
-    addBool (MiAmpParams::ampCabOn,   "Bass Cab 8x10", true);
-    addPct  (MiAmpParams::ampGain,    "Bass Gain",     50.0f);
-    addPct  (MiAmpParams::ampBass,    "Bass Low",      50.0f);
-    addPct  (MiAmpParams::ampMid,     "Bass Mid",      50.0f);
-    addPct  (MiAmpParams::ampFreq,    "Bass Mid Freq", 50.0f);
-    addPct  (MiAmpParams::ampTreble,  "Bass Treble",   50.0f);
+    addBool (MiAmpParams::ampPower,       "Bass Power",       true);
+    addBool (MiAmpParams::ampStandby,     "Bass Standby",     false);
+    addBool (MiAmpParams::ampUltraHi,     "Bass Ultra-Hi",    false);
+    addBool (MiAmpParams::ampCabOn,       "Bass Cab 8x10",    true);
+    addPct  (MiAmpParams::ampGain,        "Bass Gain",        50.0f);
+    addPct  (MiAmpParams::ampBass,        "Bass Low",         50.0f);
+    addPct  (MiAmpParams::ampMid,         "Bass Mid",         50.0f);
+    addPct  (MiAmpParams::ampFreq,        "Bass Mid Freq",    50.0f);
+    addPct  (MiAmpParams::ampTreble,      "Bass Treble",      50.0f);
+    addBool (MiAmpParams::bassHeadBypass, "Bass Head Bypass", false);
 
     // Shared Pitch Shifter & Tuner
     addBool (MiAmpParams::pitchOn,    "Drop Tune On",  false);
@@ -156,16 +157,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     for (int b = 0; b < 7; ++b)
         addPct (MiAmpParams::bassEqBand[b], "Bass EQ Band " + juce::String (b + 1), 50.0f);
 
-    // Guitar Head (Zenbox + Dual-Amp Edition)
-    addPct  (MiAmpParams::gtrInput,      "Zenbox Input",      56.0f);
-    addPct  (MiAmpParams::gtrGate,       "Zenbox Gate",       28.0f);
-    addBool (MiAmpParams::gtrOs4x,       "Zenbox 4x OS",      true);
-    addInt  (MiAmpParams::gtrCab,        "Zenbox Cab",        0, 4, 1);
-    addBool (MiAmpParams::gtrPower,      "Zenbox Power",      true);
-    addBool (MiAmpParams::gtrStandby,    "Zenbox Standby",    false);
-    addBool (MiAmpParams::gtrModeBright, "Zenbox Bright Cap", true);
-    addInt  (MiAmpParams::gtrChannel,    "Zenbox Channel",    0, 2, 2);
-    addPct  (MiAmpParams::gtrOutput,     "Zenbox Output",     58.0f);
+    // Guitar Head (MI Amp Dual-Voicing Edition)
+    addPct  (MiAmpParams::gtrInput,      "Guitar Input",       56.0f);
+    addPct  (MiAmpParams::gtrGate,       "Guitar Gate",        28.0f);
+    addBool (MiAmpParams::gtrOs4x,       "Guitar 4x OS",       true);
+    addInt  (MiAmpParams::gtrCab,        "Guitar Cab",         0, 4, 1);
+    addBool (MiAmpParams::gtrPower,      "Guitar Power",       true);
+    addBool (MiAmpParams::gtrStandby,    "Guitar Standby",     false);
+    addBool (MiAmpParams::gtrModeBright, "Guitar Bright Cap",  true);
+    addInt  (MiAmpParams::gtrChannel,    "Guitar Channel",     0, 2, 2);
+    addPct  (MiAmpParams::gtrOutput,     "Guitar Output",      58.0f);
+    addBool (MiAmpParams::gtrHeadBypass, "Guitar Head Bypass", false);
 
     const float defGain[3]   = { 28.0f, 58.0f, 68.0f };
     const float defBass[3]   = { 44.0f, 54.0f, 56.0f };
@@ -314,6 +316,7 @@ miamp::BassControlSnapshot MiAmpAudioProcessor::readBassSnapshot() const noexcep
     s.ampStandby = g (MiAmpParams::ampStandby) >= 0.5f;
     s.ampUltraHi = g (MiAmpParams::ampUltraHi) >= 0.5f;
     s.ampCabOn   = g (MiAmpParams::ampCabOn)   >= 0.5f;
+    s.headBypass = g (MiAmpParams::bassHeadBypass) >= 0.5f;
     s.ampGain    = g (MiAmpParams::ampGain);
     s.ampBass    = g (MiAmpParams::ampBass);
     s.ampMid     = g (MiAmpParams::ampMid);
@@ -439,6 +442,7 @@ zenbox::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const no
     s.ampModeBright = g (MiAmpParams::gtrModeBright) >= 0.5f;
     s.activeChannel = static_cast<int> (std::lround (g (MiAmpParams::gtrChannel)));
     s.outputKnob    = g (MiAmpParams::gtrOutput);
+    s.headBypass    = g (MiAmpParams::gtrHeadBypass) >= 0.5f;
 
     for (size_t c = 0; c < 3; ++c)
     {
@@ -598,6 +602,41 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     isClipping.store (peak >= 0.985f);
 }
 
+bool MiAmpAudioProcessor::isHeadBypassed (bool forBass) const noexcept
+{
+    const char* id = forBass ? MiAmpParams::bassHeadBypass : MiAmpParams::gtrHeadBypass;
+    return apvts.getRawParameterValue (id)->load() >= 0.5f;
+}
+
+void MiAmpAudioProcessor::setHeadBypassed (bool forBass, bool bypass)
+{
+    setParamNormalized (forBass ? MiAmpParams::bassHeadBypass : MiAmpParams::gtrHeadBypass, bypass ? 1.0f : 0.0f);
+}
+
+juce::File MiAmpAudioProcessor::getSettingsFile()
+{
+    auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                   .getChildFile ("PopupsAudio").getChildFile ("MiAmp");
+    dir.createDirectory();
+    return dir.getChildFile ("settings.xml");
+}
+
+juce::String MiAmpAudioProcessor::getGeminiApiKey()
+{
+    auto file = getSettingsFile();
+    if (! file.existsAsFile()) return {};
+    if (auto xml = juce::XmlDocument::parse (file))
+        return xml->getStringAttribute ("geminiApiKey", "").trim();
+    return {};
+}
+
+void MiAmpAudioProcessor::setGeminiApiKey (const juce::String& key)
+{
+    juce::XmlElement root ("MiAmpSettings");
+    root.setAttribute ("geminiApiKey", key.trim());
+    root.writeTo (getSettingsFile());
+}
+
 std::vector<int> MiAmpAudioProcessor::getActiveChain (bool forBass) const
 {
     std::vector<int> out;
@@ -706,21 +745,32 @@ std::vector<MiAmpBassPreset> MiAmpAudioProcessor::getFactoryPresets()
     };
 
     list.push_back (mkXv (u8"Inicial (XV Pop-Punk)",       5.6f, 4.08f, +3.7f, +0.85f, 57.6f, -5.8f, +7.3f, 1, u8"Cabezal neutro + XV Pop-Punk (Cab PUNK)"));
-    list.push_back (mkXv (u8"XV \u2022 Mark Hoppus Punk",  6.2f, 5.2f,  +4.5f, +2.0f,  72.0f, -4.5f, +8.5f, 1, u8"Bite agresivo con pua en PUNK"));
-    list.push_back (mkXv (u8"XV \u2022 Blink Enema",      5.8f, 4.4f,  +3.5f, +1.5f,  60.0f, -5.5f, +7.5f, 1, u8"Crunch limpio de finales de los 90"));
+    list.push_back (mkXv (u8"XV \u2022 Punk Cali Pick",    6.2f, 5.2f,  +4.5f, +2.0f,  72.0f, -4.5f, +8.5f, 1, u8"Bite agresivo con pua en PUNK"));
+    list.push_back (mkXv (u8"XV \u2022 90s Punk Crunch",   5.8f, 4.4f,  +3.5f, +1.5f,  60.0f, -5.5f, +7.5f, 1, u8"Crunch limpio de finales de los 90"));
     list.push_back (mkXv (u8"XV \u2022 Pop Punk Moderno", 6.0f, 6.2f,  +5.0f, +2.5f,  78.0f, -6.5f, +9.0f, 1, u8"Scoop moderno con presencia alta"));
     list.push_back (mkXv (u8"XV \u2022 Clack de Pua",     5.5f, 3.8f,  +2.0f, +3.5f,  65.0f, -3.0f, +10.0f,1, u8"Ataque afilado de pua"));
     list.push_back (mkXv (u8"XV \u2022 Calido Vintage",   6.5f, 2.2f,  +5.5f, -3.5f,  35.0f, +2.5f, +1.5f, 0, u8"Cuerpo gordo clasico (Cab BASS)"));
-    list.push_back (mkXv (u8"XV \u2022 Motown / Soul",    7.0f, 1.5f,  +6.0f, -6.0f,  25.0f, +3.5f, -2.0f, 0, u8"Graves redondos sin brillo"));
+    list.push_back (mkXv (u8"XV \u2022 Classic Soul",     7.0f, 1.5f,  +6.0f, -6.0f,  25.0f, +3.5f, -2.0f, 0, u8"Graves redondos sin brillo"));
     list.push_back (mkXv (u8"XV \u2022 Rock Clasico",     6.0f, 4.8f,  +3.5f, +0.5f,  58.0f, +1.5f, +4.5f, 0, u8"Rugido rockero con medios presentes"));
     list.push_back (mkXv (u8"XV \u2022 Sub / Slap Clean", 6.4f, 1.2f,  +6.5f, +3.0f,  30.0f, -7.0f, +6.5f, 2, u8"Clean + sub profundo"));
     list.push_back (mkXv (u8"XV \u2022 Drive Brutal",     5.4f, 8.8f,  +4.0f, +2.0f,  88.0f, -2.0f, +9.5f, 1, u8"Saturacion extrema"));
     list.push_back (mkXv (u8"XV \u2022 DI Estudio",       6.2f, 2.5f,  +2.5f, +1.0f,  45.0f, -1.5f, +3.5f, 2, u8"Directo cristalino sin cabina"));
 
     {
+        auto p = mkXv (u8"XV Directo \u2022 Original PUNK", 5.6f, 4.08f, +3.7f, +0.85f, 57.6f, -5.8f, +7.3f, 1, u8"SOLO PEDALES: XV puro sin cabezal (identico al original)");
+        p.headBypass = true;
+        list.push_back (p);
+    }
+    {
+        auto p = mkXv (u8"XV Directo \u2022 Original BASS", 6.2f, 3.2f, +4.8f, -1.5f, 48.0f, +1.5f, +3.2f, 0, u8"SOLO PEDALES: XV puro con Cab BASS sin cabezal");
+        p.headBypass = true;
+        list.push_back (p);
+    }
+
+    {
         MiAmpBassPreset p;
-        p.name = "SVT Puro (8x10 Clasico)";
-        p.hint = "Cabezal SVT caliente + Compresor suave, sin XV";
+        p.name = "8x10 Classic Tube";
+        p.hint = "Cabezal 8x10 caliente + Compresor suave, sin XV";
         p.ampGain = 62.0f; p.ampBass = 58.0f; p.ampMid = 54.0f; p.ampFreq = 46.0f; p.ampTreble = 56.0f; p.ampUltraHi = false;
         p.slots = { 0, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 48.0f; p.compAtt = 42.0f; p.compLvl = 56.0f;
@@ -768,30 +818,30 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
 
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Tom DeLonge \u2022 Enema Dirt");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 90s Cali Punk");
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 28.0f; p.output = 58.0f;
         p.gain = 68.0f; p.bass = 56.0f; p.mid = 60.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 60.0f;
         p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = true; p.driveGain = 18.0f; p.driveTone = 66.0f; p.driveLvl = 64.0f;
-        p.hint = "Triple Rectifier Vintage + JCM900 Cranked + Mesa 4x12 V30/GB";
+        p.hint = "Dual High-Gain + Crunch Brit 90s + Cab 4x12 Modern";
         list.push_back (p);
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Tom DeLonge \u2022 Enema Clean");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 90s Cali Clean");
         p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
         p.input = 52.0f; p.gate = 10.0f; p.output = 60.0f;
         p.gain = 28.0f; p.bass = 44.0f; p.mid = 54.0f; p.treble = 68.0f; p.presence = 62.0f; p.master = 64.0f;
         p.slots = { 0, 6, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.compOn = true; p.compSus = 52.0f; p.compAtt = 35.0f; p.compLvl = 56.0f;
         p.reverbOn = true; p.rvDec = 38.0f; p.rvTone = 64.0f; p.rvMix = 20.0f;
-        p.hint = "What's My Age Again / Adam's Song: JCM900 limpio + Comp + Room";
+        p.hint = "Clean brillante con punch + Comp + Room";
         list.push_back (p);
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Tom DeLonge \u2022 TOYPAJ / Untitled");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 00s Punk Wide");
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 26.0f; p.output = 58.0f;
         p.gain = 74.0f; p.bass = 58.0f; p.mid = 56.0f; p.treble = 64.0f; p.presence = 66.0f; p.master = 58.0f;
@@ -800,24 +850,24 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.chorusOn = true; p.chRate = 34.0f; p.chDepth = 48.0f; p.chMix = 28.0f;
         p.delayOn = false; p.dlTime = 38.0f; p.dlFb = 30.0f; p.dlMix = 22.0f;
         p.reverbOn = true; p.rvDec = 46.0f; p.rvTone = 60.0f; p.rvMix = 22.0f;
-        p.hint = "Anthem Pt 2 / Feeling This: Recto+JCM + Drive + Chorus sutil";
+        p.hint = "High-Gain + Overdrive + Chorus sutil";
         list.push_back (p);
     }
 
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Rock Crunch");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Rock Crunch");
         p.channel = 1; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 52.0f; p.gate = 18.0f; p.output = 58.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 60.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
         p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
         p.driveOn = false; p.driveGain = 42.0f; p.driveTone = 58.0f; p.driveLvl = 62.0f;
-        p.hint = "CH2 Crunch 70s clasico tipo Zenbox + Modern 4x12";
+        p.hint = "CH2 Crunch 70s clasico + Cab Modern 4x12";
         list.push_back (p);
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Pop-Punk Drive");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Pop-Punk Drive");
         p.channel = 2; p.cab = 1; p.bright = true; p.os4x = true;
         p.input = 55.0f; p.gate = 28.0f; p.output = 56.0f;
         p.gain = 72.0f; p.bass = 56.0f; p.mid = 62.0f; p.treble = 64.0f; p.presence = 62.0f; p.master = 56.0f;
@@ -828,7 +878,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 70s Breakup");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 70s Breakup");
         p.channel = 0; p.cab = 0; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 12.0f; p.output = 60.0f;
         p.gain = 46.0f; p.bass = 52.0f; p.mid = 56.0f; p.treble = 58.0f; p.presence = 54.0f; p.master = 62.0f;
@@ -839,7 +889,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Glass Clean Chorus");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Glass Clean Chorus");
         p.channel = 0; p.cab = 2; p.bright = true; p.os4x = true;
         p.input = 48.0f; p.gate = 10.0f; p.output = 62.0f;
         p.gain = 26.0f; p.bass = 50.0f; p.mid = 52.0f; p.treble = 62.0f; p.presence = 58.0f; p.master = 64.0f;
@@ -852,7 +902,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Hard Rock Lead");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Hard Rock Lead");
         p.channel = 2; p.cab = 0; p.bright = true; p.os4x = true;
         p.input = 56.0f; p.gate = 32.0f; p.output = 56.0f;
         p.gain = 78.0f; p.bass = 54.0f; p.mid = 68.0f; p.treble = 60.0f; p.presence = 60.0f; p.master = 58.0f;
@@ -865,7 +915,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Fuzz Stoner Wall");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Fuzz Stoner Wall");
         p.channel = 1; p.cab = 0; p.bright = false; p.os4x = true;
         p.input = 54.0f; p.gate = 28.0f; p.output = 55.0f;
         p.gain = 64.0f; p.bass = 66.0f; p.mid = 58.0f; p.treble = 50.0f; p.presence = 48.0f; p.master = 60.0f;
@@ -877,7 +927,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Studio 1x12 Indie");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Studio 1x12 Indie");
         p.channel = 1; p.cab = 3; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 16.0f; p.output = 58.0f;
         p.gain = 48.0f; p.bass = 50.0f; p.mid = 62.0f; p.treble = 60.0f; p.presence = 58.0f; p.master = 58.0f;
@@ -890,7 +940,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     }
     {
         MiAmpGuitarPreset p;
-        p.name = juce::String::fromUTF8 (u8"Zenbox \u2022 Cab Off (IR Externo)");
+        p.name = juce::String::fromUTF8 (u8"MI \u2022 Cab Off (IR Externo)");
         p.channel = 1; p.cab = 4; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 20.0f; p.output = 56.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 58.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
@@ -899,15 +949,26 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
         p.hint = "Salida directa del cabezal sin cabina para usar tu IR propio";
         list.push_back (p);
     }
+    {
+        MiAmpGuitarPreset p;
+        p.name = juce::String::fromUTF8 (u8"Directo \u2022 Dual Crunch Preamp");
+        p.headBypass = true;
+        p.slots = { 8, 5, 6, -1, -1, -1, -1, -1, -1, -1 };
+        p.delayOn = true; p.dlTime = 40.0f; p.dlFb = 30.0f; p.dlMix = 22.0f;
+        p.reverbOn = true; p.rvDec = 42.0f; p.rvTone = 58.0f; p.rvMix = 22.0f;
+        p.hint = "SOLO PEDALES: Dual Crunch + Delay + Reverb sin cabezal";
+        list.push_back (p);
+    }
 
     return list;
 }
 
 void MiAmpAudioProcessor::applyPreset (const MiAmpBassPreset& p)
 {
-    setParamNormalized (MiAmpParams::ampPower,   1.0f);
-    setParamNormalized (MiAmpParams::ampStandby, 0.0f);
-    setParamNormalized (MiAmpParams::ampCabOn,   1.0f);
+    setParamNormalized (MiAmpParams::ampPower,       1.0f);
+    setParamNormalized (MiAmpParams::ampStandby,     0.0f);
+    setParamNormalized (MiAmpParams::ampCabOn,       1.0f);
+    setParamNormalized (MiAmpParams::bassHeadBypass, p.headBypass ? 1.0f : 0.0f);
     setParamNormalized (MiAmpParams::ampGain,    p.ampGain);
     setParamNormalized (MiAmpParams::ampBass,    p.ampBass);
     setParamNormalized (MiAmpParams::ampMid,     p.ampMid);
@@ -956,6 +1017,7 @@ void MiAmpAudioProcessor::applyGuitarPreset (const MiAmpGuitarPreset& p)
     const int ch = std::clamp (p.channel, 0, 2);
     setParamNormalized (MiAmpParams::gtrPower,      1.0f);
     setParamNormalized (MiAmpParams::gtrStandby,    0.0f);
+    setParamNormalized (MiAmpParams::gtrHeadBypass, p.headBypass ? 1.0f : 0.0f);
     setParamNormalized (MiAmpParams::gtrChannel,    static_cast<float> (ch));
     setParamNormalized (MiAmpParams::gtrCab,        static_cast<float> (std::clamp (p.cab, 0, 4)));
     setParamNormalized (MiAmpParams::gtrModeBright, p.bright ? 1.0f : 0.0f);
@@ -1034,6 +1096,7 @@ void MiAmpAudioProcessor::loadUserPresetsFromDisk()
             {
                 MiAmpBassPreset p;
                 p.name       = child->getStringAttribute ("name", "Usuario");
+                p.headBypass = child->getBoolAttribute ("headBypass", false);
                 p.ampGain    = static_cast<float> (child->getDoubleAttribute ("ampGain", 50.0));
                 p.ampBass    = static_cast<float> (child->getDoubleAttribute ("ampBass", 50.0));
                 p.ampMid     = static_cast<float> (child->getDoubleAttribute ("ampMid", 50.0));
@@ -1072,8 +1135,9 @@ void MiAmpAudioProcessor::loadUserPresetsFromDisk()
             else if (child->hasTagName ("GuitarPreset"))
             {
                 MiAmpGuitarPreset p;
-                p.name     = child->getStringAttribute ("name", "Usuario");
-                p.channel  = child->getIntAttribute ("channel", 1);
+                p.name       = child->getStringAttribute ("name", "Usuario");
+                p.headBypass = child->getBoolAttribute ("headBypass", false);
+                p.channel    = child->getIntAttribute ("channel", 1);
                 p.cab      = child->getIntAttribute ("cab", 1);
                 p.bright   = child->getBoolAttribute ("bright", true);
                 p.os4x     = child->getBoolAttribute ("os4x", true);
@@ -1129,6 +1193,7 @@ void MiAmpAudioProcessor::saveUserPresetsToDisk() const
     {
         auto* e = root.createNewChildElement ("BassPreset");
         e->setAttribute ("name", p.name);
+        e->setAttribute ("headBypass", p.headBypass);
         e->setAttribute ("ampGain", p.ampGain); e->setAttribute ("ampBass", p.ampBass);
         e->setAttribute ("ampMid", p.ampMid);   e->setAttribute ("ampFreq", p.ampFreq);
         e->setAttribute ("ampTreble", p.ampTreble); e->setAttribute ("ampUltraHi", p.ampUltraHi);
@@ -1152,6 +1217,7 @@ void MiAmpAudioProcessor::saveUserPresetsToDisk() const
     {
         auto* e = root.createNewChildElement ("GuitarPreset");
         e->setAttribute ("name", p.name);
+        e->setAttribute ("headBypass", p.headBypass);
         e->setAttribute ("channel", p.channel); e->setAttribute ("cab", p.cab);
         e->setAttribute ("bright", p.bright);   e->setAttribute ("os4x", p.os4x);
         e->setAttribute ("input", p.input);     e->setAttribute ("gate", p.gate);
@@ -1186,6 +1252,7 @@ void MiAmpAudioProcessor::saveUserPreset (const juce::String& name)
         auto s = readBassSnapshot();
         MiAmpBassPreset p;
         p.name = name.trim().isEmpty() ? ("Bajo " + juce::String (userPresets.size() + 1)) : name.trim();
+        p.headBypass = s.headBypass;
         p.ampGain = s.ampGain; p.ampBass = s.ampBass; p.ampMid = s.ampMid; p.ampFreq = s.ampFreq; p.ampTreble = s.ampTreble;
         p.ampUltraHi = s.ampUltraHi; p.slots = s.chainSlots;
         p.compOn = s.compOn; p.compSus = s.compSustain; p.compAtt = s.compAttack; p.compLvl = s.compLevel;
@@ -1202,7 +1269,8 @@ void MiAmpAudioProcessor::saveUserPreset (const juce::String& name)
         auto s = readGuitarSnapshot();
         const size_t ch = static_cast<size_t> (std::clamp (s.activeChannel, 0, 2));
         MiAmpGuitarPreset p;
-        p.name = name.trim().isEmpty() ? ("Zenbox " + juce::String (guitarUserPresets.size() + 1)) : name.trim();
+        p.name = name.trim().isEmpty() ? ("Guitarra " + juce::String (guitarUserPresets.size() + 1)) : name.trim();
+        p.headBypass = s.headBypass;
         p.channel = static_cast<int> (ch); p.cab = s.cabIndex; p.bright = s.ampModeBright; p.os4x = s.os4x;
         p.input = s.inputGain; p.gate = s.gateThresh; p.output = s.outputKnob;
         p.gain = s.chGain[ch]; p.bass = s.chBass[ch]; p.mid = s.chMid[ch];

@@ -9,15 +9,16 @@ namespace MiAmpParams
     inline constexpr const char* instrument  = "instrument_mode"; // 0 = Guitarra, 1 = Bajo
 
     // Bass Head
-    inline constexpr const char* ampPower    = "amp_power";
-    inline constexpr const char* ampStandby  = "amp_standby";
-    inline constexpr const char* ampUltraHi  = "amp_ultra_hi";
-    inline constexpr const char* ampCabOn    = "amp_cab_on";
-    inline constexpr const char* ampGain     = "amp_gain";
-    inline constexpr const char* ampBass     = "amp_bass";
-    inline constexpr const char* ampMid      = "amp_mid";
-    inline constexpr const char* ampFreq     = "amp_freq";
-    inline constexpr const char* ampTreble   = "amp_treble";
+    inline constexpr const char* ampPower       = "amp_power";
+    inline constexpr const char* ampStandby     = "amp_standby";
+    inline constexpr const char* ampUltraHi     = "amp_ultra_hi";
+    inline constexpr const char* ampCabOn       = "amp_cab_on";
+    inline constexpr const char* ampGain        = "amp_gain";
+    inline constexpr const char* ampBass        = "amp_bass";
+    inline constexpr const char* ampMid         = "amp_mid";
+    inline constexpr const char* ampFreq        = "amp_freq";
+    inline constexpr const char* ampTreble      = "amp_treble";
+    inline constexpr const char* bassHeadBypass = "bass_head_bypass";
 
     // Shared Drop Pitch Shifter & Tuner
     inline constexpr const char* pitchOn     = "pitch_on";
@@ -80,7 +81,7 @@ namespace MiAmpParams
     inline constexpr const char* bassEqOn      = "bass_eq_on";
     inline constexpr const char* bassEqBand[7] = { "bass_eq_0", "bass_eq_1", "bass_eq_2", "bass_eq_3", "bass_eq_4", "bass_eq_5", "bass_eq_6" };
 
-    // Guitar Head (Zenbox Edition)
+    // Guitar Head (MI Amp Edition)
     inline constexpr const char* gtrInput      = "gtr_input";
     inline constexpr const char* gtrGate       = "gtr_gate";
     inline constexpr const char* gtrOs4x       = "gtr_os4x";
@@ -90,6 +91,7 @@ namespace MiAmpParams
     inline constexpr const char* gtrModeBright = "gtr_mode_bright";
     inline constexpr const char* gtrChannel    = "gtr_channel"; // 0=CH1, 1=CH2, 2=CH3
     inline constexpr const char* gtrOutput     = "gtr_output";
+    inline constexpr const char* gtrHeadBypass = "gtr_head_bypass";
 
     inline constexpr const char* gtrChGain[3]     = { "gtr_ch1_gain",     "gtr_ch2_gain",     "gtr_ch3_gain" };
     inline constexpr const char* gtrChBass[3]     = { "gtr_ch1_bass",     "gtr_ch2_bass",     "gtr_ch3_bass" };
@@ -124,6 +126,7 @@ struct MiAmpBassPreset
 {
     juce::String name;
     bool  isXvFactory = false;
+    bool  headBypass = false;
     float ampGain = 50.0f, ampBass = 50.0f, ampMid = 50.0f, ampFreq = 50.0f, ampTreble = 50.0f;
     bool  ampUltraHi = false;
     std::array<int, 10> slots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -144,6 +147,7 @@ struct MiAmpGuitarPreset
     int   cab = 1;     // 0..4
     bool  bright = true;
     bool  os4x = true;
+    bool  headBypass = false;
     float input = 50.0f, gate = 18.0f, output = 58.0f;
     float gain = 56.0f, bass = 54.0f, mid = 58.0f, treble = 58.0f, presence = 56.0f, master = 58.0f;
     std::array<int, 10> slots { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -189,6 +193,18 @@ public:
 
     bool isBassMode() const noexcept;
     void setInstrumentMode (bool bass);
+    bool isHeadBypassed (bool forBass) const noexcept;
+    void setHeadBypassed (bool forBass, bool bypass);
+
+    void setParamNormalized (const char* id, float plainVal);
+    void setActivePresetName (bool forBass, const juce::String& name)
+    {
+        if (forBass) activeBassPresetName = name;
+        else         activeGuitarPresetName = name;
+    }
+
+    static juce::String getGeminiApiKey();
+    static void setGeminiApiKey (const juce::String& key);
 
     // Unified chain management (dispatches based on active instrument or explicit mode)
     std::vector<int> getActiveChain (bool forBass) const;
@@ -231,9 +247,9 @@ private:
     zenbox::GuitarControlSnapshot readGuitarSnapshot() const noexcept;
     static float dbToXvKnob (float db) noexcept { return std::clamp (((db + 12.0f) / 24.0f) * 100.0f, 0.0f, 100.0f); }
     static juce::File getUserPresetsFile();
+    static juce::File getSettingsFile();
     void loadUserPresetsFromDisk();
     void saveUserPresetsToDisk() const;
-    void setParamNormalized (const char* id, float plainVal);
 
     miamp::MiAmpBassChainDSP bassDsp;
     zenbox::MiAmpGuitarChainDSP guitarDsp;
@@ -243,7 +259,7 @@ private:
     std::vector<MiAmpBassPreset> userPresets;
     std::vector<MiAmpGuitarPreset> guitarUserPresets;
     juce::String activeBassPresetName   { "Inicial (XV Pop-Punk)" };
-    juce::String activeGuitarPresetName { juce::String::fromUTF8 (u8"Tom DeLonge \u2022 Enema Dirt") };
+    juce::String activeGuitarPresetName { juce::String::fromUTF8 (u8"MI \u2022 90s Cali Punk") };
     int currentProgramIndex = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MiAmpAudioProcessor)

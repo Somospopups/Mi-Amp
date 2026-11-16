@@ -220,7 +220,7 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
         return;
     }
 
-    if (id == "headMenuPresets" || id == "headMenuTuner" || id == "headMenuPedals" || id == "headMenuConfig")
+    if (id == "headMenuPresets" || id == "headMenuTuner" || id == "headMenuToneFinder" || id == "headMenuPedals" || id == "headMenuConfig")
     {
         const float bh = static_cast<float> (bounds.getHeight());
         const float sc = bh / 38.0f;
@@ -256,6 +256,13 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
                 g.drawLine (kx[k] + r, ys[k], x1, ys[k], lw);
                 g.drawEllipse (kx[k] - r, ys[k] - r, r * 2.0f, r * 2.0f, lw);
             }
+        }
+        else if (id == "headMenuToneFinder")
+        {
+            const float r = sz * 0.32f;
+            const float lx = cx - sz * 0.10f, ly = cy - sz * 0.10f;
+            g.drawEllipse (lx - r, ly - r, r * 2.0f, r * 2.0f, lw);
+            g.drawLine (lx + r * 0.72f, ly + r * 0.72f, cx + sz * 0.44f, cy + sz * 0.44f, lw * 1.15f);
         }
         else if (id == "headMenuTuner")
         {
@@ -905,8 +912,11 @@ void MiAmpAudioProcessorEditor::PalettePedalButton::mouseDrag (const juce::Mouse
 
     if (dragged && dragMoveFn)
     {
-        auto ptInParent = e.getEventRelativeTo (getParentComponent()).position;
-        dragMoveFn (ptInParent);
+        auto* target = (getParentComponent() != nullptr && getParentComponent()->getParentComponent() != nullptr)
+                           ? getParentComponent()->getParentComponent()
+                           : getParentComponent();
+        auto ptInEditor = e.getEventRelativeTo (target).position;
+        dragMoveFn (ptInEditor);
     }
 }
 
@@ -916,8 +926,11 @@ void MiAmpAudioProcessorEditor::PalettePedalButton::mouseUp (const juce::MouseEv
     {
         if (dragEndFn)
         {
-            auto ptInParent = e.getEventRelativeTo (getParentComponent()).position;
-            dragEndFn (ptInParent);
+            auto* target = (getParentComponent() != nullptr && getParentComponent()->getParentComponent() != nullptr)
+                               ? getParentComponent()->getParentComponent()
+                               : getParentComponent();
+            auto ptInEditor = e.getEventRelativeTo (target).position;
+            dragEndFn (ptInEditor);
         }
     }
     else
@@ -1140,16 +1153,115 @@ public:
         slInput.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 22);
         slInputAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             processor.apvts, MiAmpParams::gtrInput, slInput);
+
+        // Route mode (CON AMPLI vs SOLO PEDALES) + optional Gemini API Key in CONFIG
+        addChildComponent (btnCfgRouteAmp);
+        btnCfgRouteAmp.setButtonText ("CON AMPLI");
+        btnCfgRouteAmp.onClick = [this]
+        {
+            processor.setHeadBypassed (processor.isBassMode(), false);
+            syncConfigControls();
+            if (changedFn) changedFn();
+        };
+
+        addChildComponent (btnCfgRoutePedals);
+        btnCfgRoutePedals.setButtonText ("SOLO PEDALES");
+        btnCfgRoutePedals.onClick = [this]
+        {
+            processor.setHeadBypassed (processor.isBassMode(), true);
+            syncConfigControls();
+            if (changedFn) changedFn();
+        };
+
+        addChildComponent (geminiKeyEdit);
+        geminiKeyEdit.setFont (sansFont (11.5f));
+        geminiKeyEdit.setJustification (juce::Justification::centredLeft);
+        geminiKeyEdit.setIndents (8, 0);
+        geminiKeyEdit.setPasswordCharacter (0x2022);
+        geminiKeyEdit.setTextToShowWhenEmpty ("API Key Gemini (opcional)",
+                                              juce::Colour::fromRGBA (246, 237, 221, 150));
+        geminiKeyEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+        geminiKeyEdit.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        geminiKeyEdit.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+        geminiKeyEdit.setColour (juce::TextEditor::textColourId, juce::Colour::fromRGB (255, 250, 242));
+        geminiKeyEdit.setColour (juce::CaretComponent::caretColourId, juce::Colour::fromRGB (255, 250, 242));
+        geminiKeyEdit.setText (MiAmpAudioProcessor::getGeminiApiKey(), false);
+
+        addChildComponent (btnSaveGeminiKey);
+        btnSaveGeminiKey.setButtonText ("GUARDAR");
+        btnSaveGeminiKey.onClick = [this]
+        {
+            MiAmpAudioProcessor::setGeminiApiKey (geminiKeyEdit.getText());
+            tfStatusMsg = geminiKeyEdit.getText().trim().isEmpty()
+                              ? "Clave Gemini borrada (modo 100% gratuito activo)"
+                              : "API Key guardada para busqueda Gemini + Web";
+            repaint();
+        };
+
+        // Tone Finder (BUSCAR TONO)
+        addChildComponent (tfQueryEdit);
+        tfQueryEdit.setFont (sansFont (12.5f));
+        tfQueryEdit.setJustification (juce::Justification::centredLeft);
+        tfQueryEdit.setIndents (10, 0);
+        tfQueryEdit.setTextToShowWhenEmpty ("Ej: The Story So Far, Blink, Deftones...",
+                                            juce::Colour::fromRGBA (246, 237, 221, 165));
+        tfQueryEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+        tfQueryEdit.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+        tfQueryEdit.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+        tfQueryEdit.setColour (juce::TextEditor::textColourId, juce::Colour::fromRGB (255, 250, 242));
+        tfQueryEdit.setColour (juce::CaretComponent::caretColourId, juce::Colour::fromRGB (255, 250, 242));
+        tfQueryEdit.onReturnKey = [this] { runToneSearch (tfQueryEdit.getText()); };
+
+        addChildComponent (btnTfSearch);
+        btnTfSearch.setComponentID ("presetSave");
+        btnTfSearch.setButtonText ("BUSCAR");
+        btnTfSearch.onClick = [this] { runToneSearch (tfQueryEdit.getText()); };
+
+        static constexpr const char* kTfChips[6] = {
+            "The Story So Far", "90s Cali Punk", "Turnstile",
+            "XV Directo", "Deftones", "Tool Bass"
+        };
+        for (int i = 0; i < 6; ++i)
+        {
+            addChildComponent (tfChips[i]);
+            tfChips[i].setButtonText (kTfChips[i]);
+            const juce::String q = kTfChips[i];
+            tfChips[i].onClick = [this, q]
+            {
+                tfQueryEdit.setText (q, false);
+                runToneSearch (q);
+            };
+        }
+
+        addChildComponent (btnTfApply);
+        btnTfApply.setComponentID ("presetSave");
+        btnTfApply.setButtonText ("APLICAR TONO");
+        btnTfApply.onClick = [this]
+        {
+            if (lastToneResult.found)
+            {
+                mipedals::ToneFinderEngine::applyToProcessor (processor, lastToneResult);
+                if (changedFn) changedFn();
+                syncConfigControls();
+            }
+        };
+    }
+
+    ~GlassPopover() override
+    {
+        if (lookupThread != nullptr)
+            lookupThread->stopThread (1500);
     }
 
     void setKind (PopoverKind k, const xvdsp::TunerReading& tr)
     {
         kind = k;
         tuner = tr;
-        const bool isP = (k == PopoverKind::Presets);
-        const bool isD = (k == PopoverKind::Drop);
-        const bool isT = (k == PopoverKind::Tuner);
-        const bool isC = (k == PopoverKind::Config);
+        const bool isP  = (k == PopoverKind::Presets);
+        const bool isD  = (k == PopoverKind::Drop);
+        const bool isT  = (k == PopoverKind::Tuner);
+        const bool isC  = (k == PopoverKind::Config);
+        const bool isTF = (k == PopoverKind::ToneFinder);
         const bool showDrop = (isD || isT);
         const bool bass = processor.isBassMode();
 
@@ -1166,6 +1278,8 @@ public:
         btnTunerNotation.setVisible (isT);
         btnTunerMute.setVisible (isT);
 
+        btnCfgRouteAmp.setVisible (isC);
+        btnCfgRoutePedals.setVisible (isC);
         for (int i = 0; i < 5; ++i)
             cfgCabBtns[i].setVisible (isC && (! bass || i < 2));
         for (int c = 0; c < 3; ++c)
@@ -1173,11 +1287,22 @@ public:
         btnCfgOs4x.setVisible (isC && ! bass);
         slGate.setVisible (isC && ! bass);
         slInput.setVisible (isC && ! bass);
+        geminiKeyEdit.setVisible (isC);
+        btnSaveGeminiKey.setVisible (isC);
+
+        tfQueryEdit.setVisible (isTF);
+        btnTfSearch.setVisible (isTF);
+        for (auto& c : tfChips) c.setVisible (isTF);
+        btnTfApply.setVisible (isTF && lastToneResult.found);
 
         if (isP) rebuildPresetList();
         if (showDrop) syncDropControls();
         if (isT) syncTunerButtons();
-        if (isC) syncConfigControls();
+        if (isC)
+        {
+            geminiKeyEdit.setText (MiAmpAudioProcessor::getGeminiApiKey(), false);
+            syncConfigControls();
+        }
         resized();
         repaint();
     }
@@ -1204,9 +1329,10 @@ public:
         juce::String title = (kind == PopoverKind::Presets)
                                 ? (processor.isBassMode() ? juce::String::fromUTF8 (u8"PRESETS \u00b7 BAJO")
                                                           : juce::String::fromUTF8 (u8"PRESETS \u00b7 GUITARRA"))
-                           : (kind == PopoverKind::Drop)   ? "DROP TUNER"
-                           : (kind == PopoverKind::Config) ? juce::String::fromUTF8 (u8"CONFIGURACI\u00d3N")
-                                                           : "AFINADOR + DROP";
+                           : (kind == PopoverKind::Drop)       ? "DROP TUNER"
+                           : (kind == PopoverKind::Config)     ? juce::String::fromUTF8 (u8"CONFIGURACI\u00d3N")
+                           : (kind == PopoverKind::ToneFinder) ? "BUSCAR TONO"
+                                                               : "AFINADOR + DROP";
         g.drawText (title, inner.removeFromTop (24.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft);
 
         if (kind == PopoverKind::Presets)
@@ -1239,16 +1365,84 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
-            g.setFont (sansFont (11.5f, juce::Font::bold));
+            g.setFont (sansFont (11.0f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.88f));
             const float x = inner.getX();
             const float w = inner.getWidth();
-            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, inner.getY() + 2.0f, w, 16.0f), juce::Justification::centredLeft);
+            g.drawText ("MODO DE RUTA", juce::Rectangle<float> (x, inner.getY() + 2.0f, w, 15.0f), juce::Justification::centredLeft);
+            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, inner.getY() + 56.0f, w, 15.0f), juce::Justification::centredLeft);
             if (! bass)
             {
-                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, inner.getY() + 92.0f,  w, 16.0f), juce::Justification::centredLeft);
-                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, inner.getY() + 184.0f, w, 16.0f), juce::Justification::centredLeft);
-                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, inner.getY() + 234.0f, w, 16.0f), juce::Justification::centredLeft);
+                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, inner.getY() + 140.0f, w, 15.0f), juce::Justification::centredLeft);
+                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, inner.getY() + 220.0f, w, 15.0f), juce::Justification::centredLeft);
+                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, inner.getY() + 264.0f, w, 15.0f), juce::Justification::centredLeft);
+            }
+            const float keyY = static_cast<float> (getHeight()) - 68.0f;
+            g.drawText ("GEMINI AI KEY (OPCIONAL / WEB EN VIVO)", juce::Rectangle<float> (x, keyY, w, 15.0f), juce::Justification::centredLeft);
+            if (tfStatusMsg.isNotEmpty())
+            {
+                g.setFont (sansFont (10.0f));
+                g.setColour (mintBorder().withAlpha (0.9f));
+                g.drawText (tfStatusMsg, juce::Rectangle<float> (x, keyY + 46.0f, w, 15.0f), juce::Justification::centredLeft);
+            }
+        }
+        else if (kind == PopoverKind::ToneFinder)
+        {
+            const float x = inner.getX();
+            const float w = inner.getWidth();
+            g.setFont (sansFont (11.0f));
+            g.setColour (inkColour().withAlpha (0.82f));
+            g.drawText (juce::String::fromUTF8 (u8"Escrib\u00ed banda, canci\u00f3n o estilo (ej. The Story So Far):"),
+                        juce::Rectangle<float> (x, inner.getY(), w, 16.0f), juce::Justification::centredLeft);
+
+            g.setFont (sansFont (10.0f, juce::Font::bold));
+            g.setColour (inkColour().withAlpha (0.72f));
+            g.drawText ("SUGERENCIAS", juce::Rectangle<float> (x, inner.getY() + 58.0f, w, 14.0f), juce::Justification::centredLeft);
+
+            const auto cardR = juce::Rectangle<float> (x, inner.getY() + 140.0f, w, static_cast<float> (getHeight()) - (inner.getY() + 140.0f) - 54.0f);
+            g.setColour (juce::Colour::fromRGBA (20, 28, 25, 130));
+            g.fillRoundedRectangle (cardR, 12.0f);
+            g.setColour (juce::Colour::fromRGBA (241, 224, 190, 82));
+            g.drawRoundedRectangle (cardR, 12.0f, 1.0f);
+
+            auto tc = cardR.reduced (12.0f, 10.0f);
+            if (tfSearching)
+            {
+                g.setFont (sansFont (12.5f, juce::Font::bold));
+                g.setColour (mintBorder());
+                g.drawFittedText (juce::String::fromUTF8 (u8"Buscando rig real en la web..."), tc.toNearestInt(), juce::Justification::centred, 2);
+            }
+            else if (lastToneResult.found)
+            {
+                g.setFont (sansFont (10.0f, juce::Font::bold));
+                g.setColour (mintBorder());
+                g.drawText (lastToneResult.sourceBadge.toUpperCase(), tc.removeFromTop (14.0f), juce::Justification::centredLeft);
+
+                g.setFont (sansFont (13.5f, juce::Font::bold));
+                g.setColour (inkColour());
+                g.drawFittedText (lastToneResult.title, tc.removeFromTop (22.0f).toNearestInt(), juce::Justification::centredLeft, 1);
+
+                const juce::String meta = juce::String (lastToneResult.bassMode ? "BAJO" : "GUITARRA")
+                                        + " \u00b7 " + juce::String (lastToneResult.headBypass ? "SOLO PEDALES" : "CON AMPLI")
+                                        + " \u00b7 Drop " + juce::String (lastToneResult.dropSemi)
+                                        + " \u00b7 " + juce::String (static_cast<int> (lastToneResult.chainSlots.size())) + " pedales";
+                g.setFont (sansFont (10.5f, juce::Font::bold));
+                g.setColour (juce::Colour::fromRGBA (255, 226, 175, 220));
+                g.drawText (meta, tc.removeFromTop (16.0f), juce::Justification::centredLeft);
+
+                tc.removeFromTop (4.0f);
+                g.setFont (sansFont (11.0f));
+                g.setColour (inkColour().withAlpha (0.86f));
+                g.drawFittedText (lastToneResult.explanation, tc.toNearestInt(), juce::Justification::topLeft, 5);
+            }
+            else
+            {
+                g.setFont (sansFont (11.5f));
+                g.setColour (inkColour().withAlpha (0.72f));
+                g.drawFittedText (tfStatusMsg.isNotEmpty()
+                                      ? tfStatusMsg
+                                      : juce::String::fromUTF8 (u8"Gratis y sin configuraci\u00f3n: arma cabezal, cabina, afinaci\u00f3n Drop y cadena de pedales al instante."),
+                                  tc.toNearestInt(), juce::Justification::centred, 4);
             }
         }
         else if (kind == PopoverKind::Tuner)
@@ -1358,25 +1552,43 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
+            const int hw = (inner.getWidth() - 6) / 2;
+            btnCfgRouteAmp.setBounds    (inner.getX(),          inner.getY() + 20, hw, 28);
+            btnCfgRoutePedals.setBounds (inner.getX() + hw + 6, inner.getY() + 20, hw, 28);
+
             if (bass)
             {
-                const int hw = (inner.getWidth() - 6) / 2;
-                cfgCabBtns[0].setBounds (inner.getX(),          inner.getY() + 22, hw, 34);
-                cfgCabBtns[1].setBounds (inner.getX() + hw + 6, inner.getY() + 22, hw, 34);
+                cfgCabBtns[0].setBounds (inner.getX(),          inner.getY() + 74, hw, 32);
+                cfgCabBtns[1].setBounds (inner.getX() + hw + 6, inner.getY() + 74, hw, 32);
             }
             else
             {
                 const int cw = inner.getWidth() / 3;
                 for (int i = 0; i < 5; ++i)
                     cfgCabBtns[i].setBounds (inner.getX() + (i % 3) * cw + 2,
-                                             inner.getY() + 20 + (i / 3) * 32,
-                                             cw - 4, 28);
+                                             inner.getY() + 73 + (i / 3) * 30,
+                                             cw - 4, 26);
                 for (int c = 0; c < 3; ++c)
-                    cfgChBtns[c].setBounds (inner.getX() + c * cw + 2, inner.getY() + 110, cw - 4, 28);
-                btnCfgOs4x.setBounds (inner.getX(), inner.getY() + 144, inner.getWidth(), 30);
-                slGate.setBounds     (inner.getX(), inner.getY() + 202, inner.getWidth(), 24);
-                slInput.setBounds    (inner.getX(), inner.getY() + 252, inner.getWidth(), 24);
+                    cfgChBtns[c].setBounds (inner.getX() + c * cw + 2, inner.getY() + 157, cw - 4, 26);
+                btnCfgOs4x.setBounds (inner.getX(), inner.getY() + 188, inner.getWidth(), 26);
+                slGate.setBounds     (inner.getX(), inner.getY() + 236, inner.getWidth(), 22);
+                slInput.setBounds    (inner.getX(), inner.getY() + 280, inner.getWidth(), 22);
             }
+
+            const int keyRowY = getHeight() - 50;
+            btnSaveGeminiKey.setBounds (inner.getRight() - 68, keyRowY, 68, 28);
+            geminiKeyEdit.setBounds    (inner.getX(), keyRowY, inner.getWidth() - 74, 28);
+        }
+        else if (kind == PopoverKind::ToneFinder)
+        {
+            btnTfSearch.setBounds (inner.getRight() - 72, inner.getY() + 20, 72, 30);
+            tfQueryEdit.setBounds (inner.getX(), inner.getY() + 20, inner.getWidth() - 78, 30);
+            const int cw = inner.getWidth() / 2;
+            for (int i = 0; i < 6; ++i)
+                tfChips[i].setBounds (inner.getX() + (i % 2) * cw + 2,
+                                      inner.getY() + 74 + (i / 2) * 21,
+                                      cw - 4, 19);
+            btnTfApply.setBounds (inner.getX(), getHeight() - 46, inner.getWidth(), 32);
         }
         else if (kind == PopoverKind::Tuner)
         {
@@ -1422,6 +1634,9 @@ private:
     void syncConfigControls()
     {
         const bool bass = processor.isBassMode();
+        const bool headByp = processor.isHeadBypassed (bass);
+        btnCfgRouteAmp.setToggleState    (! headByp, juce::dontSendNotification);
+        btnCfgRoutePedals.setToggleState (headByp,   juce::dontSendNotification);
         if (bass)
         {
             const bool cabOn = processor.apvts.getRawParameterValue (MiAmpParams::ampCabOn)->load() > 0.5f;
@@ -1562,6 +1777,92 @@ private:
         juce::TextButton btnLoad, btnDel;
     };
 
+    void runToneSearch (const juce::String& rawQuery)
+    {
+        const juce::String q = rawQuery.trim();
+        if (q.isEmpty())
+            return;
+
+        int localScore = 0;
+        auto localHit = mipedals::ToneFinderEngine::searchLocalCatalog (q, localScore);
+        const juce::String apiKey = MiAmpAudioProcessor::getGeminiApiKey();
+
+        // Fast local exact match when no Gemini API key is set
+        if (localHit.found && localScore >= 48 && apiKey.isEmpty())
+        {
+            lastToneResult = localHit;
+            tfSearching = false;
+            tfStatusMsg.clear();
+            mipedals::ToneFinderEngine::applyToProcessor (processor, lastToneResult);
+            btnTfApply.setVisible (kind == PopoverKind::ToneFinder);
+            if (changedFn) changedFn();
+            repaint();
+            return;
+        }
+
+        if (lookupThread != nullptr)
+            lookupThread->stopThread (800);
+
+        tfSearching = true;
+        tfStatusMsg.clear();
+        btnTfApply.setVisible (false);
+        repaint();
+
+        juce::Component::SafePointer<GlassPopover> safeThis (this);
+        lookupThread = std::make_unique<ToneLookupThread> (q, apiKey, localHit,
+            [safeThis] (mipedals::ToneMatchResult res)
+            {
+                if (safeThis == nullptr) return;
+                safeThis->tfSearching = false;
+                if (res.found)
+                {
+                    safeThis->lastToneResult = res;
+                    mipedals::ToneFinderEngine::applyToProcessor (safeThis->processor, res);
+                    safeThis->btnTfApply.setVisible (safeThis->kind == PopoverKind::ToneFinder);
+                    if (safeThis->changedFn) safeThis->changedFn();
+                }
+                else
+                {
+                    safeThis->tfStatusMsg = juce::String::fromUTF8 (u8"No se encontr\u00f3 coincidencia exacta. Prob\u00e1 con el nombre de la banda o g\u00e9nero.");
+                }
+                safeThis->repaint();
+            });
+        lookupThread->startThread();
+    }
+
+    struct ToneLookupThread final : public juce::Thread
+    {
+        ToneLookupThread (juce::String q, juce::String k, mipedals::ToneMatchResult fallback,
+                          std::function<void(mipedals::ToneMatchResult)> cb)
+            : juce::Thread ("MiAmpToneLookup"),
+              query (std::move (q)), apiKey (std::move (k)), localFallback (std::move (fallback)),
+              onDone (std::move (cb))
+        {}
+
+        void run() override
+        {
+            mipedals::ToneMatchResult res;
+            if (apiKey.isNotEmpty() && ! threadShouldExit())
+                res = mipedals::ToneFinderEngine::searchWithGemini (query, apiKey);
+            if (! res.found && ! threadShouldExit())
+            {
+                if (localFallback.found)
+                    res = localFallback;
+                else
+                    res = mipedals::ToneFinderEngine::searchFreeWeb (query);
+            }
+            if (! res.found && ! threadShouldExit())
+                res = mipedals::ToneFinderEngine::mapGenreKeywordsToTone (query, query, "Sugerencia Base");
+
+            if (! threadShouldExit() && onDone)
+                juce::MessageManager::callAsync ([fn = onDone, r = std::move (res)]() mutable { fn (std::move (r)); });
+        }
+
+        juce::String query, apiKey;
+        mipedals::ToneMatchResult localFallback;
+        std::function<void(mipedals::ToneMatchResult)> onDone;
+    };
+
     MiAmpAudioProcessor& processor;
     bool& useSolfege;
     std::function<void()> closeFn, changedFn;
@@ -1582,11 +1883,22 @@ private:
 
     juce::TextButton btnTunerNotation, btnTunerMute;
 
+    juce::TextButton btnCfgRouteAmp, btnCfgRoutePedals;
     juce::TextButton cfgCabBtns[5];
     juce::TextButton cfgChBtns[3];
     juce::TextButton btnCfgOs4x;
     juce::Slider slGate, slInput;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> slGateAttach, slInputAttach;
+    juce::TextEditor geminiKeyEdit;
+    juce::TextButton btnSaveGeminiKey;
+
+    juce::TextEditor tfQueryEdit;
+    juce::TextButton btnTfSearch, btnTfApply;
+    juce::TextButton tfChips[6];
+    mipedals::ToneMatchResult lastToneResult;
+    bool tfSearching = false;
+    juce::String tfStatusMsg;
+    std::unique_ptr<ToneLookupThread> lookupThread;
 };
 
 //==============================================================================
@@ -1599,10 +1911,11 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     loadImages();
 
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
-                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals,
+                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
                      &btnDockDrop, &btnDockConfig,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
-                     &btnFloorPresets, &btnFloorTuner, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
+                     &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
+                     &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
                      &btnFloorTunerMute, &btnFloorTunerNotation })
     {
         b->setLookAndFeel (&glassLaf);
@@ -1625,6 +1938,9 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     addAndMakeVisible (btnMainTuner);
     btnMainTuner.setComponentID ("headMenuTuner");
     btnMainTuner.onClick = [this] { togglePopover (PopoverKind::Tuner); };
+    addAndMakeVisible (btnMainToneFinder);
+    btnMainToneFinder.setComponentID ("headMenuToneFinder");
+    btnMainToneFinder.onClick = [this] { togglePopover (PopoverKind::ToneFinder); };
     addAndMakeVisible (btnMainPedals);
     btnMainPedals.setComponentID ("headMenuPedals");
     btnMainPedals.onClick = [this] { setFloorMode (true); };
@@ -1760,11 +2076,43 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
         repaint();
     };
 
+    addChildComponent (btnHeadModeAmp);
+    btnHeadModeAmp.onClick = [this]
+    {
+        audioProcessor.setHeadBypassed (audioProcessor.isBassMode(), false);
+        showHud ("CON AMPLI (CABEZAL ACTIVO)");
+        syncHeadControls();
+        repaint();
+    };
+    addChildComponent (btnHeadModePedals);
+    btnHeadModePedals.onClick = [this]
+    {
+        audioProcessor.setHeadBypassed (audioProcessor.isBassMode(), true);
+        showHud ("SOLO PEDALES (CABEZAL EN BYPASS)");
+        syncHeadControls();
+        repaint();
+    };
+
+    addChildComponent (paletteStrip);
+    paletteStrip.setInterceptsMouseClicks (false, true);
     for (int idx = 0; idx < 14; ++idx)
     {
         paletteItems[idx] = std::make_unique<PalettePedalButton> ("", juce::Image(), nullptr);
-        addChildComponent (*paletteItems[idx]);
+        paletteStrip.addAndMakeVisible (*paletteItems[idx]);
     }
+
+    addChildComponent (btnPaletteLeft);
+    btnPaletteLeft.onClick = [this]
+    {
+        paletteScrollTarget = juce::jmax (0.0f, paletteScrollTarget - 318.0f);
+    };
+    addChildComponent (btnPaletteRight);
+    btnPaletteRight.onClick = [this]
+    {
+        const int nPal = audioProcessor.isBassMode() ? 14 : 13;
+        const float maxScroll = juce::jmax (0.0f, static_cast<float> (nPal) * 106.0f - 10.0f - 966.0f);
+        paletteScrollTarget = juce::jmin (maxScroll, paletteScrollTarget + 318.0f);
+    };
 
     addChildComponent (btnFloorPresets);
     btnFloorPresets.onClick = [this] { togglePopover (PopoverKind::Presets); };
@@ -1778,6 +2126,8 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
         layoutAll();
         repaint();
     };
+    addChildComponent (btnFloorToneFinder);
+    btnFloorToneFinder.onClick = [this] { togglePopover (PopoverKind::ToneFinder); };
     addChildComponent (btnFloorDrop);
     btnFloorDrop.onClick = [this] { togglePopover (PopoverKind::Drop); };
     addChildComponent (btnFloorConfig);
@@ -1825,10 +2175,11 @@ MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
 {
     stopTimer();
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
-                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals,
+                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
                      &btnDockDrop, &btnDockConfig,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
-                     &btnFloorPresets, &btnFloorTuner, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
+                     &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
+                     &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
                      &btnFloorTunerMute, &btnFloorTunerNotation })
     {
         b->setLookAndFeel (nullptr);
@@ -1997,7 +2348,9 @@ void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
     activePopover = PopoverKind::None;
     popover->setVisible (false);
     animPedalHasPos.fill (false);
-    showHud (juce::String::fromUTF8 (toBass ? u8"BAJO \u00b7 XV EDITION" : u8"GUITARRA \u00b7 ZENBOX / ENEMA"));
+    paletteScrollTarget = 0.0f;
+    paletteScrollCur = 0.0f;
+    showHud (juce::String::fromUTF8 (toBass ? u8"BAJO \u00b7 XV EDITION" : u8"GUITARRA \u00b7 MI AMP"));
     syncHeadControls();
     syncPedalEditorControls();
     layoutAll();
@@ -2040,7 +2393,7 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     btnInstGuitar.setToggleState (! bass, juce::dontSendNotification);
     btnInstBass.setToggleState   (bass,   juce::dontSendNotification);
 
-    for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainPedals,
+    for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
                      &btnDockConfig })
         b->setVisible (showHead);
     btnDockDrop.setVisible (false);
@@ -2050,12 +2403,19 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     for (auto& k : guitarHeadKnobs)    k->setVisible (! isFloorMode && ! introRunning && ! bass);
     for (auto& s : guitarHeadSwitches) s->setVisible (! isFloorMode && ! introRunning && ! bass);
 
-    btnFloorPresets.setVisible (isFloorMode);
-    btnFloorTuner.setVisible   (isFloorMode);
-    btnFloorDrop.setVisible    (isFloorMode);
-    btnFloorConfig.setVisible  (isFloorMode);
-    btnBackToAmp.setVisible    (isFloorMode);
-    btnSkipIntro.setVisible    (introRunning && ! isFloorMode);
+    const bool headByp = audioProcessor.isHeadBypassed (bass);
+    btnHeadModeAmp.setVisible    (isFloorMode);
+    btnHeadModePedals.setVisible (isFloorMode);
+    btnHeadModeAmp.setToggleState    (! headByp, juce::dontSendNotification);
+    btnHeadModePedals.setToggleState (headByp,   juce::dontSendNotification);
+
+    btnFloorPresets.setVisible    (isFloorMode);
+    btnFloorTuner.setVisible      (isFloorMode);
+    btnFloorToneFinder.setVisible (isFloorMode);
+    btnFloorDrop.setVisible       (false); // Drop ya vive integrado dentro de AFINADOR
+    btnFloorConfig.setVisible     (isFloorMode);
+    btnBackToAmp.setVisible       (isFloorMode);
+    btnSkipIntro.setVisible       (introRunning && ! isFloorMode);
 }
 
 void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
@@ -2067,8 +2427,9 @@ void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
     }
     else
     {
-        // In floor mode, opening Presets/Drop/Config closes the left editor & slides board left (exact index.html behavior!)
-        if (isFloorMode && (kind == PopoverKind::Presets || kind == PopoverKind::Drop || kind == PopoverKind::Config))
+        // In floor mode, opening Presets/Drop/Config/ToneFinder closes the left editor & slides board left
+        if (isFloorMode && (kind == PopoverKind::Presets || kind == PopoverKind::Drop
+                         || kind == PopoverKind::Config || kind == PopoverKind::ToneFinder))
         {
             editorOpen = false;
             floorTunerOpen = false;
@@ -2180,6 +2541,11 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
         paletteItems[idx]->setVisible (isFloorMode && ! floorTunerOpen);
     }
 
+    const bool showPal = isFloorMode && ! floorTunerOpen;
+    paletteStrip.setVisible    (showPal);
+    btnPaletteLeft.setVisible  (showPal);
+    btnPaletteRight.setVisible (showPal);
+
     btnFloorTunerNotation.setVisible (isFloorMode && floorTunerOpen);
     btnFloorTunerMute.setVisible     (isFloorMode && floorTunerOpen);
 
@@ -2276,7 +2642,8 @@ void MiAmpAudioProcessorEditor::timerCallback()
     {
         const bool popFloor = (activePopover == PopoverKind::Presets
                             || activePopover == PopoverKind::Drop
-                            || activePopover == PopoverKind::Config);
+                            || activePopover == PopoverKind::Config
+                            || activePopover == PopoverKind::ToneFinder);
         const bool expanded = ! editorOpen && ! popFloor;
 
         const float targetTx    = popFloor ? -330.0f : (expanded ? -260.0f : 0.0f);
@@ -2286,6 +2653,22 @@ void MiAmpAudioProcessorEditor::timerCallback()
         boardTx    += 0.16f * (targetTx    - boardTx);
         boardTy    += 0.16f * (targetTy    - boardTy);
         boardScale += 0.16f * (targetScale - boardScale);
+
+        const int nPal = audioProcessor.isBassMode() ? 14 : 13;
+        const float maxScroll = juce::jmax (0.0f, static_cast<float> (nPal) * 106.0f - 10.0f - 966.0f);
+        paletteScrollTarget = juce::jlimit (0.0f, maxScroll, paletteScrollTarget);
+        if (std::fabs (paletteScrollTarget - paletteScrollCur) > 0.25f)
+        {
+            paletteScrollCur += 0.22f * (paletteScrollTarget - paletteScrollCur);
+            syncPalettePositions();
+        }
+        else if (paletteScrollCur != paletteScrollTarget)
+        {
+            paletteScrollCur = paletteScrollTarget;
+            syncPalettePositions();
+        }
+        btnPaletteLeft.setEnabled  (paletteScrollTarget > 1.0f);
+        btnPaletteRight.setEnabled (paletteScrollTarget < maxScroll - 1.0f);
 
         const bool bass = audioProcessor.isBassMode();
         auto chain = audioProcessor.getActiveChain (bass);
@@ -2361,10 +2744,12 @@ void MiAmpAudioProcessorEditor::timerCallback()
     btnFloorDrop.setToggleState   (dropOn || activePopover == PopoverKind::Drop, juce::dontSendNotification);
     btnFloorConfig.setToggleState (activePopover == PopoverKind::Config, juce::dontSendNotification);
 
-    btnMainPresets.setToggleState  (activePopover == PopoverKind::Presets, juce::dontSendNotification);
-    btnMainTuner.setToggleState    (activePopover == PopoverKind::Tuner,   juce::dontSendNotification);
-    btnFloorPresets.setToggleState (activePopover == PopoverKind::Presets, juce::dontSendNotification);
-    btnFloorTuner.setToggleState   (floorTunerOpen, juce::dontSendNotification);
+    btnMainPresets.setToggleState     (activePopover == PopoverKind::Presets,    juce::dontSendNotification);
+    btnMainTuner.setToggleState       (activePopover == PopoverKind::Tuner,      juce::dontSendNotification);
+    btnMainToneFinder.setToggleState  (activePopover == PopoverKind::ToneFinder, juce::dontSendNotification);
+    btnFloorPresets.setToggleState    (activePopover == PopoverKind::Presets,    juce::dontSendNotification);
+    btnFloorToneFinder.setToggleState (activePopover == PopoverKind::ToneFinder, juce::dontSendNotification);
+    btnFloorTuner.setToggleState      (floorTunerOpen, juce::dontSendNotification);
 
     const bool muted = audioProcessor.apvts.getRawParameterValue (MiAmpParams::tunerMuted)->load() > 0.5f;
     btnFloorTunerMute.setToggleState (muted, juce::dontSendNotification);
@@ -2507,13 +2892,14 @@ void MiAmpAudioProcessorEditor::layoutAll()
 
     if (! isFloorMode)
     {
-        // Unified right glass panel (.menu 1290, 25, 225, 294) — no top-left bar!
-        btnInstGuitar.setBounds  (toScreenInt (1308, 45,  93, 34));
-        btnInstBass.setBounds    (toScreenInt (1404, 45,  93, 34));
-        btnMainPresets.setBounds (toScreenInt (1305, 90,  195, 38));
-        btnMainTuner.setBounds   (toScreenInt (1305, 134, 195, 38));
-        btnMainPedals.setBounds  (toScreenInt (1305, 178, 195, 38));
-        btnDockConfig.setBounds  (toScreenInt (1305, 222, 195, 38));
+        // Unified right glass panel (.menu 1290, 25, 225, 304) — clean head with 5 items + meters
+        btnInstGuitar.setBounds      (toScreenInt (1308, 43,  93, 32));
+        btnInstBass.setBounds        (toScreenInt (1404, 43,  93, 32));
+        btnMainPresets.setBounds     (toScreenInt (1305, 84,  195, 34));
+        btnMainTuner.setBounds       (toScreenInt (1305, 122, 195, 34));
+        btnMainToneFinder.setBounds  (toScreenInt (1305, 160, 195, 34));
+        btnMainPedals.setBounds      (toScreenInt (1305, 198, 195, 34));
+        btnDockConfig.setBounds      (toScreenInt (1305, 236, 195, 34));
 
         if (bass)
         {
@@ -2563,12 +2949,16 @@ void MiAmpAudioProcessorEditor::layoutAll()
             }
         }
 
-        // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 294)
+        // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 304)
         if (popover->isVisible())
-            popover->setBounds (toScreenInt (1215, 331, 300, 422));
+            popover->setBounds (toScreenInt (1215, 338, 300, 418));
     }
     else
     {
+        // Top-right Amp vs Pedals-Only segmented switch (above board)
+        btnHeadModeAmp.setBounds    (toScreenInt (1236, 30, 134, 30));
+        btnHeadModePedals.setBounds (toScreenInt (1374, 30, 136, 30));
+
         // .edit controls (35, 28, 420, 577)
         btnEditClose.setBounds   (toScreenInt (412, 38,  30, 30));
         btnMoveLeft.setBounds    (toScreenInt (57,  553, 36, 34));
@@ -2610,30 +3000,40 @@ void MiAmpAudioProcessorEditor::layoutAll()
             pedalToggles[i]->setBounds (toScreenInt (cx - swW * 0.50f, cy - swH * 0.5147f, swW, swH));
         }
 
-        // Single-row .palette (13 Guitar / 14 Bass pedals cleanly aligned between label and right nav)
-        const int nPal = bass ? 14 : 13;
-        const float startX = 216.0f;
-        const float availW = 1022.0f;
-        const float gap = bass ? 4.5f : 5.0f;
-        const float iw = (availW - gap * static_cast<float> (nPal - 1)) / static_cast<float> (nPal);
-        for (int idx = 0; idx < nPal; ++idx)
-        {
-            const float px = startX + static_cast<float> (idx) * (iw + gap);
-            paletteItems[idx]->setBounds (toScreenInt (px, 636, iw, 98));
-        }
+        // Smooth scrollable .palette carousel (large spacious pedals + < > arrows)
+        btnPaletteLeft.setBounds  (toScreenInt (206, 656, 26, 58));
+        btnPaletteRight.setBounds (toScreenInt (1206, 656, 26, 58));
+        paletteStrip.setBounds    (toScreenInt (236, 632, 966, 108));
+        syncPalettePositions();
 
         btnFloorTunerNotation.setBounds (toScreenInt (1030, 640, 175, 36));
         btnFloorTunerMute.setBounds     (toScreenInt (1030, 684, 175, 39));
 
         // .palette-nav (right side of .palette, w=250 -> x=1246..1496)
-        btnFloorPresets.setBounds (toScreenInt (1246, 630, 122, 34));
-        btnFloorTuner.setBounds   (toScreenInt (1374, 630, 122, 34));
-        btnFloorDrop.setBounds    (toScreenInt (1246, 668, 122, 34));
-        btnFloorConfig.setBounds  (toScreenInt (1374, 668, 122, 34));
-        btnBackToAmp.setBounds    (toScreenInt (1246, 706, 250, 34));
+        btnFloorPresets.setBounds    (toScreenInt (1246, 630, 122, 34));
+        btnFloorTuner.setBounds      (toScreenInt (1374, 630, 122, 34));
+        btnFloorToneFinder.setBounds (toScreenInt (1246, 668, 122, 34));
+        btnFloorConfig.setBounds     (toScreenInt (1374, 668, 122, 34));
+        btnBackToAmp.setBounds       (toScreenInt (1246, 706, 250, 34));
 
         if (popover->isVisible())
             popover->setBounds (toScreenInt (1215, 110, 300, 474));
+    }
+}
+
+void MiAmpAudioProcessorEditor::syncPalettePositions()
+{
+    const bool bass = audioProcessor.isBassMode();
+    const int nPal = bass ? 14 : 13;
+    const float s = stageScale();
+    const float cardW = 96.0f * s;
+    const float cardH = 104.0f * s;
+    const float step  = 106.0f * s;
+    const float offX  = -paletteScrollCur * s;
+    for (int idx = 0; idx < nPal; ++idx)
+    {
+        const int x = juce::roundToInt (offX + static_cast<float> (idx) * step);
+        paletteItems[idx]->setBounds (x, juce::roundToInt (2.0f * s), juce::roundToInt (cardW), juce::roundToInt (cardH));
     }
 }
 
@@ -2838,17 +3238,27 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
 
     const float s = stageScale();
 
-    // Unified right glass panel (.menu 1290, 25, 225, 294) — clean head with no top-left bar!
-    paintGlassPanel (g, toScreen (1290, 25, 225, 294), 22.0f);
+    // Unified right glass panel (.menu 1290, 25, 225, 304) — clean head with 5 actions + meters
+    paintGlassPanel (g, toScreen (1290, 25, 225, 304), 22.0f);
 
-    auto swBox = toScreen (1305, 42, 195, 40);
+    auto swBox = toScreen (1305, 40, 195, 38);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, 24));
     g.fillRoundedRectangle (swBox, 8.0f * s);
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, 102));
     g.drawRoundedRectangle (swBox, 8.0f * s, 1.0f);
 
-    // Integrated status LED + IN / OUT meters inside right panel (1305, 267, 195, 37)
-    auto meterBox = toScreen (1305, 267, 195, 37);
+    // Subtle banner in Head View when SOLO PEDALES (Head Bypass) is active
+    if (audioProcessor.isHeadBypassed (bass))
+    {
+        auto bR = toScreen (465, 25, 620, 34);
+        paintGlassPanel (g, bR, 12.0f);
+        g.setColour (mintBorder());
+        g.setFont (sansFont (juce::jmax (10.0f, 12.0f * s), juce::Font::bold));
+        g.drawText ("MODO SOLO PEDALES ACTIVO (CABEZAL EN BYPASS)", bR, juce::Justification::centred);
+    }
+
+    // Integrated status LED + IN / OUT meters inside right panel (1305, 276, 195, 37)
+    auto meterBox = toScreen (1305, 276, 195, 37);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, 16));
     g.fillRoundedRectangle (meterBox, 8.0f * s);
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, 74));
@@ -2859,14 +3269,14 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
                                      : (! pwr || standby ? juce::Colour::fromRGB (247, 197, 107)
                                                          : juce::Colour::fromRGB (126, 255, 189));
     g.setColour (ledCol);
-    g.fillEllipse (toScreen (1316, 281, 9, 9));
+    g.fillEllipse (toScreen (1316, 290, 9, 9));
 
     const float inFrac  = juce::jlimit (0.0f, 1.0f, audioProcessor.inputRms.load() * 3.5f);
     const float outFrac = juce::jlimit (0.0f, 1.0f, audioProcessor.outputRms.load() * 3.5f);
     g.setColour (inkColour().withAlpha (0.80f));
     g.setFont (sansFont (juce::jmax (7.5f, 9.0f * s), juce::Font::bold));
-    g.drawText ("IN",  toScreen (1332, 273, 22, 11), juce::Justification::centredLeft);
-    g.drawText ("OUT", toScreen (1332, 287, 24, 11), juce::Justification::centredLeft);
+    g.drawText ("IN",  toScreen (1332, 282, 22, 11), juce::Justification::centredLeft);
+    g.drawText ("OUT", toScreen (1332, 296, 24, 11), juce::Justification::centredLeft);
 
     auto drawMeter = [&] (float y, float frac)
     {
@@ -2882,8 +3292,8 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
             g.fillRoundedRectangle (tr.withWidth (tr.getWidth() * frac), 3.0f * s);
         }
     };
-    drawMeter (276.0f, inFrac);
-    drawMeter (290.0f, outFrac);
+    drawMeter (285.0f, inFrac);
+    drawMeter (299.0f, outFrac);
 
     if (hudText.isNotEmpty())
     {
@@ -2943,13 +3353,20 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             const float artH = static_cast<float> (pSpec.natH) * scFit;
             const auto artR = juce::Rectangle<float> (sr.getCentreX() - artW * 0.5f, sr.getCentreY() - artH * 0.5f, artW, artH);
 
-            // Retain full vivid pedal color even in bypass (only LED goes dark!)
+            // Dim bypassed pedals visually on the board so active vs bypassed is immediately clear
             g.setOpacity (isBeingDragged ? 0.25f : 1.0f);
 
             if (pImg.isValid())
                 g.drawImage (pImg, artR, juce::RectanglePlacement::stretchToFit);
 
             paintMiniPedalKnobs (g, bass, pt, artR);
+
+            if (! active && ! isBeingDragged)
+            {
+                g.setColour (juce::Colour::fromRGBA (8, 12, 14, 138));
+                g.fillRoundedRectangle (artR, 8.0f * s);
+                paintPedalStateOverlays (g, bass, pt, artR, false);
+            }
             g.setOpacity (1.0f);
 
             if (pt == sel && showEd && ! isBeingDragged)
@@ -3099,16 +3516,19 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
                     toScreen (56, 514, 330, 26), juce::Justification::centredLeft);
     }
 
+    // Top-right glass pill for CON AMPLI | SOLO PEDALES
+    paintGlassPanel (g, toScreen (1230, 26, 284, 38), 14.0f);
+
     // Bottom .palette glass bar (36, 623, 1478, 125)
     paintGlassPanel (g, toScreen (36, 623, 1478, 125), 22.0f);
     if (! floorTunerOpen)
     {
         g.setColour (inkColour());
-        g.setFont (sansFont (juce::jmax (10.0f, 13.5f * s), juce::Font::bold));
-        g.drawText (juce::String::fromUTF8 (u8"ARRASTR\u00c1 LOS PEDALES"), toScreen (56, 650, 200, 24), juce::Justification::centredLeft);
+        g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s), juce::Font::bold));
+        g.drawText (juce::String::fromUTF8 (u8"ARRASTR\u00c1 LOS PEDALES"), toScreen (52, 650, 152, 24), juce::Justification::centredLeft);
         g.setColour (inkColour().withAlpha (0.82f));
-        g.setFont (sansFont (juce::jmax (9.0f, 11.5f * s), juce::Font::plain));
-        g.drawText (juce::String::fromUTF8 (u8"o hac\u00e9 clic para agregar"), toScreen (56, 676, 200, 34), juce::Justification::topLeft);
+        g.setFont (sansFont (juce::jmax (9.0f, 11.0f * s), juce::Font::plain));
+        g.drawText (juce::String::fromUTF8 (u8"o hac\u00e9 clic para agregar"), toScreen (52, 676, 152, 34), juce::Justification::topLeft);
     }
     else
     {
@@ -3274,11 +3694,20 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
         if (introRunning) return;
 
         // Clear CLIP on meter click inside unified right panel
-        if (juce::Rectangle<float> (1305, 267, 195, 37).contains (stagePt))
+        if (juce::Rectangle<float> (1305, 276, 195, 37).contains (stagePt))
         {
             audioProcessor.isClipping.store (false, std::memory_order_relaxed);
             return;
         }
+        // Banner click in Head View jumps to Pedals floor view
+        if (audioProcessor.isHeadBypassed (bass) && juce::Rectangle<float> (465, 25, 620, 34).contains (stagePt))
+        {
+            setFloorMode (true);
+            return;
+        }
+        // Close open popover if clicking outside it
+        if (activePopover != PopoverKind::None)
+            togglePopover (PopoverKind::None);
         // Easter Egg: .brand-trigger (420, 185, 450, 95)
         if (juce::Rectangle<float> (420, 185, 450, 95).contains (stagePt))
         {
@@ -3358,6 +3787,45 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
     }
 
     draggingPedalType = -1;
+
+    // Clicking any empty area outside pedals, left editor, dock, top-right switch, and popover closes the left editor
+    const bool inLeftEditor = editorOpen && juce::Rectangle<float> (35, 28, 420, 577).contains (stagePt);
+    const bool inBottomDock = juce::Rectangle<float> (36, 623, 1478, 125).contains (stagePt);
+    const bool inTopRight   = juce::Rectangle<float> (1230, 26, 284, 38).contains (stagePt);
+    const bool inPopover    = (activePopover != PopoverKind::None) && juce::Rectangle<float> (1215, 110, 300, 474).contains (stagePt);
+
+    if (! inLeftEditor && ! inBottomDock && ! inTopRight && ! inPopover)
+    {
+        bool changed = false;
+        if (editorOpen)
+        {
+            editorOpen = false;
+            syncPedalEditorControls();
+            changed = true;
+        }
+        if (activePopover != PopoverKind::None)
+        {
+            togglePopover (PopoverKind::None);
+            changed = true;
+        }
+        if (changed)
+            repaint();
+    }
+}
+
+void MiAmpAudioProcessorEditor::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
+{
+    if (! isFloorMode || floorTunerOpen)
+        return;
+
+    const auto stagePt = editorPtToStage (e.position);
+    if (juce::Rectangle<float> (200, 623, 1040, 125).contains (stagePt))
+    {
+        const int nPal = audioProcessor.isBassMode() ? 14 : 13;
+        const float maxScroll = juce::jmax (0.0f, static_cast<float> (nPal) * 106.0f - 10.0f - 966.0f);
+        const float delta = (std::fabs (wheel.deltaX) > std::fabs (wheel.deltaY)) ? -wheel.deltaX : -wheel.deltaY;
+        paletteScrollTarget = juce::jlimit (0.0f, maxScroll, paletteScrollTarget + delta * 240.0f);
+    }
 }
 
 void MiAmpAudioProcessorEditor::mouseDrag (const juce::MouseEvent& e)
