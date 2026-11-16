@@ -159,7 +159,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
 
     // Guitar Head (MI Amp Dual-Voicing Edition)
     addPct  (MiAmpParams::gtrInput,      "Guitar Input",       56.0f);
-    addPct  (MiAmpParams::gtrGate,       "Guitar Gate",        28.0f);
+    addPct  (MiAmpParams::gtrGate,       "Guitar Gate",        32.0f);
     addBool (MiAmpParams::gtrOs4x,       "Guitar 4x OS",       true);
     addInt  (MiAmpParams::gtrCab,        "Guitar Cab",         0, 4, 1);
     addBool (MiAmpParams::gtrPower,      "Guitar Power",       true);

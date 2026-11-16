@@ -3802,6 +3802,17 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
         g.drawText ("MODO SOLO PEDALES ACTIVO (CABEZAL EN BYPASS)", bR, juce::Justification::centred);
     }
 
+    if (miamp_standalone::isRunningStandalone() && miamp_standalone::isAudioInputMuted())
+    {
+        const float ay = audioProcessor.isHeadBypassed (bass) ? 66.0f : 25.0f;
+        auto aR = toScreen (465, ay, 620, 30);
+        paintGlassPanel (g, aR, 10.0f, uiAlpha);
+        g.setColour (juce::Colour::fromRGB (247, 211, 138).withAlpha (uiAlpha));
+        g.setFont (sansFont (juce::jmax (9.5f, 11.2f * s), juce::Font::bold));
+        g.drawText (juce::String::fromUTF8 (u8"ENTRADA SILENCIADA (SIN INTERFAZ) \u00b7 CLIC PARA ELEGIR PLACA"),
+                    aR, juce::Justification::centred);
+    }
+
     // Integrated status LED + IN / OUT meters inside right panel (1305, 276, 195, 37)
     auto meterBox = toScreen (1305, 276, 195, 37);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, static_cast<uint8_t> (16.0f * uiAlpha)));
@@ -4249,6 +4260,17 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
         {
             setFloorMode (true);
             return;
+        }
+        // Standalone muted-input banner click opens Audio/Interface settings
+        if (miamp_standalone::isRunningStandalone() && miamp_standalone::isAudioInputMuted())
+        {
+            const float ay = audioProcessor.isHeadBypassed (bass) ? 66.0f : 25.0f;
+            if (juce::Rectangle<float> (465, ay, 620, 30).contains (stagePt))
+            {
+                miamp_standalone::openAudioSettingsDialog();
+                repaint();
+                return;
+            }
         }
         // Close open popover if clicking outside it
         if (activePopover != PopoverKind::None)
