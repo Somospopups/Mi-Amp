@@ -155,8 +155,8 @@ public:
                      { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 58.f }, { MiAmpParams::gtrReverbTone, 60.f }, { MiAmpParams::gtrReverbMix, 34.f }
                  });
 
-            add ("story so far bass kelen capener bajo pop punk empty space quicksand proper dose",
-                 "The Story So Far \u2022 Bajo Kelen (8x10 + BDDI)",
+            add ("story so far bass kelen capener bajo pop punk empty space quicksand proper dose nerve heavy gloom clairvoyant will levy",
+                 "The Story So Far \u2022 Bajo (8x10 + BDDI)",
                  u8"MI-87 Compresor siempre activo + MI Bass Driver con presencia de p\u00faa sobre cabezal 8x10 cl\u00e1sico.",
                  true, false, -2, 0, 0, false, 56.f, 56.f, 58.f, 60.f, 52.f, 55.f,
                  { 0, 5 },
@@ -177,8 +177,8 @@ public:
                      { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusMix, 24.f }
                  });
 
-            add ("blink 182 mark hoppus bass bajo pop punk dammit all the small things",
-                 "Pop-Punk Bass \u2022 XV Original Directo",
+            add ("blink 182 enema dammit whats my age again all the small things anthem feeling this cali pop punk bass mark hoppus bajo",
+                 "90s/00s Cali Pop-Punk \u2022 Bajo XV Directo",
                  u8"Modo SOLO PEDALES con XV Preamp puro (Cab PUNK) + Compresor para ataque cristalino de p\u00faa id\u00e9ntico al original.",
                  true, true, 0, 0, 0, false, 50.f, 50.f, 50.f, 50.f, 50.f, 50.f,
                  { 0, 1 },
@@ -405,7 +405,7 @@ public:
 
             add ("soul motown vintage warm round bass bajo",
                  "Vintage Warm Soul Bass",
-                 "Bass Food cálido sin brillo + Cabezal 8x10 con graves llenos.",
+                 u8"Bass Food c\u00e1lido sin brillo + Cabezal 8x10 con graves llenos.",
                  true, false, 0, 0, 0, false, 52.f, 66.f, 58.f, 34.f, 42.f, 50.f,
                  { 0, 13 },
                  {
@@ -413,12 +413,113 @@ public:
                      { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 62.f }, { MiAmpParams::bassEqBand[5], 30.f }
                  });
 
+            // === ADDITIONAL BASS RIGS (Full parity for every genre/band when in Bass mode) ===
+            add ("turnstile glow on blackout mystery hardcore punk franz lyons bass bajo",
+                 "Turnstile \u2022 Bajo Hardcore Groove",
+                 u8"Drop -2 + MI-87 Comp + MI Bass Driver con grit y pegada en medios-bajos sobre 8x10.",
+                 true, false, -2, 0, 0, false, 60.f, 62.f, 62.f, 62.f, 54.f, 55.f,
+                 { 11, 0, 5 },
+                 {
+                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 32.f },
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 60.f }, { MiAmpParams::compAttack, 30.f },
+                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 52.f }, { MiAmpParams::bddiBlend, 68.f }, { MiAmpParams::bddiPresence, 70.f }
+                 });
+
+            add ("neck deep december in bloom gold steps paramore sum 41 fat lip skate pop punk bass bajo",
+                 "Modern Pop-Punk \u2022 Bajo Pick & Bite",
+                 u8"MI-87 Comp + MI Bass Driver + Bass EQ realzando ataque de p\u00faa en 4.5 kHz.",
+                 true, false, -2, 0, 0, false, 58.f, 58.f, 58.f, 66.f, 58.f, 55.f,
+                 { 0, 5, 13 },
+                 {
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 58.f },
+                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 48.f }, { MiAmpParams::bddiBlend, 64.f }, { MiAmpParams::bddiPresence, 76.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 56.f }, { MiAmpParams::bassEqBand[5], 66.f }
+                 });
+
+            add ("deftones my own summer around the fur white pony chi cheng sergio vega nu metal drop bass bajo",
+                 "Deftones \u2022 Bajo Drop Wall",
+                 u8"Drop -3 + Silent Gate + MI-87 Comp + MI Gold Drive grueso + 8x10 con sub pesado.",
+                 true, false, -3, 0, 0, false, 64.f, 68.f, 56.f, 60.f, 50.f, 55.f,
+                 { 11, 0, 6, 2 },
+                 {
+                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 38.f },
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 62.f },
+                     { MiAmpParams::goldOn, 1.f }, { MiAmpParams::goldGain, 58.f }, { MiAmpParams::goldBlend, 62.f }, { MiAmpParams::goldEq, 56.f },
+                     { MiAmpParams::chorusOn, 0.f }, { MiAmpParams::chorusMix, 24.f }
+                 });
+
+            add ("metallica master of puppets enter sandman cliff burton jason newsted thrash metal bass bajo",
+                 "80s Thrash \u2022 Bajo Pick & Growl",
+                 u8"MI-87 Comp + Bass Food + Bass EQ en sonrisa para cortar entre guitarras.",
+                 true, false, 0, 0, 0, false, 62.f, 62.f, 44.f, 68.f, 56.f, 55.f,
+                 { 0, 7, 13 },
+                 {
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 60.f },
+                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 56.f }, { MiAmpParams::bfBlend, 66.f }, { MiAmpParams::bfPad, 1.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 62.f }, { MiAmpParams::bassEqBand[3], 38.f }, { MiAmpParams::bassEqBand[5], 68.f }
+                 });
+
+            add ("knocked loose metalcore hardcore beatdown modern metal djent drop bass bajo",
+                 "Metalcore / Djent \u2022 Bajo Clank Brutal",
+                 u8"Drop -4 + Silent Gate + MI-87 Comp + XV Preamp en SOLO PEDALES con clank agresivo.",
+                 true, true, -4, 0, 0, false, 50.f, 50.f, 50.f, 50.f, 50.f, 50.f,
+                 { 11, 0, 1, 13 },
+                 {
+                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 48.f },
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 68.f },
+                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvDrive, 76.f }, { MiAmpParams::xvBlend, 74.f }, { MiAmpParams::xvMid, 32.f }, { MiAmpParams::xvPresence, 86.f }, { MiAmpParams::xvCab, 1.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 60.f }, { MiAmpParams::bassEqBand[5], 68.f }
+                 });
+
+            add ("nirvana nevermind smells like teen spirit grunge foo fighters everlong alt rock bass bajo",
+                 "90s Grunge / Alt Rock \u2022 Bajo C\u00e1lido",
+                 u8"MI-87 Comp + Bass Food crunch suave + Cabezal 8x10 con graves y medios redondos.",
+                 true, false, 0, 0, 0, false, 58.f, 62.f, 62.f, 56.f, 50.f, 55.f,
+                 { 0, 7 },
+                 {
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f },
+                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 42.f }, { MiAmpParams::bfBlend, 58.f }
+                 });
+
+            add ("title fight shoegaze post hardcore midwest emo math rock ambient post rock clean bass bajo",
+                 "Indie / Emo / Shoegaze \u2022 Bajo Mel\u00f3dico",
+                 u8"MI-87 Comp + MI Deep Chorus sutil + MI Studio Reverb + Cabezal 8x10 limpio y definido.",
+                 true, false, 0, 0, 0, false, 48.f, 58.f, 60.f, 58.f, 52.f, 55.f,
+                 { 0, 2, 4 },
+                 {
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 58.f },
+                     { MiAmpParams::chorusOn, 1.f }, { MiAmpParams::chorusRate, 32.f }, { MiAmpParams::chorusDepth, 48.f }, { MiAmpParams::chorusMix, 34.f },
+                     { MiAmpParams::reverbOn, 1.f }, { MiAmpParams::reverbDecay, 46.f }, { MiAmpParams::reverbMix, 22.f }
+                 });
+
+            add ("stoner doom queens of the stone age kyuss fuzz bass bajo",
+                 "Stoner / Doom \u2022 Bajo Fuzz Masivo",
+                 u8"Drop -4 + Poly Octave Sub + MI Olive Fuzz + 8x10 con graves gigantes.",
+                 true, false, -4, 0, 0, false, 64.f, 70.f, 58.f, 48.f, 44.f, 55.f,
+                 { 0, 12, 8 },
+                 {
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 56.f },
+                     { MiAmpParams::bassOctOn, 1.f }, { MiAmpParams::bassOctDry, 78.f }, { MiAmpParams::bassOctSub, 62.f },
+                     { MiAmpParams::oliveOn, 1.f }, { MiAmpParams::oliveSustain, 78.f }, { MiAmpParams::oliveTone, 48.f }, { MiAmpParams::oliveMode, 1.f }
+                 });
+
+            add ("dual directo solo pedales preamp guitar guitarra",
+                 "Dual Crunch \u2022 Solo Pedales (Directo)",
+                 u8"Modo SOLO PEDALES con MI Dual Crunch + Pearl Delay + Studio Reverb sin cabezal.",
+                 false, true, 0, 2, 1, true, 60.f, 54.f, 60.f, 60.f, 60.f, 60.f,
+                 { 8, 5, 6 },
+                 {
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualDrive, 62.f }, { MiAmpParams::gtrDualBlend, 55.f }, { MiAmpParams::gtrDualTone, 58.f }, { MiAmpParams::gtrDualOutput, 60.f },
+                     { MiAmpParams::gtrDelayOn, 1.f }, { MiAmpParams::gtrDelayTime, 40.f }, { MiAmpParams::gtrDelayFb, 30.f }, { MiAmpParams::gtrDelayMix, 22.f },
+                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 42.f }, { MiAmpParams::gtrReverbMix, 22.f }
+                 });
+
             return v;
         }();
         return cat;
     }
 
-    static ToneMatchResult searchLocalCatalog (const juce::String& queryRaw, int& outBestScore)
+    static ToneMatchResult searchLocalCatalog (const juce::String& queryRaw, bool forBass, int& outBestScore)
     {
         const juce::String q = normalizeQuery (queryRaw);
         outBestScore = 0;
@@ -429,7 +530,6 @@ public:
         tokens.addTokens (q, " ", "");
         tokens.removeEmptyStrings();
 
-        const bool wantBass = queryImpliesBass (q);
         const auto& cat = getCatalog();
 
         int bestIdx = -1;
@@ -437,12 +537,20 @@ public:
 
         for (size_t i = 0; i < cat.size(); ++i)
         {
+            // Strictly respect the currently selected instrument (Guitar vs Bass)!
+            if (cat[i].result.bassMode != forBass)
+                continue;
+
             const juce::String hay = normalizeQuery (cat[i].keywords + " " + cat[i].result.title);
             int score = 0;
 
+            int tokenHits = 0;
             // Bonus for multi-word exact phrase match
             if (q.length() >= 4 && hay.contains (q))
+            {
                 score += 120;
+                ++tokenHits;
+            }
 
             for (const auto& tok : tokens)
             {
@@ -450,16 +558,18 @@ public:
                 // Ignore generic filler words
                 if (tok == "quiero" || tok == "sonar" || tok == "como" || tok == "esta"
                     || tok == "cancion" || tok == "tema" || tok == "para" || tok == "banda"
-                    || tok == "sound" || tok == "like" || tok == "tone" || tok == "song" || tok == "the")
+                    || tok == "sound" || tok == "like" || tok == "tone" || tok == "song" || tok == "the"
+                    || tok == "parecerme" || tok == "estilo" || tok == "tono")
                     continue;
                 if (hay.contains (tok))
+                {
                     score += (tok.length() >= 5 ? 30 : 18);
+                    ++tokenHits;
+                }
             }
 
-            if (wantBass && cat[i].result.bassMode)
-                score += 22;
-            else if (! wantBass && ! cat[i].result.bassMode)
-                score += 8;
+            if (tokenHits == 0)
+                continue;
 
             if (score > bestScore)
             {
@@ -469,38 +579,98 @@ public:
         }
 
         outBestScore = bestScore;
-        if (bestIdx >= 0 && bestScore >= 24)
+        if (bestIdx >= 0 && bestScore >= 28)
             return cat[static_cast<size_t> (bestIdx)].result;
 
         return {};
     }
 
-    static ToneMatchResult mapGenreKeywordsToTone (const juce::String& text, const juce::String& query, const juce::String& badge)
+    static ToneMatchResult mapGenreKeywordsToTone (const juce::String& text, const juce::String& query, bool forBass, const juce::String& badge)
     {
-        const juce::String norm = normalizeQuery (text + " " + query);
+        const juce::String norm = normalizeQuery (text);
         int score = 0;
-        auto local = searchLocalCatalog (norm, score);
-        if (local.found)
+        auto local = searchLocalCatalog (norm, forBass, score);
+        if (local.found && score >= 28)
         {
             local.sourceBadge = badge;
             local.title = query.trim().substring (0, 26) + " (" + local.title.upToFirstOccurrenceOf (juce::String::fromUTF8 (u8" \u2022"), false, false) + ")";
             return local;
         }
+        return {};
+    }
 
-        const bool bass = queryImpliesBass (norm);
-        if (bass)
+    static juce::String buildAiPrompt (const juce::String& userQuery, bool forBass)
+    {
+        if (forBass)
         {
-            auto r = getCatalog()[2].result;
-            r.sourceBadge = badge;
-            return r;
+            return juce::String::fromUTF8 (
+                u8"Tengo el plugin MI AMP en modo BAJO y quiero lograr el tono de bajo de: \"")
+                + userQuery.trim()
+                + juce::String::fromUTF8 (
+                u8"\".\n\n"
+                u8"Us\u00e1 EXCLUSIVAMENTE este equipamiento de BAJO en MI AMP y decime paso a paso qu\u00e9 elegir con valores exactos (0 a 100, o -12 a +12 dB en EQ):\n\n"
+                u8"1) RUTA Y AFINACI\u00d3N:\n"
+                u8"- Modo de ruta: CON AMPLI (cabezal 8x10 + cabina) o SOLO PEDALES (bypass completo del cabezal, ideal para XV directo)\n"
+                u8"- DROP TUNER: On/Off, Semitonos (-12 a +12, ej. -2 para D)\n\n"
+                u8"2) CABEZAL DE BAJO (si usa CON AMPLI):\n"
+                u8"- Cabezal 8x10 | Switch ULTRA-HI (On/Off) | Cabina 8x10 (ON/OFF)\n"
+                u8"- Perillas (0-100): Gain, Bass, Mid, Freq, Treble\n\n"
+                u8"3) PEDALES DE BAJO (hasta 10 en orden):\n"
+                u8"- MI-87 COMP (Compresor): Sustain, Attack, Level, Input\n"
+                u8"- XV PREAMP (Bi-Amp Preamp): Level, Drive, Low, High, Blend, Mid, Presence, Cab (BASS/PUNK/CLEAN)\n"
+                u8"- MI DEEP CHORUS: Rate, Depth, Mix, Tone\n"
+                u8"- MI LIME PHASE: Speed, Depth, Feedback\n"
+                u8"- MI STUDIO (Reverb): Decay, Tone, Mix, Mode\n"
+                u8"- MI BASS DRIVER (DI Preamp): Drive, Blend, Treble, Presence, Bass, Level, 3 switches (Grit/Mid/Cab)\n"
+                u8"- MI GOLD DRIVE: Gain, Tone, Blend, Level\n"
+                u8"- BASS FOOD (Overdrive): Drive, Blend, Treble, Bass, Level, Switch GRIT\n"
+                u8"- MI OLIVE (Fuzz): Level, Tone, Sustain, Switch 3-pos (Normal/Boost/Cut)\n"
+                u8"- MI VIOLET (Flanger): Manual, Res, Depth, Rate, Switch MODE\n"
+                u8"- MI PEARL (Delay): Time, Feedback, Mix, Mode, Switch SUBDIV\n"
+                u8"- MI SILENT (Noise Gate): Thresh, Decay, Mode\n"
+                u8"- MI POLY OCTAVE: Dry, Sub, Oct Up\n"
+                u8"- MI BASS EQ (7 Bandas -12 a +12 dB): 50Hz, 120Hz, 400Hz, 500Hz, 800Hz, 4.5kHz, 10kHz\n\n"
+                u8"Respondeme con:\n"
+                u8"1) Modo (CON AMPLI o SOLO PEDALES) y Drop Tuner\n"
+                u8"2) Configuraci\u00f3n del Cabezal 8x10 y Cabina\n"
+                u8"3) Orden exacto de pedales de BAJO y valor de cada perilla/switch.");
         }
-        auto r = getCatalog()[0].result;
-        r.sourceBadge = badge;
-        return r;
+
+        return juce::String::fromUTF8 (
+            u8"Tengo el plugin MI AMP en modo GUITARRA y quiero lograr el tono de guitarra de: \"")
+            + userQuery.trim()
+            + juce::String::fromUTF8 (
+            u8"\".\n\n"
+            u8"Us\u00e1 EXCLUSIVAMENTE este equipamiento de GUITARRA en MI AMP y decime paso a paso qu\u00e9 elegir con valores exactos (0 a 100, o -12 a +12 dB en EQ):\n\n"
+            u8"1) RUTA Y AFINACI\u00d3N:\n"
+            u8"- Modo de ruta: CON AMPLI (cabezal + cabina activos) o SOLO PEDALES (bypass completo del cabezal)\n"
+            u8"- DROP TUNER: On/Off, Semitonos (-12 a +12, ej. -2 para D)\n\n"
+            u8"2) CABEZAL Y CABINA DE GUITARRA (si usa CON AMPLI):\n"
+            u8"- Canales: CH1 CLEAN / CH2 CRUNCH / CH3 PUNK | Switch BRIGHT (On/Off)\n"
+            u8"- Perillas (0-100): Gain, Bass, Mid, Treble, Presence, Master, Output | Noise Gate (0-100) | Input Trim (0-100)\n"
+            u8"- Cabinas: VINT 4x12, MOD 4x12, OPEN 2x12, STUD 1x12, CAB OFF\n\n"
+            u8"3) PEDALES DE GUITARRA (hasta 10 en orden):\n"
+            u8"- MI ICE COMP (Compresor): Sustain, Attack, Level, Tone\n"
+            u8"- MI GREEN DRIVE (Overdrive): Gain, Tone, Level, Switch CLIP\n"
+            u8"- MI SUSTAIN (Octave Fuzz): Volume, Tone, Sustain\n"
+            u8"- MI SKY CHORUS (Chorus): Rate, Depth, Mix, EQ, Switch MODE\n"
+            u8"- MI PHASER (4-Stage Phaser): Speed\n"
+            u8"- MI PEARL (Delay): Time, Feedback, Mix, Mode, Switch SUBDIV\n"
+            u8"- MI STUDIO (Reverb): Decay, Tone, Mix, Mode\n"
+            u8"- MI ORANGE (Distortion): Tone, Level, Dist\n"
+            u8"- MI DUAL CRUNCH (High Gain Preamp): Output, Gain, Blend, Tone, Drive, Switch SCOOP\n"
+            u8"- MI VIOLET (Flanger): Manual, Res, Depth, Rate, Switch MODE\n"
+            u8"- MI SILENT (Noise Gate): Thresh, Decay, Mode\n"
+            u8"- MI SUB OCTAVE (Octavador): Direct, Oct Up, Sub 1, Sub 2\n"
+            u8"- MI GRAPHIC EQ (7 Bandas -12 a +12 dB): 100Hz, 200Hz, 400Hz, 800Hz, 1.6kHz, 3.2kHz, 6.4kHz\n\n"
+            u8"Respondeme con:\n"
+            u8"1) Modo (CON AMPLI o SOLO PEDALES) y Drop Tuner\n"
+            u8"2) Configuraci\u00f3n del Cabezal y Cabina\n"
+            u8"3) Orden exacto de pedales de GUITARRA y valor de cada perilla/switch.");
     }
 
     // Free public web lookup (Wikipedia + MusicBrainz, ZERO API keys required)
-    static ToneMatchResult searchFreeWeb (const juce::String& query)
+    static ToneMatchResult searchFreeWeb (const juce::String& query, bool forBass)
     {
         juce::String collectedText;
 
@@ -561,26 +731,30 @@ public:
         if (collectedText.trim().isEmpty())
             return {};
 
-        return mapGenreKeywordsToTone (collectedText, query, "Web (Wiki + MusicBrainz)");
+        return mapGenreKeywordsToTone (collectedText, query, forBass, "Web (Wiki + MusicBrainz)");
     }
 
     // Optional Google Gemini + Google Search Grounding (if user entered their own free Gemini key in CONFIG)
-    static ToneMatchResult searchWithGemini (const juce::String& query, const juce::String& apiKey)
+    static ToneMatchResult searchWithGemini (const juce::String& query, bool forBass, const juce::String& apiKey)
     {
         if (apiKey.trim().isEmpty())
             return {};
 
         try
         {
+            const juce::String instStr = forBass ? "BASS (use ONLY bass pedals 0..13 and bass head)" : "GUITAR (use ONLY guitar pedals 0..12 and guitar head)";
             const juce::String prompt =
-                "You are a guitar/bass rig expert. Search the web for the real amp, cabinet, tuning and pedal chain for: \""
+                "You are a guitar/bass rig expert. The user is currently in " + instStr
+                + ". Search the web for the real rig, tuning and pedal chain for: \""
                 + query.replace ("\"", "'")
-                + "\". Map it to MI AMP parameters and reply ONLY with valid JSON (no markdown fences) with keys: "
-                  "\"title\" (string), \"explanation\" (short Spanish description), \"bassMode\" (bool), \"headBypass\" (bool, true for direct preamp/XV without amp head), "
+                + "\". Map it to MI AMP parameters for " + instStr + " ONLY and reply with valid JSON (no markdown fences) with keys: "
+                  "\"title\" (string), \"explanation\" (short Spanish description), \"bassMode\" (must be " + juce::String (forBass ? "true" : "false") + "), \"headBypass\" (bool, true for direct preamp/XV without amp head), "
                   "\"dropSemi\" (int -12..12), \"channel\" (0 clean, 1 crunch, 2 high-gain), \"cab\" (0..3), "
                   "\"gain\" (0..100), \"bass\" (0..100), \"mid\" (0..100), \"treble\" (0..100), \"presence\" (0..100), "
-                  "\"slots\" (array of pedal indices: for guitar 0=Comp,1=GreenDrive,2=Fuzz,3=Chorus,4=Phaser,5=Delay,6=Reverb,7=OrangeDist,8=DualCrunch,9=Flanger,10=Gate,11=Octaver,12=GraphicEQ; "
-                  "for bass 0=MI87Comp,1=XV,2=Chorus,3=Phaser,4=Reverb,5=BassDriver,6=GoldDrive,7=BassFood,8=OliveFuzz,9=Flanger,10=Delay,11=Gate,12=Octaver,13=BassEQ).";
+                  "\"slots\" (array of pedal indices: "
+                  + juce::String (forBass
+                      ? "for bass 0=MI87Comp,1=XV,2=Chorus,3=Phaser,4=Reverb,5=BassDriver,6=GoldDrive,7=BassFood,8=OliveFuzz,9=Flanger,10=Delay,11=Gate,12=Octaver,13=BassEQ)."
+                      : "for guitar 0=Comp,1=GreenDrive,2=Fuzz,3=Chorus,4=Phaser,5=Delay,6=Reverb,7=OrangeDist,8=DualCrunch,9=Flanger,10=Gate,11=Octaver,12=GraphicEQ).");
 
             auto* root = new juce::DynamicObject();
             juce::Array<juce::var> contents;
@@ -635,7 +809,7 @@ public:
                                     r.sourceBadge = "Gemini IA + Google Search";
                                     r.title = parsed.getProperty ("title", query).toString();
                                     r.explanation = parsed.getProperty ("explanation", "Cadena armada con busqueda web en vivo.").toString();
-                                    r.bassMode = static_cast<bool> (parsed.getProperty ("bassMode", false));
+                                    r.bassMode = forBass;
                                     r.headBypass = static_cast<bool> (parsed.getProperty ("headBypass", false));
                                     r.dropSemi = std::clamp (static_cast<int> (parsed.getProperty ("dropSemi", 0)), -12, 12);
                                     r.gtrChannel = std::clamp (static_cast<int> (parsed.getProperty ("channel", 2)), 0, 2);
