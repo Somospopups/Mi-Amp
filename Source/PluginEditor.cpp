@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "PedalCatalogSpecs.h"
 #include "PresetExporter.h"
+#include "StandaloneAudioBridge.h"
 #include <BinaryData.h>
 #include <algorithm>
 #include <cmath>
@@ -1268,9 +1269,16 @@ public:
         btnSaveGeminiKey.onClick = [this]
         {
             MiAmpAudioProcessor::setGeminiApiKey (geminiKeyEdit.getText());
-            tfStatusMsg = geminiKeyEdit.getText().trim().isEmpty()
-                              ? "Clave Gemini borrada (modo 100% gratuito activo)"
-                              : "API Key guardada para busqueda Gemini + Web";
+            btnSaveGeminiKey.setButtonText (geminiKeyEdit.getText().trim().isEmpty() ? "BORRADA" : "LISTO!");
+            repaint();
+        };
+
+        addChildComponent (btnCfgAudio);
+        btnCfgAudio.setComponentID ("presetSave");
+        btnCfgAudio.setButtonText ("CONFIGURAR PLACA / AUDIO");
+        btnCfgAudio.onClick = [this]
+        {
+            miamp_standalone::openAudioSettingsDialog();
             repaint();
         };
 
@@ -1423,6 +1431,7 @@ public:
         slInput.setVisible (isC && ! bass);
         geminiKeyEdit.setVisible (isC);
         btnSaveGeminiKey.setVisible (isC);
+        btnCfgAudio.setVisible (isC && miamp_standalone::isRunningStandalone());
 
         tfQueryEdit.setVisible (isTF);
         btnTfSearch.setVisible (isTF);
@@ -1438,6 +1447,7 @@ public:
         if (isC)
         {
             geminiKeyEdit.setText (MiAmpAudioProcessor::getGeminiApiKey(), false);
+            btnSaveGeminiKey.setButtonText ("GUARDAR");
             syncConfigControls();
         }
         resized();
@@ -1543,11 +1553,15 @@ public:
             }
             const float keyY = bass ? 156.0f : 322.0f;
             g.drawText ("GEMINI AI KEY (OPCIONAL)", juce::Rectangle<float> (x, keyY, w, 14.0f), juce::Justification::centredLeft);
-            if (tfStatusMsg.isNotEmpty())
+            if (miamp_standalone::isRunningStandalone())
             {
-                g.setFont (sansFont (10.0f));
-                g.setColour (mintBorder().withAlpha (0.9f));
-                g.drawText (tfStatusMsg, juce::Rectangle<float> (x, keyY + 48.0f, w, 15.0f), juce::Justification::centredLeft);
+                const float audioLabelY = bass ? 210.0f : 370.0f;
+                const auto summary = miamp_standalone::getCurrentAudioStatusSummary();
+                g.setFont (sansFont (9.8f, juce::Font::bold));
+                g.setColour (mintBorder().withAlpha (0.92f));
+                g.drawFittedText (summary.isNotEmpty() ? summary : "AUDIO STANDALONE (SIN DAW)",
+                                  juce::Rectangle<int> (static_cast<int> (x), static_cast<int> (audioLabelY), static_cast<int> (w), 14),
+                                  juce::Justification::centredLeft, 1);
             }
         }
         else if (kind == PopoverKind::ToneFinder)
@@ -1771,6 +1785,8 @@ public:
             const int keyRowY = bass ? 174 : 338;
             btnSaveGeminiKey.setBounds (x + w - 68, keyRowY, 68, 28);
             geminiKeyEdit.setBounds    (x, keyRowY, w - 74, 28);
+            if (miamp_standalone::isRunningStandalone())
+                btnCfgAudio.setBounds (x, bass ? 228 : 387, w, 28);
         }
         else if (kind == PopoverKind::ToneFinder)
         {
@@ -2381,7 +2397,7 @@ private:
     juce::Slider slGate, slInput;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> slGateAttach, slInputAttach;
     juce::TextEditor geminiKeyEdit;
-    juce::TextButton btnSaveGeminiKey;
+    juce::TextButton btnSaveGeminiKey, btnCfgAudio;
 
     juce::TextEditor tfQueryEdit, tfPromptPreview;
     juce::TextButton btnTfSearch, btnTfApply, btnTfSavePreset, btnTfCopyPrompt;
@@ -2663,6 +2679,9 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     headSceneYOffsetStage = kStageH;
     setFloorMode (false);
     startTimerHz (60);
+
+    if (miamp_standalone::isRunningStandalone())
+        juce::MessageManager::callAsync ([] { miamp_standalone::ensureAudioInputActive(); });
 }
 
 MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
@@ -2805,6 +2824,8 @@ void MiAmpAudioProcessorEditor::finishIntro()
     btnSkipIntro.setVisible (false);
     for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnDockConfig })
         b->setAlpha (1.0f);
+    if (miamp_standalone::isRunningStandalone())
+        miamp_standalone::ensureAudioInputActive();
     syncHeadControls();
     layoutAll();
     repaint();

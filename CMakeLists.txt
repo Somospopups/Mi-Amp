@@ -55,6 +55,7 @@ target_sources(MiAmp
         Source/PedalCatalogSpecs.h
         Source/ToneFinderEngine.h
         Source/PresetExporter.h
+        Source/StandaloneAudioBridge.h
         Source/DSP/MiAmpBassChainDSP.h
         Source/DSP/MiAmpGuitarChainDSP.h
         Source/DSP/MiAmpBoutiquePedalsDSP.h
@@ -156,3 +157,11 @@ target_link_libraries(MiAmp
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+if(TARGET MiAmp_Standalone)
+    target_sources(MiAmp_Standalone PRIVATE Source/StandaloneAudioImpl.cpp)
+endif()
+
+if(TARGET MiAmp_VST3)
+    target_sources(MiAmp_VST3 PRIVATE Source/StandaloneAudioStub.cpp)
+endif()

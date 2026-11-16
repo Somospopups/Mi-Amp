@@ -559,6 +559,33 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     if (totalIn == 1 && totalOut >= 2)
         buffer.copyFrom (1, 0, buffer, 0, 0, numSamples);
 
+    // In Standalone mode, many 2-channel interfaces have the instrument plugged into
+    // only Input 1 (L) or Input 2 (R). Automatically mirror the active channel to L+R
+    // so it plays centered at full volume without needing DAW input routing.
+    if (wrapperType == wrapperType_Standalone && totalIn >= 2 && totalOut >= 2)
+    {
+        float* ch0 = buffer.getWritePointer (0);
+        float* ch1 = buffer.getWritePointer (1);
+        double sq0 = 0.0, sq1 = 0.0;
+        for (int i = 0; i < numSamples; ++i)
+        {
+            sq0 += static_cast<double> (ch0[i]) * static_cast<double> (ch0[i]);
+            sq1 += static_cast<double> (ch1[i]) * static_cast<double> (ch1[i]);
+        }
+        const double rms0 = std::sqrt (sq0 / static_cast<double> (numSamples));
+        const double rms1 = std::sqrt (sq1 / static_cast<double> (numSamples));
+        if (rms0 > rms1 * 2.5 || rms1 > rms0 * 2.5)
+        {
+            const bool use1 = (rms1 > rms0);
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const float s = use1 ? ch1[i] : ch0[i];
+                ch0[i] = s;
+                ch1[i] = s;
+            }
+        }
+    }
+
     // Measure input RMS + feed shared tuner
     const float* in0 = buffer.getReadPointer (0);
     const float* in1 = buffer.getNumChannels() > 1 ? buffer.getReadPointer (1) : in0;
