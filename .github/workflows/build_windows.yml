@@ -80,7 +80,7 @@ jobs:
 
   build-macos:
     name: macOS Universal (.pkg + .dmg AU + VST3 + Standalone)
-    runs-on: macos-latest
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
@@ -142,15 +142,18 @@ jobs:
   publish-release:
     name: Publish Multi-Platform Release & version.json
     needs: [ build-windows, build-macos ]
+    if: always() && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows Artifact
+        if: needs.build-windows.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: Windows-x64-Installer
           path: release_assets
 
       - name: Download macOS Artifact
+        if: needs.build-macos.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: macOS-Universal-Installer
@@ -161,33 +164,41 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          mkdir -p release_assets
           BUILD_NUM=${{ github.run_number }}
           VER="1.1.${BUILD_NUM}"
+
+          WIN_URL=""
+          MAC_URL=""
+          FILES=("release_assets/version.json")
+          if [ -f "release_assets/Instalar_MI_AMP_Windows_x64.exe" ]; then
+            WIN_URL="https://github.com/Somospopups/Mi-Amp/releases/download/v1.0.0-win/Instalar_MI_AMP_Windows_x64.exe"
+            FILES+=("release_assets/Instalar_MI_AMP_Windows_x64.exe")
+          fi
+          if [ -f "release_assets/Instalar_MI_AMP_macOS_Universal.pkg" ]; then
+            MAC_URL="https://github.com/Somospopups/Mi-Amp/releases/download/v1.0.0-win/Instalar_MI_AMP_macOS_Universal.pkg"
+            FILES+=("release_assets/Instalar_MI_AMP_macOS_Universal.pkg")
+          fi
+          if [ -f "release_assets/MI_AMP_macOS_Universal.dmg" ]; then
+            FILES+=("release_assets/MI_AMP_macOS_Universal.dmg")
+          fi
+
           cat > release_assets/version.json << EOF
           {
             "version": "${VER}",
             "build": ${BUILD_NUM},
-            "windows_url": "https://github.com/Somospopups/Mi-Amp/releases/download/v1.0.0-win/Instalar_MI_AMP_Windows_x64.exe",
-            "macos_url": "https://github.com/Somospopups/Mi-Amp/releases/download/v1.0.0-win/Instalar_MI_AMP_macOS_Universal.pkg"
+            "windows_url": "${WIN_URL}",
+            "macos_url": "${MAC_URL}"
           }
           EOF
 
           TAG="v1.0.0-win"
           NOTES="MI AMP v${VER} — Instaladores oficiales Windows x64 (VST3 + Standalone) y macOS Universal Apple Silicon/Intel (AU + VST3 + Standalone), soporte multilenguaje (ES/EN/PT/FR/DE) y actualización automática."
           if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "$TAG" \
-              release_assets/Instalar_MI_AMP_Windows_x64.exe \
-              release_assets/Instalar_MI_AMP_macOS_Universal.pkg \
-              release_assets/MI_AMP_macOS_Universal.dmg \
-              release_assets/version.json \
-              --repo "${{ github.repository }}" --clobber
+            gh release upload "$TAG" "${FILES[@]}" --repo "${{ github.repository }}" --clobber
             gh release edit "$TAG" --repo "${{ github.repository }}" --notes "$NOTES"
           else
-            gh release create "$TAG" \
-              release_assets/Instalar_MI_AMP_Windows_x64.exe \
-              release_assets/Instalar_MI_AMP_macOS_Universal.pkg \
-              release_assets/MI_AMP_macOS_Universal.dmg \
-              release_assets/version.json \
+            gh release create "$TAG" "${FILES[@]}" \
               --repo "${{ github.repository }}" \
               --title "MI AMP (Windows & macOS)" \
               --notes "$NOTES" --latest
