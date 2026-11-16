@@ -1014,9 +1014,12 @@ public:
     GlassPopover (MiAmpAudioProcessor& proc,
                   bool& solfegeRef,
                   std::function<void()> onClose,
-                  std::function<void()> onChanged)
+                  std::function<void()> onChanged,
+                  std::function<void()> onLangChanged,
+                  std::function<void()> onManualUpdateCheck)
         : processor (proc), useSolfege (solfegeRef),
-          closeFn (std::move (onClose)), changedFn (std::move (onChanged))
+          closeFn (std::move (onClose)), changedFn (std::move (onChanged)),
+          langChangedFn (std::move (onLangChanged)), manualUpdateFn (std::move (onManualUpdateCheck))
     {
         addAndMakeVisible (btnClose);
         btnClose.setComponentID ("popoverClose");
@@ -1029,7 +1032,7 @@ public:
         presetNameEdit.setJustification (juce::Justification::centredLeft);
         presetNameEdit.setIndents (10, 0);
         presetNameEdit.setInputRestrictions (32);
-        presetNameEdit.setTextToShowWhenEmpty (juce::String::fromUTF8 (u8"Nombre del preset"),
+        presetNameEdit.setTextToShowWhenEmpty (miamp_i18n::tr (miamp_i18n::Msg::PresetNamePlaceholder),
                                                juce::Colour::fromRGBA (246, 237, 221, 170));
         presetNameEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
         presetNameEdit.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
@@ -1040,7 +1043,7 @@ public:
 
         addChildComponent (btnSavePreset);
         btnSavePreset.setComponentID ("presetSave");
-        btnSavePreset.setButtonText ("GUARDAR");
+        btnSavePreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnSave));
         btnSavePreset.onClick = [this]
         {
             const auto name = presetNameEdit.getText().trim();
@@ -1056,11 +1059,11 @@ public:
         };
 
         addChildComponent (btnImportPreset);
-        btnImportPreset.setButtonText ("IMPORTAR .MIAMP");
+        btnImportPreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnImportMiAmp));
         btnImportPreset.onClick = [this]
         {
             activeChooser = std::make_unique<juce::FileChooser> (
-                "Importar preset de MI AMP (.miamp)",
+                miamp_i18n::tr (miamp_i18n::Msg::ImportChooserTitle),
                 juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                 "*.miamp;*.xml");
             juce::Component::SafePointer<GlassPopover> safeThis (this);
@@ -1090,7 +1093,7 @@ public:
         // In-app MI AMP Glass Export Format sub-view (replaces OS PopupMenu)
         addChildComponent (btnExportBack);
         btnExportBack.setComponentID ("presetExportBack");
-        btnExportBack.setButtonText (juce::String::fromUTF8 (u8"\u2190 VOLVER"));
+        btnExportBack.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnBackArrow));
         btnExportBack.onClick = [this]
         {
             presetExportSubView = false;
@@ -1171,11 +1174,17 @@ public:
             if (changedFn) changedFn();
         };
 
-        // Config (Cab + Zenbox Channel + 4x OS + Gate + Input)
+        // Config inside scrollable ConfigHolder
+        addChildComponent (configViewport);
+        configViewport.setViewedComponent (&configHolder, false);
+        configViewport.setScrollBarsShown (true, false);
+        configViewport.setScrollBarThickness (6);
+        configHolder.owner = this;
+
         const char* cabLabels[5] = { "VINT 4x12", "MOD 4x12", "OPEN 2x12", "STUD 1x12", "CAB OFF" };
         for (int i = 0; i < 5; ++i)
         {
-            addChildComponent (cfgCabBtns[i]);
+            configHolder.addChildComponent (cfgCabBtns[i]);
             cfgCabBtns[i].setButtonText (cabLabels[i]);
             cfgCabBtns[i].onClick = [this, i]
             {
@@ -1197,7 +1206,7 @@ public:
         const char* chLabels[3] = { "CH1 CLEAN", "CH2 CRUNCH", "CH3 PUNK" };
         for (int c = 0; c < 3; ++c)
         {
-            addChildComponent (cfgChBtns[c]);
+            configHolder.addChildComponent (cfgChBtns[c]);
             cfgChBtns[c].setButtonText (chLabels[c]);
             cfgChBtns[c].onClick = [this, c]
             {
@@ -1208,7 +1217,7 @@ public:
             };
         }
 
-        addChildComponent (btnCfgOs4x);
+        configHolder.addChildComponent (btnCfgOs4x);
         btnCfgOs4x.onClick = [this]
         {
             if (auto* p = processor.apvts.getParameter (MiAmpParams::gtrOs4x))
@@ -1217,23 +1226,23 @@ public:
             if (changedFn) changedFn();
         };
 
-        addChildComponent (slGate);
+        configHolder.addChildComponent (slGate);
         slGate.setRange (0.0, 100.0, 1.0);
         slGate.setSliderStyle (juce::Slider::LinearHorizontal);
         slGate.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 22);
         slGateAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             processor.apvts, MiAmpParams::gtrGate, slGate);
 
-        addChildComponent (slInput);
+        configHolder.addChildComponent (slInput);
         slInput.setRange (0.0, 100.0, 1.0);
         slInput.setSliderStyle (juce::Slider::LinearHorizontal);
         slInput.setTextBoxStyle (juce::Slider::TextBoxRight, false, 48, 22);
         slInputAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
             processor.apvts, MiAmpParams::gtrInput, slInput);
 
-        // Route mode (CON AMPLI vs SOLO PEDALES) + optional Gemini API Key in CONFIG
-        addChildComponent (btnCfgRouteAmp);
-        btnCfgRouteAmp.setButtonText ("CON AMPLI");
+        // Route mode (CON AMPLI vs SOLO PEDALES)
+        configHolder.addChildComponent (btnCfgRouteAmp);
+        btnCfgRouteAmp.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnWithAmp));
         btnCfgRouteAmp.onClick = [this]
         {
             processor.setHeadBypassed (processor.isBassMode(), false);
@@ -1241,8 +1250,8 @@ public:
             if (changedFn) changedFn();
         };
 
-        addChildComponent (btnCfgRoutePedals);
-        btnCfgRoutePedals.setButtonText ("SOLO PEDALES");
+        configHolder.addChildComponent (btnCfgRoutePedals);
+        btnCfgRoutePedals.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnPedalsOnly));
         btnCfgRoutePedals.onClick = [this]
         {
             processor.setHeadBypassed (processor.isBassMode(), true);
@@ -1250,12 +1259,27 @@ public:
             if (changedFn) changedFn();
         };
 
-        addChildComponent (geminiKeyEdit);
+        // Language selector (ES / EN / PT / FR / DE)
+        for (int i = 0; i < 5; ++i)
+        {
+            const auto langVal = static_cast<miamp_i18n::Lang> (i);
+            configHolder.addChildComponent (langBtns[i]);
+            langBtns[i].setButtonText (miamp_i18n::langShortCode (langVal));
+            langBtns[i].onClick = [this, langVal]
+            {
+                miamp_i18n::setLang (langVal);
+                refreshLanguage();
+                if (langChangedFn) langChangedFn();
+            };
+        }
+
+        // Optional Gemini API Key in CONFIG
+        configHolder.addChildComponent (geminiKeyEdit);
         geminiKeyEdit.setFont (sansFont (11.5f));
         geminiKeyEdit.setJustification (juce::Justification::centredLeft);
         geminiKeyEdit.setIndents (8, 0);
         geminiKeyEdit.setPasswordCharacter (0x2022);
-        geminiKeyEdit.setTextToShowWhenEmpty ("API Key Gemini (opcional)",
+        geminiKeyEdit.setTextToShowWhenEmpty (miamp_i18n::tr (miamp_i18n::Msg::CfgGeminiPlaceholder),
                                               juce::Colour::fromRGBA (246, 237, 221, 150));
         geminiKeyEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
         geminiKeyEdit.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
@@ -1264,22 +1288,33 @@ public:
         geminiKeyEdit.setColour (juce::CaretComponent::caretColourId, juce::Colour::fromRGB (255, 250, 242));
         geminiKeyEdit.setText (MiAmpAudioProcessor::getGeminiApiKey(), false);
 
-        addChildComponent (btnSaveGeminiKey);
-        btnSaveGeminiKey.setButtonText ("GUARDAR");
+        configHolder.addChildComponent (btnSaveGeminiKey);
+        btnSaveGeminiKey.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnSave));
         btnSaveGeminiKey.onClick = [this]
         {
             MiAmpAudioProcessor::setGeminiApiKey (geminiKeyEdit.getText());
-            btnSaveGeminiKey.setButtonText (geminiKeyEdit.getText().trim().isEmpty() ? "BORRADA" : "LISTO!");
-            repaint();
+            btnSaveGeminiKey.setButtonText (miamp_i18n::tr (
+                geminiKeyEdit.getText().trim().isEmpty() ? miamp_i18n::Msg::CfgCleared
+                                                         : miamp_i18n::Msg::CfgSavedOk));
+            configHolder.repaint();
         };
 
-        addChildComponent (btnCfgAudio);
+        configHolder.addChildComponent (btnCfgAudio);
         btnCfgAudio.setComponentID ("presetSave");
-        btnCfgAudio.setButtonText ("CONFIGURAR PLACA / AUDIO");
+        btnCfgAudio.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::CfgAudioBtn));
         btnCfgAudio.onClick = [this]
         {
             miamp_standalone::openAudioSettingsDialog();
-            repaint();
+            configHolder.repaint();
+        };
+
+        configHolder.addChildComponent (btnCheckUpdates);
+        btnCheckUpdates.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::CfgCheckUpdatesBtn));
+        btnCheckUpdates.onClick = [this]
+        {
+            updateStatusMsg = miamp_i18n::tr (miamp_i18n::Msg::CfgCheckingUpdates);
+            configHolder.repaint();
+            if (manualUpdateFn) manualUpdateFn();
         };
 
         // Tone Finder (BUSCAR TONO)
@@ -1287,7 +1322,7 @@ public:
         tfQueryEdit.setFont (sansFont (12.5f));
         tfQueryEdit.setJustification (juce::Justification::centredLeft);
         tfQueryEdit.setIndents (10, 0);
-        tfQueryEdit.setTextToShowWhenEmpty ("Ej: The Story So Far, Blink, Deftones...",
+        tfQueryEdit.setTextToShowWhenEmpty (miamp_i18n::tr (miamp_i18n::Msg::TfPlaceholder),
                                             juce::Colour::fromRGBA (246, 237, 221, 165));
         tfQueryEdit.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
         tfQueryEdit.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
@@ -1298,7 +1333,7 @@ public:
 
         addChildComponent (btnTfSearch);
         btnTfSearch.setComponentID ("presetSave");
-        btnTfSearch.setButtonText ("BUSCAR");
+        btnTfSearch.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfSearchBtn));
         btnTfSearch.onClick = [this] { runToneSearch (tfQueryEdit.getText()); };
 
         for (int i = 0; i < 6; ++i)
@@ -1313,7 +1348,7 @@ public:
         }
 
         addChildComponent (btnTfApply);
-        btnTfApply.setButtonText ("APLICAR");
+        btnTfApply.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfApplyBtn));
         btnTfApply.onClick = [this]
         {
             if (lastToneResult.found)
@@ -1326,14 +1361,14 @@ public:
 
         addChildComponent (btnTfSavePreset);
         btnTfSavePreset.setComponentID ("presetSave");
-        btnTfSavePreset.setButtonText ("GUARDAR PRESET");
+        btnTfSavePreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfSavePresetBtn));
         btnTfSavePreset.onClick = [this]
         {
             if (lastToneResult.found)
             {
                 processor.saveUserPreset (lastToneResult.title);
                 tfSavedNotice = true;
-                btnTfSavePreset.setButtonText ("GUARDADO!");
+                btnTfSavePreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfSavedBtn));
                 if (changedFn) changedFn();
                 repaint();
             }
@@ -1351,13 +1386,13 @@ public:
 
         addChildComponent (btnTfCopyPrompt);
         btnTfCopyPrompt.setComponentID ("presetSave");
-        btnTfCopyPrompt.setButtonText ("COPIAR PROMPT PARA IA");
+        btnTfCopyPrompt.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfCopyPromptBtn));
         btnTfCopyPrompt.onClick = [this]
         {
             if (tfPromptText.isNotEmpty())
             {
                 juce::SystemClipboard::copyTextToClipboard (tfPromptText);
-                btnTfCopyPrompt.setButtonText (juce::String::fromUTF8 (u8"\u00a1PROMPT COPIADO!"));
+                btnTfCopyPrompt.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfPromptCopiedBtn));
                 repaint();
             }
         };
@@ -1420,6 +1455,7 @@ public:
         btnTunerNotation.setVisible (isT);
         btnTunerMute.setVisible (isT);
 
+        configViewport.setVisible (isC);
         btnCfgRouteAmp.setVisible (isC);
         btnCfgRoutePedals.setVisible (isC);
         for (int i = 0; i < 5; ++i)
@@ -1429,9 +1465,12 @@ public:
         btnCfgOs4x.setVisible (isC && ! bass);
         slGate.setVisible (isC && ! bass);
         slInput.setVisible (isC && ! bass);
+        for (int i = 0; i < 5; ++i)
+            langBtns[i].setVisible (isC);
         geminiKeyEdit.setVisible (isC);
         btnSaveGeminiKey.setVisible (isC);
         btnCfgAudio.setVisible (isC && miamp_standalone::isRunningStandalone());
+        btnCheckUpdates.setVisible (isC);
 
         tfQueryEdit.setVisible (isTF);
         btnTfSearch.setVisible (isTF);
@@ -1447,11 +1486,51 @@ public:
         if (isC)
         {
             geminiKeyEdit.setText (MiAmpAudioProcessor::getGeminiApiKey(), false);
-            btnSaveGeminiKey.setButtonText ("GUARDAR");
+            btnSaveGeminiKey.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnSave));
             syncConfigControls();
         }
         resized();
         repaint();
+    }
+
+    void refreshLanguage()
+    {
+        presetNameEdit.setTextToShowWhenEmpty (miamp_i18n::tr (miamp_i18n::Msg::PresetNamePlaceholder),
+                                               juce::Colour::fromRGBA (246, 237, 221, 170));
+        btnSavePreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnSave));
+        btnImportPreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnImportMiAmp));
+        btnExportBack.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnBackArrow));
+        btnCfgRouteAmp.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnWithAmp));
+        btnCfgRoutePedals.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnPedalsOnly));
+        geminiKeyEdit.setTextToShowWhenEmpty (miamp_i18n::tr (miamp_i18n::Msg::CfgGeminiPlaceholder),
+                                              juce::Colour::fromRGBA (246, 237, 221, 150));
+        btnSaveGeminiKey.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnSave));
+        btnCfgAudio.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::CfgAudioBtn));
+        btnCheckUpdates.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::CfgCheckUpdatesBtn));
+        tfQueryEdit.setTextToShowWhenEmpty (miamp_i18n::tr (miamp_i18n::Msg::TfPlaceholder),
+                                            juce::Colour::fromRGBA (246, 237, 221, 165));
+        btnTfSearch.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfSearchBtn));
+        btnTfApply.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfApplyBtn));
+        btnTfSavePreset.setButtonText (miamp_i18n::tr (tfSavedNotice ? miamp_i18n::Msg::TfSavedBtn
+                                                                     : miamp_i18n::Msg::TfSavePresetBtn));
+        btnTfCopyPrompt.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfCopyPromptBtn));
+
+        syncDropControls();
+        syncTunerButtons();
+        syncConfigControls();
+        if (kind == PopoverKind::Presets)
+        {
+            if (presetExportSubView) rebuildExportCards();
+            else rebuildPresetList();
+        }
+        configHolder.repaint();
+        repaint();
+    }
+
+    void setUpdateStatusMessage (const juce::String& msg)
+    {
+        updateStatusMsg = msg;
+        configHolder.repaint();
     }
 
     void updateTuner (const xvdsp::TunerReading& tr)
@@ -1475,14 +1554,14 @@ public:
         g.setFont (sansFont (16.0f, juce::Font::bold));
         juce::String title = (kind == PopoverKind::Presets)
                                 ? (presetExportSubView
-                                    ? juce::String ("EXPORTAR PRESET")
-                                    : (processor.isBassMode() ? juce::String::fromUTF8 (u8"PRESETS \u00b7 BAJO")
-                                                              : juce::String::fromUTF8 (u8"PRESETS \u00b7 GUITARRA")))
-                           : (kind == PopoverKind::Drop)       ? "DROP TUNER"
-                           : (kind == PopoverKind::Config)     ? juce::String::fromUTF8 (u8"CONFIGURACI\u00d3N")
-                           : (kind == PopoverKind::ToneFinder) ? (processor.isBassMode() ? juce::String::fromUTF8 (u8"BUSCAR TONO \u00b7 BAJO")
-                                                                                         : juce::String::fromUTF8 (u8"BUSCAR TONO \u00b7 GUITARRA"))
-                                                               : "AFINADOR + DROP";
+                                    ? miamp_i18n::tr (miamp_i18n::Msg::TitleExportPreset)
+                                    : miamp_i18n::tr (processor.isBassMode() ? miamp_i18n::Msg::TitlePresetsBass
+                                                                             : miamp_i18n::Msg::TitlePresetsGuitar))
+                           : (kind == PopoverKind::Drop)       ? miamp_i18n::tr (miamp_i18n::Msg::TitleDropTuner)
+                           : (kind == PopoverKind::Config)     ? miamp_i18n::tr (miamp_i18n::Msg::TitleConfig)
+                           : (kind == PopoverKind::ToneFinder) ? miamp_i18n::tr (processor.isBassMode() ? miamp_i18n::Msg::TitleToneFinderBass
+                                                                                                        : miamp_i18n::Msg::TitleToneFinderGuitar)
+                                                               : miamp_i18n::tr (miamp_i18n::Msg::TitleTunerDrop);
         g.drawText (title, inner.removeFromTop (24.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft);
 
         if (kind == PopoverKind::Presets)
@@ -1493,13 +1572,14 @@ public:
             {
                 g.setFont (sansFont (11.5f, juce::Font::bold));
                 g.setColour (juce::Colour::fromRGB (247, 211, 138));
-                g.drawFittedText (exportTargetName + (exportTargetIsBass ? " (BAJO)" : " (GUITARRA)"),
+                g.drawFittedText (exportTargetName + miamp_i18n::tr (exportTargetIsBass ? miamp_i18n::Msg::TagBassParens
+                                                                                        : miamp_i18n::Msg::TagGuitarParens),
                                   juce::Rectangle<int> (18, 46, getWidth() - 120, 22),
                                   juce::Justification::centredLeft, 1);
 
                 g.setFont (sansFont (10.0f));
                 g.setColour (juce::Colour::fromRGBA (244, 234, 217, 175));
-                g.drawText (juce::String::fromUTF8 (u8"Eleg\u00ed el formato para tu pedalera o DAW:"),
+                g.drawText (miamp_i18n::tr (miamp_i18n::Msg::ExportChooseFormat),
                             juce::Rectangle<float> (bx, 68.0f, bw, 15.0f),
                             juce::Justification::centredLeft);
 
@@ -1520,7 +1600,7 @@ public:
                 const float bottom = static_cast<float> (getHeight()) - 14.0f;
                 g.setFont (sansFont (10.0f, juce::Font::bold));
                 g.setColour (juce::Colour::fromRGBA (244, 234, 217, 184)); // #f4ead9b8
-                g.drawText ("GUARDAR PRESET",
+                g.drawText (miamp_i18n::tr (miamp_i18n::Msg::SavePresetHeader),
                             juce::Rectangle<float> (bx, bottom - 102.0f, bw, 16.0f),
                             juce::Justification::centredLeft);
             }
@@ -1532,37 +1612,9 @@ public:
             const float x = inner.getX();
             const float w = inner.getWidth();
             const float y0 = inner.getY() + 104.0f;
-            g.drawText ("Semitonos", juce::Rectangle<float> (x, y0, w, 16.0f), juce::Justification::centredLeft);
-            g.drawText ("Cents",     juce::Rectangle<float> (x, y0 + 42.0f, w, 16.0f), juce::Justification::centredLeft);
-            g.drawText ("Mix %",     juce::Rectangle<float> (x, y0 + 84.0f, w, 16.0f), juce::Justification::centredLeft);
-        }
-        else if (kind == PopoverKind::Config)
-        {
-            const bool bass = processor.isBassMode();
-            g.setFont (sansFont (10.5f, juce::Font::bold));
-            g.setColour (inkColour().withAlpha (0.88f));
-            const float x = 18.0f;
-            const float w = static_cast<float> (getWidth()) - 36.0f;
-            g.drawText ("MODO DE RUTA", juce::Rectangle<float> (x, 44.0f, w, 14.0f), juce::Justification::centredLeft);
-            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, 92.0f, w, 14.0f), juce::Justification::centredLeft);
-            if (! bass)
-            {
-                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, 165.0f, w, 14.0f), juce::Justification::centredLeft);
-                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, 238.0f, w, 14.0f), juce::Justification::centredLeft);
-                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, 278.0f, w, 14.0f), juce::Justification::centredLeft);
-            }
-            const float keyY = bass ? 156.0f : 322.0f;
-            g.drawText ("GEMINI AI KEY (OPCIONAL)", juce::Rectangle<float> (x, keyY, w, 14.0f), juce::Justification::centredLeft);
-            if (miamp_standalone::isRunningStandalone())
-            {
-                const float audioLabelY = bass ? 210.0f : 370.0f;
-                const auto summary = miamp_standalone::getCurrentAudioStatusSummary();
-                g.setFont (sansFont (9.8f, juce::Font::bold));
-                g.setColour (mintBorder().withAlpha (0.92f));
-                g.drawFittedText (summary.isNotEmpty() ? summary : "AUDIO STANDALONE (SIN DAW)",
-                                  juce::Rectangle<int> (static_cast<int> (x), static_cast<int> (audioLabelY), static_cast<int> (w), 14),
-                                  juce::Justification::centredLeft, 1);
-            }
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelSemitones), juce::Rectangle<float> (x, y0, w, 16.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelCents),     juce::Rectangle<float> (x, y0 + 42.0f, w, 16.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelMixPct),    juce::Rectangle<float> (x, y0 + 84.0f, w, 16.0f), juce::Justification::centredLeft);
         }
         else if (kind == PopoverKind::ToneFinder)
         {
@@ -1570,12 +1622,12 @@ public:
             const float w = static_cast<float> (getWidth()) - 36.0f;
             g.setFont (sansFont (11.0f));
             g.setColour (inkColour().withAlpha (0.84f));
-            g.drawText (juce::String::fromUTF8 (u8"Escrib\u00ed banda, canci\u00f3n o estilo:"),
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::TfPromptLabel),
                         juce::Rectangle<float> (x, 42.0f, w, 16.0f), juce::Justification::centredLeft);
 
             g.setFont (sansFont (10.0f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.72f));
-            g.drawText ("SUGERENCIAS", juce::Rectangle<float> (x, 99.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::TfSuggestions), juce::Rectangle<float> (x, 99.0f, w, 14.0f), juce::Justification::centredLeft);
 
             const float cardTop = 192.0f;
             const float cardBot = static_cast<float> (getHeight()) - (lastToneResult.found ? 82.0f : (tfNotFound ? 54.0f : 16.0f));
@@ -1590,22 +1642,26 @@ public:
             {
                 g.setFont (sansFont (12.5f, juce::Font::bold));
                 g.setColour (mintBorder());
-                g.drawFittedText (juce::String::fromUTF8 (u8"Buscando rig real..."), tc.toNearestInt(), juce::Justification::centred, 2);
+                g.drawFittedText (miamp_i18n::tr (miamp_i18n::Msg::TfSearching), tc.toNearestInt(), juce::Justification::centred, 2);
             }
             else if (lastToneResult.found)
             {
                 g.setFont (sansFont (9.5f, juce::Font::bold));
                 g.setColour (mintBorder());
-                g.drawText (lastToneResult.sourceBadge.toUpperCase(), tc.removeFromTop (13.0f), juce::Justification::centredLeft);
+                const juce::String badgeTxt = (lastToneResult.sourceBadge == "Rig Verificado")
+                    ? miamp_i18n::tr (miamp_i18n::Msg::TfLocalBadge)
+                    : lastToneResult.sourceBadge;
+                g.drawText (badgeTxt.toUpperCase(), tc.removeFromTop (13.0f), juce::Justification::centredLeft);
 
                 g.setFont (sansFont (13.0f, juce::Font::bold));
                 g.setColour (inkColour());
                 g.drawFittedText (lastToneResult.title, tc.removeFromTop (20.0f).toNearestInt(), juce::Justification::centredLeft, 1);
 
-                const juce::String meta = juce::String (lastToneResult.bassMode ? "BAJO" : "GUITARRA")
-                                        + " \u00b7 " + juce::String (lastToneResult.headBypass ? "SOLO PEDALES" : "CON AMPLI")
+                const juce::String meta = miamp_i18n::tr (lastToneResult.bassMode ? miamp_i18n::Msg::BtnBass : miamp_i18n::Msg::BtnGuitar)
+                                        + " \u00b7 " + miamp_i18n::tr (lastToneResult.headBypass ? miamp_i18n::Msg::BtnPedalsOnly : miamp_i18n::Msg::BtnWithAmp)
                                         + " \u00b7 Drop " + juce::String (lastToneResult.dropSemi)
-                                        + " \u00b7 " + juce::String (static_cast<int> (lastToneResult.chainSlots.size())) + " pedales";
+                                        + " \u00b7 " + juce::String (static_cast<int> (lastToneResult.chainSlots.size())) + " "
+                                        + miamp_i18n::tr (miamp_i18n::Msg::TfPedalsWord);
                 g.setFont (sansFont (10.0f, juce::Font::bold));
                 g.setColour (juce::Colour::fromRGBA (255, 226, 175, 225));
                 g.drawText (meta, tc.removeFromTop (15.0f), juce::Justification::centredLeft);
@@ -1617,9 +1673,8 @@ public:
 
                 g.setFont (sansFont (10.5f, juce::Font::bold));
                 g.setColour (tfSavedNotice ? mintBorder() : juce::Colour::fromRGBA (255, 240, 210, 220));
-                g.drawText (tfSavedNotice
-                                ? juce::String::fromUTF8 (u8"\u00a1Tono guardado en Presets!")
-                                : juce::String::fromUTF8 (u8"\u00bfQuer\u00e9s guardar este tono en Presets?"),
+                g.drawText (miamp_i18n::tr (tfSavedNotice ? miamp_i18n::Msg::TfSavedNotice
+                                                          : miamp_i18n::Msg::TfAskSaveNotice),
                             juce::Rectangle<float> (x, static_cast<float> (getHeight()) - 72.0f, w, 18.0f),
                             juce::Justification::centred);
             }
@@ -1627,14 +1682,14 @@ public:
             {
                 g.setFont (sansFont (10.5f, juce::Font::bold));
                 g.setColour (juce::Colour::fromRGB (255, 210, 140));
-                g.drawFittedText (juce::String::fromUTF8 (u8"No est\u00e1 en la base. Copi\u00e1 este prompt para tu IA:"),
+                g.drawFittedText (miamp_i18n::tr (miamp_i18n::Msg::TfNotFound),
                                   tc.removeFromTop (28.0f).toNearestInt(), juce::Justification::centredLeft, 2);
             }
             else
             {
                 g.setFont (sansFont (11.5f));
                 g.setColour (inkColour().withAlpha (0.76f));
-                g.drawFittedText (juce::String::fromUTF8 (u8"Gratis y sin configuraci\u00f3n: arma cabezal, cabina, afinaci\u00f3n Drop y cadena de pedales al instante."),
+                g.drawFittedText (miamp_i18n::tr (miamp_i18n::Msg::TfEmptyIntro),
                                   tc.toNearestInt(), juce::Justification::centred, 4);
             }
         }
@@ -1654,7 +1709,7 @@ public:
             g.setColour (inkColour().withAlpha (0.85f));
             const juce::String hz = active
                 ? (juce::String (tuner.freqHz, 1) + " Hz  (" + (tuner.cents >= 0 ? "+" : "") + juce::String (tuner.cents, 1) + " ct)")
-                : juce::String::fromUTF8 (u8"Esperando se\u00f1al");
+                : miamp_i18n::tr (miamp_i18n::Msg::WaitingSignal);
             g.drawText (hz, juce::Rectangle<float> (x, 70.0f, w, 15.0f), juce::Justification::centred);
 
             auto meter = juce::Rectangle<float> (x + 6.0f, 89.0f, w - 12.0f, 11.0f);
@@ -1704,13 +1759,13 @@ public:
 
             g.setFont (sansFont (10.0f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.76f));
-            g.drawText ("DROP TUNE", juce::Rectangle<float> (x, 168.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelDropTune), juce::Rectangle<float> (x, 168.0f, w, 14.0f), juce::Justification::centredLeft);
 
             g.setFont (sansFont (10.5f));
             g.setColour (inkColour().withAlpha (0.84f));
-            g.drawText ("Semitonos", juce::Rectangle<float> (x, 265.0f, w, 14.0f), juce::Justification::centredLeft);
-            g.drawText ("Cents",     juce::Rectangle<float> (x, 303.0f, w, 14.0f), juce::Justification::centredLeft);
-            g.drawText ("Mix %",     juce::Rectangle<float> (x, 341.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelSemitones), juce::Rectangle<float> (x, 265.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelCents),     juce::Rectangle<float> (x, 303.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::LabelMixPct),    juce::Rectangle<float> (x, 341.0f, w, 14.0f), juce::Justification::centredLeft);
         }
     }
 
@@ -1757,36 +1812,50 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
-            const int x = 18;
-            const int w = getWidth() - 36;
+            const bool isStand = miamp_standalone::isRunningStandalone();
+            const int vpW = getWidth() - 36;
+            const int vpH = juce::jmax (80, getHeight() - 60);
+            configViewport.setBounds (18, 46, vpW, vpH);
+
+            const int w = vpW - 10;
             const int hw = (w - 6) / 2;
-            btnCfgRouteAmp.setBounds    (x,          60, hw, 24);
-            btnCfgRoutePedals.setBounds (x + hw + 6, 60, hw, 24);
+            btnCfgRouteAmp.setBounds    (0,      18, hw, 24);
+            btnCfgRoutePedals.setBounds (hw + 6, 18, hw, 24);
 
             if (bass)
             {
-                cfgCabBtns[0].setBounds (x,          108, hw, 30);
-                cfgCabBtns[1].setBounds (x + hw + 6, 108, hw, 30);
+                cfgCabBtns[0].setBounds (0,      66, hw, 28);
+                cfgCabBtns[1].setBounds (hw + 6, 66, hw, 28);
             }
             else
             {
                 const int cw = w / 3;
                 for (int i = 0; i < 5; ++i)
-                    cfgCabBtns[i].setBounds (x + (i % 3) * cw + 2,
-                                             108 + (i / 3) * 26,
+                    cfgCabBtns[i].setBounds ((i % 3) * cw + 2,
+                                             66 + (i / 3) * 26,
                                              cw - 4, 23);
                 for (int c = 0; c < 3; ++c)
-                    cfgChBtns[c].setBounds (x + c * cw + 2, 181, cw - 4, 23);
-                btnCfgOs4x.setBounds (x, 208, w, 23);
-                slGate.setBounds     (x, 253, w, 20);
-                slInput.setBounds    (x, 293, w, 20);
+                    cfgChBtns[c].setBounds (c * cw + 2, 140, cw - 4, 23);
+                btnCfgOs4x.setBounds (0, 167, w, 23);
+                slGate.setBounds     (0, 213, w, 20);
+                slInput.setBounds    (0, 254, w, 20);
             }
 
-            const int keyRowY = bass ? 174 : 338;
-            btnSaveGeminiKey.setBounds (x + w - 68, keyRowY, 68, 28);
-            geminiKeyEdit.setBounds    (x, keyRowY, w - 74, 28);
-            if (miamp_standalone::isRunningStandalone())
-                btnCfgAudio.setBounds (x, bass ? 228 : 387, w, 28);
+            const int langY = bass ? 118 : 298;
+            const int lw = w / 5;
+            for (int i = 0; i < 5; ++i)
+                langBtns[i].setBounds (i * lw + 1, langY, lw - 2, 24);
+
+            const int keyRowY = bass ? 166 : 346;
+            btnSaveGeminiKey.setBounds (w - 72, keyRowY, 72, 28);
+            geminiKeyEdit.setBounds    (0,      keyRowY, w - 78, 28);
+
+            if (isStand)
+                btnCfgAudio.setBounds (0, bass ? 218 : 398, w, 28);
+
+            const int updBtnY = isStand ? (bass ? 270 : 450) : (bass ? 218 : 398);
+            btnCheckUpdates.setBounds (0, updBtnY, w, 28);
+            configHolder.setSize (w, updBtnY + 34);
         }
         else if (kind == PopoverKind::ToneFinder)
         {
@@ -1834,7 +1903,7 @@ private:
     {
         const bool on = processor.apvts.getRawParameterValue (MiAmpParams::pitchOn)->load() > 0.5f;
         btnDropToggle.setToggleState (on, juce::dontSendNotification);
-        btnDropToggle.setButtonText (on ? "DROP ACTIVADO" : "ACTIVAR DROP");
+        btnDropToggle.setButtonText (miamp_i18n::tr (on ? miamp_i18n::Msg::DropActive : miamp_i18n::Msg::DropEnable));
 
         const int semi = static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::pitchSemi)->load()));
         const int semis[6] = { 0, -1, -2, -3, -4, 12 };
@@ -1845,11 +1914,13 @@ private:
     void syncTunerButtons()
     {
         btnTunerNotation.setToggleState (useSolfege, juce::dontSendNotification);
-        btnTunerNotation.setButtonText (useSolfege ? "DO RE MI" : "C D E F G");
+        btnTunerNotation.setButtonText (miamp_i18n::tr (useSolfege ? miamp_i18n::Msg::TunerNotesSolfege
+                                                                   : miamp_i18n::Msg::TunerNotesLetters));
 
         const bool muted = processor.apvts.getRawParameterValue (MiAmpParams::tunerMuted)->load() > 0.5f;
         btnTunerMute.setToggleState (muted, juce::dontSendNotification);
-        btnTunerMute.setButtonText (muted ? "MUTE: ON" : "MUTE: OFF");
+        btnTunerMute.setButtonText (miamp_i18n::tr (muted ? miamp_i18n::Msg::TunerMuteOn
+                                                          : miamp_i18n::Msg::TunerMuteOff));
     }
 
     void syncConfigControls()
@@ -1861,14 +1932,15 @@ private:
         if (bass)
         {
             const bool cabOn = processor.apvts.getRawParameterValue (MiAmpParams::ampCabOn)->load() > 0.5f;
-            cfgCabBtns[0].setButtonText ("CAB 8x10 ON");
-            cfgCabBtns[1].setButtonText ("CAB 8x10 OFF");
+            cfgCabBtns[0].setButtonText (miamp_i18n::tr (miamp_i18n::Msg::CfgCab8x10On));
+            cfgCabBtns[1].setButtonText (miamp_i18n::tr (miamp_i18n::Msg::CfgCab8x10Off));
             cfgCabBtns[0].setToggleState (cabOn,   juce::dontSendNotification);
             cfgCabBtns[1].setToggleState (! cabOn, juce::dontSendNotification);
         }
         else
         {
-            const char* cabLabels[5] = { "VINT 4x12", "MOD 4x12", "OPEN 2x12", "STUD 1x12", "CAB OFF" };
+            const juce::String cabOffTxt = miamp_i18n::tr (miamp_i18n::Msg::CfgCabOff);
+            const juce::String cabLabels[5] = { "VINT 4x12", "MOD 4x12", "OPEN 2x12", "STUD 1x12", cabOffTxt };
             const int cab = static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::gtrCab)->load()));
             for (int i = 0; i < 5; ++i)
             {
@@ -1881,8 +1953,14 @@ private:
 
             const bool os4x = processor.apvts.getRawParameterValue (MiAmpParams::gtrOs4x)->load() > 0.5f;
             btnCfgOs4x.setToggleState (os4x, juce::dontSendNotification);
-            btnCfgOs4x.setButtonText (os4x ? "4x OVERSAMPLING: ON" : "4x OVERSAMPLING: OFF");
+            btnCfgOs4x.setButtonText (miamp_i18n::tr (os4x ? miamp_i18n::Msg::CfgOs4xOn : miamp_i18n::Msg::CfgOs4xOff));
         }
+
+        const int curL = static_cast<int> (miamp_i18n::currentLang());
+        for (int i = 0; i < 5; ++i)
+            langBtns[i].setToggleState (curL == i, juce::dontSendNotification);
+
+        configHolder.repaint();
     }
 
     void rebuildPresetList()
@@ -1975,8 +2053,8 @@ private:
     {
         mipedals::ExportFormat fmt;
         const char* ext;
-        const char* title;
-        const char* subtitle;
+        miamp_i18n::Msg titleMsg;
+        miamp_i18n::Msg subMsg;
         const char* badge;
         bool highlight = false;
     };
@@ -2028,13 +2106,13 @@ private:
             const float textW = r.getWidth() - 78.0f;
             g.setColour (juce::Colour::fromRGB (252, 246, 235));
             g.setFont (sansFont (11.5f, juce::Font::bold));
-            g.drawFittedText (juce::String::fromUTF8 (spec.title),
+            g.drawFittedText (miamp_i18n::tr (spec.titleMsg),
                               juce::Rectangle<int> (10, 6, static_cast<int> (textW), 16),
                               juce::Justification::centredLeft, 1);
 
             g.setColour (juce::Colour::fromRGBA (241, 228, 205, 195));
             g.setFont (sansFont (9.5f));
-            g.drawFittedText (juce::String::fromUTF8 (spec.subtitle),
+            g.drawFittedText (miamp_i18n::tr (spec.subMsg),
                               juce::Rectangle<int> (10, 23, static_cast<int> (textW), 14),
                               juce::Justification::centredLeft, 1);
         }
@@ -2055,9 +2133,8 @@ private:
             g.drawRoundedRectangle (r, 8.0f, 1.0f);
             g.setColour (juce::Colour::fromRGBA (241, 228, 205, 170));
             g.setFont (sansFont (9.2f));
-            g.drawFittedText (
-                juce::String::fromUTF8 (u8"Nota: Kemper (.kipr), Neural Capture, IK TONEX y Fractal son formatos cerrados propietarios; us\u00e1 .nam o .aidax como puente."),
-                getLocalBounds().reduced (8, 5), juce::Justification::centredLeft, 3);
+            g.drawFittedText (miamp_i18n::tr (miamp_i18n::Msg::ExportProprietaryNote),
+                              getLocalBounds().reduced (8, 5), juce::Justification::centredLeft, 3);
         }
     };
 
@@ -2086,17 +2163,17 @@ private:
         exportListHolder.removeAllChildren();
 
         static const ExportOptionSpec kSpecs[] = {
-            { mipedals::ExportFormat::NamA2,        ".nam",   u8"NAM A2 \u00b7 M-Vave / TONE3000",   u8"Lite 3ch + Full 8ch \u00b7 JuiceBox & ANNlab", "A2", true },
-            { mipedals::ExportFormat::NamA1,        ".nam",   u8"NAM A1 \u00b7 WaveNet Est\u00e1ndar", u8"Neural Amp Modeler cl\u00e1sico (48 kHz)",      "A1", false },
-            { mipedals::ExportFormat::NamLstm,      ".nam",   u8"NAM \u00b7 LSTM Ligero",           u8"Baja latencia / consumo m\u00ednimo CPU",      "LSTM", false },
-            { mipedals::ExportFormat::AidaX,        ".aidax", u8"AIDA-X \u00b7 MOD Dwarf / Genome", u8"RTNeural Keras LSTM-12",                       "AIDA", false },
-            { mipedals::ExportFormat::ProteusJson,  ".json",  u8"GuitarML Proteus",                 u8"Proteus Capture Player (LSTM-40)",             "PROT", false },
-            { mipedals::ExportFormat::NeuralPiJson, ".json",  u8"GuitarML NeuralPi",                u8"NeuralPi / Raspberry Pi (LSTM-20)",            "NPI",  false },
-            { mipedals::ExportFormat::IrWav24_44k,  ".wav",   u8"M-Vave Blackbox \u00b7 IR Cabina", u8"44.1 kHz / 24-bit mono (IR CAB + EQ)",         "IR",   false },
-            { mipedals::ExportFormat::BlackboxTxt,  ".txt",   u8"M-Vave Blackbox \u00b7 Gu\u00eda",  u8"Mapeo de m\u00f3dulos y perillas",             "TXT",  false },
-            { mipedals::ExportFormat::HelixHlx,     ".hlx",   u8"Line 6 Helix / HX Stomp",          u8"Preset JSON v6 compatible POD Go",             "HLX",  false },
-            { mipedals::ExportFormat::HeadrushRig,  ".rig",   u8"HeadRush Pedalboard",              u8"Rig JSON (Amp + Cab + FX)",                    "RIG",  false },
-            { mipedals::ExportFormat::MiAmpXml,     ".miamp", u8"MI AMP \u00b7 Backup Portable",    u8"Preset completo importable en MI AMP",         "XML",  false }
+            { mipedals::ExportFormat::NamA2,        ".nam",   miamp_i18n::Msg::ExpNamA2Title,    miamp_i18n::Msg::ExpNamA2Sub,    "A2", true },
+            { mipedals::ExportFormat::NamA1,        ".nam",   miamp_i18n::Msg::ExpNamA1Title,    miamp_i18n::Msg::ExpNamA1Sub,    "A1", false },
+            { mipedals::ExportFormat::NamLstm,      ".nam",   miamp_i18n::Msg::ExpNamLstmTitle,  miamp_i18n::Msg::ExpNamLstmSub,  "LSTM", false },
+            { mipedals::ExportFormat::AidaX,        ".aidax", miamp_i18n::Msg::ExpAidaXTitle,    miamp_i18n::Msg::ExpAidaXSub,    "AIDA", false },
+            { mipedals::ExportFormat::ProteusJson,  ".json",  miamp_i18n::Msg::ExpProteusTitle,  miamp_i18n::Msg::ExpProteusSub,  "PROT", false },
+            { mipedals::ExportFormat::NeuralPiJson, ".json",  miamp_i18n::Msg::ExpNeuralPiTitle, miamp_i18n::Msg::ExpNeuralPiSub, "NPI",  false },
+            { mipedals::ExportFormat::IrWav24_44k,  ".wav",   miamp_i18n::Msg::ExpIrWavTitle,    miamp_i18n::Msg::ExpIrWavSub,    "IR",   false },
+            { mipedals::ExportFormat::BlackboxTxt,  ".txt",   miamp_i18n::Msg::ExpBlackboxTitle, miamp_i18n::Msg::ExpBlackboxSub, "TXT",  false },
+            { mipedals::ExportFormat::HelixHlx,     ".hlx",   miamp_i18n::Msg::ExpHelixTitle,    miamp_i18n::Msg::ExpHelixSub,    "HLX",  false },
+            { mipedals::ExportFormat::HeadrushRig,  ".rig",   miamp_i18n::Msg::ExpHeadrushTitle, miamp_i18n::Msg::ExpHeadrushSub, "RIG",  false },
+            { mipedals::ExportFormat::MiAmpXml,     ".miamp", miamp_i18n::Msg::ExpMiAmpTitle,    miamp_i18n::Msg::ExpMiAmpSub,    "XML",  false }
         };
 
         for (const auto& sp : kSpecs)
@@ -2122,7 +2199,7 @@ private:
 
         juce::Component::SafePointer<GlassPopover> safeThis (this);
         activeChooser = std::make_unique<juce::FileChooser> (
-            "Exportar " + exportTargetName + " (" + ext + ")",
+            miamp_i18n::tr (miamp_i18n::Msg::ExportDialogPrefix) + exportTargetName + " (" + ext + ")",
             initFile,
             "*" + ext);
         activeChooser->launchAsync (
@@ -2161,13 +2238,13 @@ private:
 
                 if (ok)
                 {
-                    safeThis->exportStatusMsg = juce::String::fromUTF8 (u8"\u00a1Exportado! ") + out.getFileName();
+                    safeThis->exportStatusMsg = miamp_i18n::tr (miamp_i18n::Msg::ExportedOkPrefix) + out.getFileName();
                     if (esr >= 0.0f)
                         safeThis->exportStatusMsg += " (ESR " + juce::String (esr, 2) + ")";
                 }
                 else
                 {
-                    safeThis->exportStatusMsg = "Error al guardar el archivo.";
+                    safeThis->exportStatusMsg = miamp_i18n::tr (miamp_i18n::Msg::ExportSaveError);
                 }
                 safeThis->resized();
                 safeThis->repaint();
@@ -2219,14 +2296,14 @@ private:
 
             addAndMakeVisible (btnExport);
             btnExport.setComponentID ("presetExport");
-            btnExport.setTooltip ("Descargar preset para pedalera digital");
+            btnExport.setTooltip (miamp_i18n::tr (miamp_i18n::Msg::TooltipExportPreset));
             btnExport.onClick = [this] { if (onExport) onExport(); };
 
             if (delCb)
             {
                 addAndMakeVisible (btnDel);
                 btnDel.setComponentID ("presetDelete");
-                btnDel.setTooltip ("Eliminar preset guardado");
+                btnDel.setTooltip (miamp_i18n::tr (miamp_i18n::Msg::TooltipDeletePreset));
                 btnDel.onClick = std::move (delCb);
             }
         }
@@ -2270,8 +2347,8 @@ private:
 
         tfSavedNotice = false;
         tfNotFound = false;
-        btnTfSavePreset.setButtonText ("GUARDAR PRESET");
-        btnTfCopyPrompt.setButtonText ("COPIAR PROMPT PARA IA");
+        btnTfSavePreset.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfSavePresetBtn));
+        btnTfCopyPrompt.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TfCopyPromptBtn));
 
         const bool forBass = processor.isBassMode();
         tfLastBass = forBass;
@@ -2357,9 +2434,67 @@ private:
         std::function<void(mipedals::ToneMatchResult)> onDone;
     };
 
+    struct ConfigHolderComponent final : public juce::Component
+    {
+        GlassPopover* owner = nullptr;
+        void paint (juce::Graphics& g) override
+        {
+            if (owner == nullptr) return;
+            const bool bass = owner->processor.isBassMode();
+            const bool isStand = miamp_standalone::isRunningStandalone();
+            const float w = static_cast<float> (getWidth());
+
+            g.setFont (sansFont (10.5f, juce::Font::bold));
+            g.setColour (inkColour().withAlpha (0.88f));
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::CfgRouteMode),
+                        juce::Rectangle<float> (0.0f, 2.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (miamp_i18n::tr (bass ? miamp_i18n::Msg::CfgBassCab : miamp_i18n::Msg::CfgGuitarCab),
+                        juce::Rectangle<float> (0.0f, 50.0f, w, 14.0f), juce::Justification::centredLeft);
+
+            if (! bass)
+            {
+                g.drawText (miamp_i18n::tr (miamp_i18n::Msg::CfgHeadChannel),
+                            juce::Rectangle<float> (0.0f, 124.0f, w, 14.0f), juce::Justification::centredLeft);
+                g.drawText (miamp_i18n::tr (miamp_i18n::Msg::CfgNoiseGate),
+                            juce::Rectangle<float> (0.0f, 198.0f, w, 14.0f), juce::Justification::centredLeft);
+                g.drawText (miamp_i18n::tr (miamp_i18n::Msg::CfgInputTrim),
+                            juce::Rectangle<float> (0.0f, 239.0f, w, 14.0f), juce::Justification::centredLeft);
+            }
+
+            const float langLabelY = bass ? 102.0f : 282.0f;
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::CfgLanguage),
+                        juce::Rectangle<float> (0.0f, langLabelY, w, 14.0f), juce::Justification::centredLeft);
+
+            const float keyY = bass ? 150.0f : 330.0f;
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::CfgGeminiKey),
+                        juce::Rectangle<float> (0.0f, keyY, w, 14.0f), juce::Justification::centredLeft);
+
+            if (isStand)
+            {
+                const float audioLabelY = bass ? 202.0f : 382.0f;
+                const auto summary = miamp_standalone::getCurrentAudioStatusSummary();
+                g.setFont (sansFont (9.8f, juce::Font::bold));
+                g.setColour (mintBorder().withAlpha (0.92f));
+                g.drawFittedText (summary.isNotEmpty() ? summary : miamp_i18n::tr (miamp_i18n::Msg::CfgAudioHeader),
+                                  juce::Rectangle<int> (0, static_cast<int> (audioLabelY), static_cast<int> (w), 14),
+                                  juce::Justification::centredLeft, 1);
+            }
+
+            const float updLabelY = isStand ? (bass ? 254.0f : 434.0f) : (bass ? 202.0f : 382.0f);
+            const juce::String verTxt = miamp_i18n::tr (miamp_i18n::Msg::CfgUpdatesHeader)
+                                      + "  \u00b7  v" + miamp_updater::currentVersionString()
+                                      + (owner->updateStatusMsg.isNotEmpty() ? (" (" + owner->updateStatusMsg + ")") : juce::String());
+            g.setFont (sansFont (9.8f, juce::Font::bold));
+            g.setColour (inkColour().withAlpha (0.85f));
+            g.drawFittedText (verTxt,
+                              juce::Rectangle<int> (0, static_cast<int> (updLabelY), static_cast<int> (w), 14),
+                              juce::Justification::centredLeft, 1);
+        }
+    };
+
     MiAmpAudioProcessor& processor;
     bool& useSolfege;
-    std::function<void()> closeFn, changedFn;
+    std::function<void()> closeFn, changedFn, langChangedFn, manualUpdateFn;
     PopoverKind kind = PopoverKind::None;
     xvdsp::TunerReading tuner;
 
@@ -2390,14 +2525,18 @@ private:
 
     juce::TextButton btnTunerNotation, btnTunerMute;
 
+    juce::Viewport configViewport;
+    ConfigHolderComponent configHolder;
     juce::TextButton btnCfgRouteAmp, btnCfgRoutePedals;
     juce::TextButton cfgCabBtns[5];
     juce::TextButton cfgChBtns[3];
     juce::TextButton btnCfgOs4x;
     juce::Slider slGate, slInput;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> slGateAttach, slInputAttach;
+    juce::TextButton langBtns[5];
     juce::TextEditor geminiKeyEdit;
-    juce::TextButton btnSaveGeminiKey, btnCfgAudio;
+    juce::TextButton btnSaveGeminiKey, btnCfgAudio, btnCheckUpdates;
+    juce::String updateStatusMsg;
 
     juce::TextEditor tfQueryEdit, tfPromptPreview;
     juce::TextButton btnTfSearch, btnTfApply, btnTfSavePreset, btnTfCopyPrompt;
@@ -2409,6 +2548,71 @@ private:
     bool tfLastBass = false;
     juce::String tfStatusMsg, tfPromptText;
     std::unique_ptr<ToneLookupThread> lookupThread;
+};
+
+//==============================================================================
+// UpdateOverlayComponent (Centered glass modal for automatic updates)
+//==============================================================================
+class MiAmpAudioProcessorEditor::UpdateOverlayComponent final : public juce::Component
+{
+public:
+    UpdateOverlayComponent (MiAmpAudioProcessorEditor& ed) : editor (ed)
+    {
+        setInterceptsMouseClicks (true, true);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        const float s = editor.stageScale();
+        g.setColour (juce::Colour::fromRGBA (10, 16, 17, 200));
+        g.fillRect (getLocalBounds());
+
+        const auto card = editor.toScreen (465, 240, 620, 250);
+        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 82), card.getX(), card.getY(),
+                                   juce::Colour::fromRGBA (38, 44, 38, 232), card.getRight(), card.getBottom(), false);
+        g.setGradientFill (grad);
+        g.fillRoundedRectangle (card, 20.0f * s);
+        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 165));
+        g.drawRoundedRectangle (card, 20.0f * s, 1.5f);
+
+        g.setColour (mintBorder());
+        g.setFont (sansFont (juce::jmax (10.5f, 12.5f * s), juce::Font::bold));
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::UpdModalTitle),
+                    editor.toScreen (495, 260, 560, 22), juce::Justification::centred);
+
+        g.setColour (inkColour());
+        g.setFont (sansFont (juce::jmax (14.0f, 18.0f * s), juce::Font::bold));
+        const juce::String verLine = miamp_i18n::tr (miamp_i18n::Msg::UpdAvailableTitle) + editor.pendingUpdate.remoteVersion;
+        g.drawText (verLine, editor.toScreen (495, 290, 560, 28), juce::Justification::centred);
+
+        juce::String subLine;
+        if (editor.updateFailed)
+            subLine = miamp_i18n::tr (miamp_i18n::Msg::UpdFailed);
+        else if (editor.updateInstalling)
+            subLine = miamp_i18n::tr (miamp_i18n::Msg::UpdInstalling);
+        else if (editor.updateDownloading)
+            subLine = miamp_i18n::tr (miamp_i18n::Msg::UpdDownloading)
+                    + " " + juce::String (juce::roundToInt (editor.updateProgress * 100.0f)) + "%";
+        else
+            subLine = miamp_i18n::tr (miamp_i18n::Msg::UpdDawWarning);
+
+        g.setColour (inkColour().withAlpha (0.88f));
+        g.setFont (sansFont (juce::jmax (11.0f, 13.0f * s)));
+        g.drawFittedText (subLine, editor.toScreenInt (505, 326, 540, 44), juce::Justification::centred, 2);
+
+        if (editor.updateDownloading || editor.updateInstalling)
+        {
+            const auto bar = editor.toScreen (525, 384, 500, 12);
+            g.setColour (juce::Colour::fromRGBA (255, 255, 255, 30));
+            g.fillRoundedRectangle (bar, 6.0f * s);
+            const float fillW = bar.getWidth() * juce::jlimit (0.04f, 1.0f, editor.updateProgress);
+            g.setColour (mintBorder());
+            g.fillRoundedRectangle (bar.withWidth (fillW), 6.0f * s);
+        }
+    }
+
+private:
+    MiAmpAudioProcessorEditor& editor;
 };
 
 //==============================================================================
@@ -2590,7 +2794,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     btnHeadModeAmp.onClick = [this]
     {
         audioProcessor.setHeadBypassed (audioProcessor.isBassMode(), false);
-        showHud ("CON AMPLI (CABEZAL ACTIVO)");
+        showHud (miamp_i18n::tr (miamp_i18n::Msg::HudWithAmp));
         syncHeadControls();
         repaint();
     };
@@ -2598,7 +2802,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     btnHeadModePedals.onClick = [this]
     {
         audioProcessor.setHeadBypassed (audioProcessor.isBassMode(), true);
-        showHud ("SOLO PEDALES (CABEZAL EN BYPASS)");
+        showHud (miamp_i18n::tr (miamp_i18n::Msg::HudPedalsOnly));
         syncHeadControls();
         repaint();
     };
@@ -2662,9 +2866,25 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     popover = std::make_unique<GlassPopover> (
         audioProcessor, useSolfege,
         [this] { togglePopover (PopoverKind::None); },
-        [this] { syncHeadControls(); syncPedalEditorControls(); repaint(); });
+        [this] { syncHeadControls(); syncPedalEditorControls(); repaint(); },
+        [this] { applyLanguageTexts(); },
+        [this] { startAutoUpdateCheck (true); });
     popover->setLookAndFeel (&glassLaf);
     addChildComponent (*popover);
+
+    updateOverlay = std::make_unique<UpdateOverlayComponent> (*this);
+    addChildComponent (*updateOverlay);
+
+    updateOverlay->addChildComponent (btnUpdateNow);
+    btnUpdateNow.setLookAndFeel (&glassLaf);
+    btnUpdateNow.setComponentID ("presetSave");
+    btnUpdateNow.onClick = [this] { beginAutoUpdateDownload (pendingUpdate); };
+
+    updateOverlay->addChildComponent (btnUpdateLater);
+    btnUpdateLater.setLookAndFeel (&glassLaf);
+    btnUpdateLater.onClick = [this] { dismissUpdateModal(); };
+
+    applyLanguageTexts();
 
     if (auto* constrainer = getConstrainer())
         constrainer->setFixedAspectRatio (kStageW / kStageH);
@@ -2682,18 +2902,32 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
 
     if (miamp_standalone::isRunningStandalone())
         juce::MessageManager::callAsync ([] { miamp_standalone::ensureAudioInputActive(); });
+
+    if (! miamp_updater::startupCheckDoneFlag().exchange (true))
+    {
+        juce::Component::SafePointer<MiAmpAudioProcessorEditor> safeEd (this);
+        juce::MessageManager::callAsync ([safeEd]
+        {
+            if (safeEd != nullptr)
+                safeEd->startAutoUpdateCheck (false);
+        });
+    }
 }
 
 MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
 {
     stopTimer();
+    if (updateCheckThread != nullptr)
+        updateCheckThread->stopThread (800);
+    if (updateDownloadThread != nullptr)
+        updateDownloadThread->stopThread (1200);
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
                      &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
                      &btnDockDrop, &btnDockConfig,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
                      &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
                      &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
-                     &btnFloorTunerMute, &btnFloorTunerNotation })
+                     &btnFloorTunerMute, &btnFloorTunerNotation, &btnUpdateNow, &btnUpdateLater })
     {
         b->setLookAndFeel (nullptr);
     }
@@ -2849,6 +3083,174 @@ const char* MiAmpAudioProcessorEditor::pedalBypassParamId (bool bassMode, int ty
     return mipedalui::getPedalSpec (bassMode, type).bypassParamId;
 }
 
+void MiAmpAudioProcessorEditor::applyLanguageTexts()
+{
+    btnSkipIntro.setButtonText       (miamp_i18n::tr (miamp_i18n::Msg::BtnSkip));
+    btnCreditClose.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnClose));
+    btnInstGuitar.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnGuitar));
+    btnInstBass.setButtonText        (miamp_i18n::tr (miamp_i18n::Msg::BtnBass));
+    btnMainPresets.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnPresets));
+    btnMainTuner.setButtonText       (miamp_i18n::tr (miamp_i18n::Msg::BtnTuner));
+    btnMainToneFinder.setButtonText  (miamp_i18n::tr (miamp_i18n::Msg::BtnToneFinder));
+    btnMainPedals.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnPedals));
+    btnDockConfig.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnConfig));
+
+    btnHeadModeAmp.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnWithAmp));
+    btnHeadModePedals.setButtonText  (miamp_i18n::tr (miamp_i18n::Msg::BtnPedalsOnly));
+    btnFloorPresets.setButtonText    (miamp_i18n::tr (miamp_i18n::Msg::BtnPresets));
+    btnFloorTuner.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnTuner));
+    btnFloorToneFinder.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnToneFinder));
+    btnFloorConfig.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnConfig));
+    btnBackToAmp.setButtonText       (miamp_i18n::tr (miamp_i18n::Msg::BtnBackToAmp));
+    btnFloorTunerMute.setButtonText  (miamp_i18n::tr (miamp_i18n::Msg::TunerMuteShort));
+    btnFloorTunerNotation.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TunerNotesSolfege));
+
+    btnUpdateNow.setButtonText       (miamp_i18n::tr (miamp_i18n::Msg::UpdBtnNow));
+    btnUpdateLater.setButtonText     (miamp_i18n::tr (updateDownloading ? miamp_i18n::Msg::UpdBtnCancel
+                                                                        : miamp_i18n::Msg::UpdBtnLater));
+    if (popover != nullptr)
+        popover->refreshLanguage();
+    repaint();
+}
+
+void MiAmpAudioProcessorEditor::startAutoUpdateCheck (bool manualFromConfig)
+{
+    if (updateCheckThread != nullptr && updateCheckThread->isThreadRunning())
+        return;
+
+    juce::Component::SafePointer<MiAmpAudioProcessorEditor> safeEd (this);
+    updateCheckThread = std::make_unique<miamp_updater::CheckThread> (
+        [safeEd, manualFromConfig] (miamp_updater::UpdateInfo info)
+        {
+            if (safeEd == nullptr) return;
+            if (! info.networkOk)
+            {
+                if (manualFromConfig && safeEd->popover != nullptr)
+                    safeEd->popover->setUpdateStatusMessage (miamp_i18n::tr (miamp_i18n::Msg::CfgUpdateCheckErr));
+                return;
+            }
+
+            if (info.available)
+            {
+                safeEd->pendingUpdate = info;
+                safeEd->updateFailed = false;
+                safeEd->updateInstalling = false;
+                safeEd->updateProgress = 0.0f;
+
+                if (miamp_standalone::isRunningStandalone())
+                {
+                    if (safeEd->introRunning)
+                        safeEd->finishIntro();
+                    safeEd->beginAutoUpdateDownload (info);
+                }
+                else
+                {
+                    safeEd->updateModalVisible = true;
+                    safeEd->updateDownloading = false;
+                    safeEd->btnUpdateNow.setVisible (true);
+                    safeEd->btnUpdateLater.setVisible (true);
+                    safeEd->btnUpdateLater.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::UpdBtnLater));
+                    if (safeEd->updateOverlay != nullptr)
+                    {
+                        safeEd->updateOverlay->setVisible (true);
+                        safeEd->updateOverlay->toFront (true);
+                    }
+                    safeEd->layoutAll();
+                    safeEd->repaint();
+                }
+            }
+            else if (manualFromConfig && safeEd->popover != nullptr)
+            {
+                safeEd->popover->setUpdateStatusMessage (miamp_i18n::tr (miamp_i18n::Msg::CfgUpToDate));
+            }
+        },
+        manualFromConfig);
+    updateCheckThread->startThread();
+}
+
+void MiAmpAudioProcessorEditor::beginAutoUpdateDownload (const miamp_updater::UpdateInfo& info)
+{
+    if (updateDownloadThread != nullptr && updateDownloadThread->isThreadRunning())
+        return;
+
+    updateModalVisible = true;
+    updateDownloading  = true;
+    updateInstalling   = false;
+    updateFailed       = false;
+    updateProgress     = 0.04f;
+    btnUpdateNow.setVisible (false);
+    btnUpdateLater.setVisible (true);
+    btnUpdateLater.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::UpdBtnCancel));
+    if (updateOverlay != nullptr)
+    {
+        updateOverlay->setVisible (true);
+        updateOverlay->toFront (true);
+    }
+    layoutAll();
+    repaint();
+
+    juce::Component::SafePointer<MiAmpAudioProcessorEditor> safeEd (this);
+    updateDownloadThread = std::make_unique<miamp_updater::DownloadThread> (
+        info.downloadUrl, info.remoteBuild,
+        [safeEd] (float prog)
+        {
+            if (safeEd == nullptr || ! safeEd->updateDownloading) return;
+            safeEd->updateProgress = prog;
+            if (safeEd->updateOverlay != nullptr)
+                safeEd->updateOverlay->repaint();
+        },
+        [safeEd] (bool ok, const juce::File& file)
+        {
+            if (safeEd == nullptr || ! safeEd->updateModalVisible) return;
+            safeEd->updateDownloading = false;
+            if (! ok)
+            {
+                safeEd->updateFailed = true;
+                safeEd->btnUpdateNow.setVisible (false);
+                safeEd->btnUpdateLater.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnClose));
+                safeEd->layoutAll();
+                if (safeEd->updateOverlay != nullptr)
+                    safeEd->updateOverlay->repaint();
+                return;
+            }
+
+            if (miamp_standalone::isRunningStandalone())
+            {
+                safeEd->updateInstalling = true;
+                safeEd->updateProgress = 1.0f;
+                safeEd->btnUpdateLater.setVisible (false);
+                if (safeEd->updateOverlay != nullptr)
+                    safeEd->updateOverlay->repaint();
+                if (! miamp_updater::launchStandaloneSilentUpdateAndQuit (file))
+                {
+                    file.startAsProcess();
+                    safeEd->dismissUpdateModal();
+                }
+            }
+            else
+            {
+                file.startAsProcess();
+                safeEd->dismissUpdateModal();
+            }
+        });
+    updateDownloadThread->startThread();
+}
+
+void MiAmpAudioProcessorEditor::dismissUpdateModal()
+{
+    if (updateDownloadThread != nullptr && updateDownloadThread->isThreadRunning())
+        updateDownloadThread->signalThreadShouldExit();
+    updateModalVisible = false;
+    updateDownloading  = false;
+    updateInstalling   = false;
+    updateFailed       = false;
+    btnUpdateNow.setVisible (false);
+    btnUpdateLater.setVisible (false);
+    if (updateOverlay != nullptr)
+        updateOverlay->setVisible (false);
+    repaint();
+}
+
 void MiAmpAudioProcessorEditor::showHud (const juce::String& text)
 {
     hudText = text;
@@ -2867,7 +3269,7 @@ void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
     animPedalHasPos.fill (false);
     paletteScrollTarget = 0.0f;
     paletteScrollCur = 0.0f;
-    showHud (juce::String::fromUTF8 (toBass ? u8"BAJO \u00b7 XV EDITION" : u8"GUITARRA \u00b7 MI AMP"));
+    showHud (miamp_i18n::tr (toBass ? miamp_i18n::Msg::HudBass : miamp_i18n::Msg::HudGuitar));
     syncHeadControls();
     syncPedalEditorControls();
     layoutAll();
@@ -3426,6 +3828,20 @@ void MiAmpAudioProcessorEditor::layoutAll()
 
     btnSkipIntro.setBounds   (toScreenInt (1550 - 31 - 96, 25, 96, 36));
     btnCreditClose.setBounds (toScreenInt (775 - 48, 520, 96, 36));
+    if (updateOverlay != nullptr)
+        updateOverlay->setBounds (getLocalBounds());
+    if (updateModalVisible)
+    {
+        if (btnUpdateNow.isVisible())
+        {
+            btnUpdateNow.setBounds   (toScreenInt (555, 424, 210, 34));
+            btnUpdateLater.setBounds (toScreenInt (785, 424, 210, 34));
+        }
+        else if (btnUpdateLater.isVisible())
+        {
+            btnUpdateLater.setBounds (toScreenInt (625, 424, 300, 34));
+        }
+    }
 
     if (! isFloorMode)
     {
@@ -3863,7 +4279,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
     {
         g.setColour (juce::Colour::fromRGBA (242, 232, 212, 180));
         g.setFont (sansFont (juce::jmax (13.0f, 20.0f * s), juce::Font::bold));
-        g.drawText (juce::String::fromUTF8 (u8"TU PEDALBOARD EST\u00c1 VAC\u00cdA \u2014 Arrastr\u00e1 un pedal desde abajo"),
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::BoardEmptyHint),
                     boardScreenR, juce::Justification::centred);
     }
     else
@@ -3957,7 +4373,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             g.fillRoundedRectangle (tagR, 6.0f * s);
             g.setColour (juce::Colours::white);
             g.setFont (sansFont (juce::jmax (9.0f, 11.0f * s), juce::Font::bold));
-            g.drawText (juce::String::fromUTF8 (u8"SOLT\u00c1 PARA QUITAR"), tagR, juce::Justification::centred);
+            g.drawText (miamp_i18n::tr (miamp_i18n::Msg::ReleaseToRemove), tagR, juce::Justification::centred);
         }
     }
 
@@ -3967,7 +4383,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         paintGlassPanel (g, toScreen (35, 28, 420, 577), 22.0f);
         g.setColour (inkColour());
         g.setFont (sansFont (juce::jmax (14.0f, 18.0f * s), juce::Font::bold));
-        g.drawText ("EDITAR " + pedalName (bass, sel).toUpperCase(),
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::EditPrefix) + pedalName (bass, sel).toUpperCase(),
                     toScreen (56, 42, 344, 28), juce::Justification::centredLeft);
 
         const auto pedStage = computeEditorPedalStageRect();
@@ -4045,9 +4461,9 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
         const int posIdx = (it != chain.end()) ? static_cast<int> (std::distance (chain.begin(), it)) + 1 : 1;
         g.setColour (inkColour().withAlpha (0.85f));
         g.setFont (sansFont (juce::jmax (9.5f, 11.0f * s), juce::Font::plain));
-        g.drawText ("CADENA " + juce::String (posIdx) + "/" + juce::String (chain.size()),
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::ChainPrefix) + juce::String (posIdx) + "/" + juce::String (chain.size()),
                     toScreen (96, 553, 76, 34), juce::Justification::centred);
-        g.drawText (juce::String::fromUTF8 (u8"Arrastr\u00e1 una perilla \u00b7 ") + juce::String (selActive ? "ACTIVO" : "BYPASS"),
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::DragKnobHint) + miamp_i18n::tr (selActive ? miamp_i18n::Msg::StateActive : miamp_i18n::Msg::StateBypass),
                     toScreen (56, 514, 330, 26), juce::Justification::centredLeft);
     }
 
@@ -4060,10 +4476,10 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
     {
         g.setColour (inkColour());
         g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s), juce::Font::bold));
-        g.drawText (juce::String::fromUTF8 (u8"ARRASTR\u00c1 LOS PEDALES"), toScreen (52, 650, 152, 24), juce::Justification::centredLeft);
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::PaletteTitle), toScreen (52, 650, 152, 24), juce::Justification::centredLeft);
         g.setColour (inkColour().withAlpha (0.82f));
         g.setFont (sansFont (juce::jmax (9.0f, 11.0f * s), juce::Font::plain));
-        g.drawText (juce::String::fromUTF8 (u8"o hac\u00e9 clic para agregar"), toScreen (52, 676, 152, 34), juce::Justification::topLeft);
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::PaletteSubtitle), toScreen (52, 676, 152, 34), juce::Justification::topLeft);
     }
     else
     {
@@ -4081,10 +4497,10 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
 
         g.setColour (inkColour());
         g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s), juce::Font::bold));
-        g.drawText ("AFINADOR", toScreen (210, 638, 220, 20), juce::Justification::centredLeft);
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::TunerLabel), toScreen (210, 638, 220, 20), juce::Justification::centredLeft);
         const juce::String hzStr = active
             ? (juce::String (tunerReading.freqHz, 1) + " Hz  (" + (tunerReading.cents >= 0 ? "+" : "") + juce::String (tunerReading.cents, 1) + " ct)")
-            : juce::String::fromUTF8 (u8"Esperando se\u00f1al");
+            : miamp_i18n::tr (miamp_i18n::Msg::WaitingSignal);
         g.setFont (sansFont (juce::jmax (10.0f, 13.0f * s)));
         g.drawText (hzStr, toScreen (650, 638, 345, 20), juce::Justification::centredRight);
 
@@ -4204,7 +4620,7 @@ void MiAmpAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
 
         g.setColour (inkColour().withAlpha (0.85f));
         g.setFont (sansFont (juce::jmax (12.0f, 16.0f * s), juce::Font::bold));
-        g.drawText ("DESARROLLADO POR", toScreen (475, 220, 600, 32), juce::Justification::centred);
+        g.drawText (miamp_i18n::tr (miamp_i18n::Msg::DevelopedBy), toScreen (475, 220, 600, 32), juce::Justification::centred);
 
         if (imgs.popupsCredit.isValid())
         {
@@ -4400,7 +4816,7 @@ void MiAmpAudioProcessorEditor::mouseUp (const juce::MouseEvent&)
                 if (! ch.empty()) sel = ch.front();
                 else editorOpen = false;
             }
-            showHud (pedalName (bass, draggingPedalType) + " QUITADO");
+            showHud (pedalName (bass, draggingPedalType) + miamp_i18n::tr (miamp_i18n::Msg::HudRemoved));
         }
         else if (dragInsertIndex >= 0)
         {
@@ -4409,7 +4825,7 @@ void MiAmpAudioProcessorEditor::mouseUp (const juce::MouseEvent&)
             if (activePopover != PopoverKind::None)
                 togglePopover (PopoverKind::None);
             editorOpen = true;
-            showHud (pedalName (bass, draggingPedalType) + " MOVIDO");
+            showHud (pedalName (bass, draggingPedalType) + miamp_i18n::tr (miamp_i18n::Msg::HudMoved));
         }
     }
     else

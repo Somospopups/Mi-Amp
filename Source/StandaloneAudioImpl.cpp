@@ -1,4 +1,5 @@
 #include "StandaloneAudioBridge.h"
+#include "Localization.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -30,9 +31,11 @@ namespace
         const auto low = name.toLowerCase();
         static constexpr const char* kBlocked[] = {
             "microphone", "microfono", "micr\xc3\xb3" "fono", "mic array", "array de mic",
-            "internal mic", "built-in mic", "webcam", "camera",
+            "internal mic", "built-in mic", "built-in input", "macbook", "imac",
+            "iphone", "ipad", "continuity", "airpods", "webcam", "camera",
             "stereo mix", "mezcla est", "what u hear", "loopback",
             "hands-free", "headset", "bluetooth", "voicemeeter", "cable output",
+            "blackhole", "soundflower",
             "realtek", "conexant", "idt high definition"
         };
         for (const char* kw : kBlocked)
@@ -161,15 +164,15 @@ juce::String getCurrentAudioStatusSummary()
         return {};
 
     if (static_cast<bool> (holder->getMuteInputValue().getValue()))
-        return "Entrada silenciada (elegi tu interfaz)";
+        return miamp_i18n::tr (miamp_i18n::Msg::CfgAudioMuted);
 
     auto* dev = holder->deviceManager.getCurrentAudioDevice();
     if (dev == nullptr)
-        return "Audio: Sin dispositivo activo";
+        return miamp_i18n::tr (miamp_i18n::Msg::CfgAudioNoDevice);
 
     const int ins = dev->getActiveInputChannels().countNumberOfSetBits();
     if (ins <= 0)
-        return "Audio: " + dev->getName() + " (Sin entrada)";
+        return "Audio: " + dev->getName() + " (" + miamp_i18n::tr (miamp_i18n::Msg::CfgAudioNoInput) + ")";
 
     const int srKhz = static_cast<int> (std::lround (dev->getCurrentSampleRate() / 1000.0));
     return dev->getName() + " (" + juce::String (ins) + " in / " + juce::String (srKhz) + "k)";

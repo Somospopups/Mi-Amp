@@ -1,5 +1,6 @@
 #pragma once
 #include "PluginProcessor.h"
+#include "Localization.h"
 #include <vector>
 #include <array>
 #include <utility>
@@ -602,6 +603,66 @@ public:
 
     static juce::String buildAiPrompt (const juce::String& userQuery, bool forBass)
     {
+        const auto lang = miamp_i18n::currentLang();
+        if (lang != miamp_i18n::Lang::ES)
+        {
+            const juce::String replyLang = miamp_i18n::langAiPromptName (lang);
+            if (forBass)
+            {
+                return "I have the MI AMP plugin in BASS mode and want to recreate the bass tone of: \""
+                    + userQuery.trim()
+                    + "\".\n\nPlease reply in " + replyLang + " using ONLY this MI AMP BASS gear, with exact values (0-100, or -12 to +12 dB on EQ):\n\n"
+                    "1) ROUTING & TUNING:\n"
+                    "- Routing mode: WITH AMP (8x10 head + cab) or PEDALS ONLY (full amp head bypass, ideal for direct XV)\n"
+                    "- DROP TUNER: On/Off, Semitones (-12 to +12, e.g. -2 for D)\n\n"
+                    "2) BASS HEAD (if WITH AMP):\n"
+                    "- 8x10 Head | ULTRA-HI switch (On/Off) | 8x10 Cabinet (ON/OFF)\n"
+                    "- Knobs (0-100): Gain, Bass, Mid, Freq, Treble\n\n"
+                    "3) BASS PEDALS (up to 10 in chain order):\n"
+                    "- MI-87 COMP: Sustain, Attack, Level, Input\n"
+                    "- XV PREAMP: Level, Drive, Low, High, Blend, Mid, Presence, Cab (BASS/PUNK/CLEAN)\n"
+                    "- MI DEEP CHORUS: Rate, Depth, Mix, Tone\n"
+                    "- MI LIME PHASE: Speed, Depth, Feedback\n"
+                    "- MI STUDIO (Reverb): Decay, Tone, Mix, Mode\n"
+                    "- MI BASS DRIVER (DI): Drive, Blend, Treble, Presence, Bass, Level, 3 switches (Grit/Mid/Cab)\n"
+                    "- MI GOLD DRIVE: Gain, Tone, Blend, Level\n"
+                    "- BASS FOOD: Drive, Blend, Treble, Bass, Level, GRIT switch\n"
+                    "- MI OLIVE (Fuzz): Level, Tone, Sustain, 3-way switch (Normal/Boost/Cut)\n"
+                    "- MI VIOLET (Flanger): Manual, Res, Depth, Rate, MODE switch\n"
+                    "- MI PEARL (Delay): Time, Feedback, Mix, Mode, SUBDIV switch\n"
+                    "- MI SILENT (Gate): Thresh, Decay, Mode\n"
+                    "- MI POLY OCTAVE: Dry, Sub, Oct Up\n"
+                    "- MI BASS EQ (7-Band -12..+12 dB): 50Hz, 120Hz, 400Hz, 500Hz, 800Hz, 4.5kHz, 10kHz\n\n"
+                    "Reply in " + replyLang + " with:\n1) Mode & Drop Tuner\n2) 8x10 Head & Cab settings\n3) Exact pedal order & knob/switch values.";
+            }
+
+            return "I have the MI AMP plugin in GUITAR mode and want to recreate the guitar tone of: \""
+                + userQuery.trim()
+                + "\".\n\nPlease reply in " + replyLang + " using ONLY this MI AMP GUITAR gear, with exact values (0-100, or -12 to +12 dB on EQ):\n\n"
+                "1) ROUTING & TUNING:\n"
+                "- Routing mode: WITH AMP (head + cab active) or PEDALS ONLY (full amp bypass)\n"
+                "- DROP TUNER: On/Off, Semitones (-12 to +12, e.g. -2 for D)\n\n"
+                "2) GUITAR HEAD & CAB (if WITH AMP):\n"
+                "- Channels: CH1 CLEAN / CH2 CRUNCH / CH3 PUNK | BRIGHT switch (On/Off)\n"
+                "- Knobs (0-100): Gain, Bass, Mid, Treble, Presence, Master, Output | Noise Gate (0-100) | Input Trim (0-100)\n"
+                "- Cabinets: VINT 4x12, MOD 4x12, OPEN 2x12, STUD 1x12, CAB OFF\n\n"
+                "3) GUITAR PEDALS (up to 10 in chain order):\n"
+                "- MI ICE COMP: Sustain, Attack, Level, Tone\n"
+                "- MI GREEN DRIVE: Gain, Tone, Level, CLIP switch\n"
+                "- MI SUSTAIN (Fuzz): Volume, Tone, Sustain\n"
+                "- MI SKY CHORUS: Rate, Depth, Mix, EQ, MODE switch\n"
+                "- MI PHASER: Speed\n"
+                "- MI PEARL (Delay): Time, Feedback, Mix, Mode, SUBDIV switch\n"
+                "- MI STUDIO (Reverb): Decay, Tone, Mix, Mode\n"
+                "- MI ORANGE (Dist): Gain, Tone, Level, MODE switch\n"
+                "- MI DUAL CRUNCH: Gain, Tone, Level, CLIP switch\n"
+                "- MI VIOLET (Flanger): Manual, Res, Depth, Rate, MODE switch\n"
+                "- MI SILENT (Gate): Thresh, Decay, Mode\n"
+                "- MI SUB OCTAVE: Dry, Sub, Oct Up\n"
+                "- MI GRAPHIC EQ (7-Band -12..+12 dB): 100Hz, 200Hz, 400Hz, 800Hz, 1.6kHz, 3.2kHz, 6.4kHz\n\n"
+                "Reply in " + replyLang + " with:\n1) Mode & Drop Tuner\n2) Head channel, cab & knobs\n3) Exact pedal order & knob/switch values.";
+        }
+
         if (forBass)
         {
             return juce::String::fromUTF8 (
@@ -744,12 +805,13 @@ public:
         try
         {
             const juce::String instStr = forBass ? "BASS (use ONLY bass pedals 0..13 and bass head)" : "GUITAR (use ONLY guitar pedals 0..12 and guitar head)";
+            const juce::String descLang = miamp_i18n::langAiPromptName (miamp_i18n::currentLang());
             const juce::String prompt =
                 "You are a guitar/bass rig expert. The user is currently in " + instStr
                 + ". Search the web for the real rig, tuning and pedal chain for: \""
                 + query.replace ("\"", "'")
                 + "\". Map it to MI AMP parameters for " + instStr + " ONLY and reply with valid JSON (no markdown fences) with keys: "
-                  "\"title\" (string), \"explanation\" (short Spanish description), \"bassMode\" (must be " + juce::String (forBass ? "true" : "false") + "), \"headBypass\" (bool, true for direct preamp/XV without amp head), "
+                  "\"title\" (string), \"explanation\" (short " + descLang + " description), \"bassMode\" (must be " + juce::String (forBass ? "true" : "false") + "), \"headBypass\" (bool, true for direct preamp/XV without amp head), "
                   "\"dropSemi\" (int -12..12), \"channel\" (0 clean, 1 crunch, 2 high-gain), \"cab\" (0..3), "
                   "\"gain\" (0..100), \"bass\" (0..100), \"mid\" (0..100), \"treble\" (0..100), \"presence\" (0..100), "
                   "\"slots\" (array of pedal indices: "
@@ -807,9 +869,9 @@ public:
                                 {
                                     ToneMatchResult r;
                                     r.found = true;
-                                    r.sourceBadge = "Gemini IA + Google Search";
+                                    r.sourceBadge = miamp_i18n::tr (miamp_i18n::Msg::TfGeminiBadge);
                                     r.title = parsed.getProperty ("title", query).toString();
-                                    r.explanation = parsed.getProperty ("explanation", "Cadena armada con busqueda web en vivo.").toString();
+                                    r.explanation = parsed.getProperty ("explanation", miamp_i18n::tr (miamp_i18n::Msg::TfGeminiFallbackDesc)).toString();
                                     r.bassMode = forBass;
                                     r.headBypass = true; // Siempre arrancar en SOLO PEDALES por defecto; usuario puede activar CON AMPLI luego
                                     r.dropSemi = std::clamp (static_cast<int> (parsed.getProperty ("dropSemi", 0)), -12, 12);

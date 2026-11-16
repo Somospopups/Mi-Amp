@@ -1,9 +1,16 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(MiAmp VERSION 1.0.0 LANGUAGES C CXX)
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version" FORCE)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Universal macOS architectures" FORCE)
+endif()
+
+project(MiAmp VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(MIAMP_BUILD_NUMBER "0" CACHE STRING "CI build number for auto-updater")
 
 # Busca JUCE preinstalado, ruta local (-DJUCE_DIR=...), o descarga JUCE 8.0.4 automáticamente
 find_package(JUCE CONFIG QUIET)
@@ -22,7 +29,11 @@ if(NOT JUCE_FOUND)
     endif()
 endif()
 
-set(PLUGIN_FORMATS VST3 Standalone)
+if(APPLE)
+    set(PLUGIN_FORMATS VST3 AU Standalone)
+else()
+    set(PLUGIN_FORMATS VST3 Standalone)
+endif()
 
 juce_add_plugin(MiAmp
     COMPANY_NAME                  "Popups Audio"
@@ -41,7 +52,7 @@ juce_add_plugin(MiAmp
     ICON_BIG                      "${CMAKE_CURRENT_SOURCE_DIR}/Resources/app_icon_512.png"
     ICON_SMALL                    "${CMAKE_CURRENT_SOURCE_DIR}/Resources/app_icon_180.png"
     MICROPHONE_PERMISSION_ENABLED TRUE
-    MICROPHONE_PERMISSION_TEXT    "MI AMP usa la entrada de audio para procesar guitarra y bajo electrico en tiempo real."
+    MICROPHONE_PERMISSION_TEXT    "MI AMP uses the audio input to process guitar and bass in real time."
 )
 
 juce_generate_juce_header(MiAmp)
@@ -55,6 +66,8 @@ target_sources(MiAmp
         Source/PedalCatalogSpecs.h
         Source/ToneFinderEngine.h
         Source/PresetExporter.h
+        Source/Localization.h
+        Source/AutoUpdater.h
         Source/StandaloneAudioBridge.h
         Source/DSP/MiAmpBassChainDSP.h
         Source/DSP/MiAmpGuitarChainDSP.h
@@ -137,6 +150,8 @@ target_compile_definitions(MiAmp
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
         JUCE_DISPLAY_SPLASH_SCREEN=0
+        MIAMP_BUILD_NUMBER=${MIAMP_BUILD_NUMBER}
+        MIAMP_APP_VERSION="1.1.${MIAMP_BUILD_NUMBER}"
 )
 
 target_compile_options(MiAmp
@@ -164,4 +179,8 @@ endif()
 
 if(TARGET MiAmp_VST3)
     target_sources(MiAmp_VST3 PRIVATE Source/StandaloneAudioStub.cpp)
+endif()
+
+if(TARGET MiAmp_AU)
+    target_sources(MiAmp_AU PRIVATE Source/StandaloneAudioStub.cpp)
 endif()

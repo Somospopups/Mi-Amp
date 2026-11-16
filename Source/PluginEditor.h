@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 #include "ToneFinderEngine.h"
+#include "Localization.h"
+#include "AutoUpdater.h"
 
 class MiAmpAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                         private juce::Timer
@@ -200,6 +202,10 @@ private:
     void setFloorMode (bool floor);
     void switchInstrument (bool toBass);
     void togglePopover (PopoverKind kind);
+    void applyLanguageTexts();
+    void startAutoUpdateCheck (bool manualFromConfig = false);
+    void beginAutoUpdateDownload (const miamp_updater::UpdateInfo& info);
+    void dismissUpdateModal();
     void syncHeadControls();
     void syncPedalEditorControls();
     void syncPalettePositions();
@@ -307,6 +313,20 @@ private:
 
     // Floating glass popover (.popover / .floor-popover)
     std::unique_ptr<GlassPopover> popover;
+
+    class UpdateOverlayComponent;
+
+    // Auto-Updater (background check + centered glass modal; never a banner above amp head)
+    std::unique_ptr<miamp_updater::CheckThread> updateCheckThread;
+    std::unique_ptr<miamp_updater::DownloadThread> updateDownloadThread;
+    std::unique_ptr<UpdateOverlayComponent> updateOverlay;
+    bool updateModalVisible = false;
+    bool updateDownloading = false;
+    bool updateInstalling = false;
+    bool updateFailed = false;
+    float updateProgress = 0.0f;
+    miamp_updater::UpdateInfo pendingUpdate;
+    juce::TextButton btnUpdateNow { "ACTUALIZAR AHORA" }, btnUpdateLater { "MAS TARDE" };
 
     juce::String hudText;
     int hudTicks = 0;

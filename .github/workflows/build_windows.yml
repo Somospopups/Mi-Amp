@@ -1,4 +1,4 @@
-name: Build & Publish MI AMP Windows x64 (.exe Installer)
+name: Build & Publish MI AMP (Windows + macOS)
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMIAMP_BUILD_NUMBER=${{ github.run_number }}
 
       - name: Build Plugin (VST3 + Standalone)
         run: cmake --build build --config Release --parallel
@@ -78,17 +78,117 @@ jobs:
           name: Windows-x64-Installer
           path: Instalar_MI_AMP_Windows_x64.exe
 
-      - name: Publish Windows Release (.exe)
+  build-macos:
+    name: macOS Universal (.pkg + .dmg AU + VST3 + Standalone)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake (Universal arm64 + x86_64)
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMIAMP_BUILD_NUMBER=${{ github.run_number }}
+
+      - name: Build Plugin (AU + VST3 + Standalone)
+        run: cmake --build build --config Release --parallel
+
+      - name: Ad-hoc Code Sign & Package macOS (.pkg + .dmg)
+        run: |
+          set -e
+          VER="1.1.${{ github.run_number }}"
+          APP_SRC=$(find build/MiAmp_artefacts -maxdepth 3 -name "MI AMP.app" -print -quit)
+          VST_SRC=$(find build/MiAmp_artefacts -maxdepth 3 -name "MI AMP.vst3" -print -quit)
+          AU_SRC=$(find build/MiAmp_artefacts -maxdepth 3 -name "MI AMP.component" -print -quit)
+          if [ -z "$APP_SRC" ] || [ -z "$VST_SRC" ] || [ -z "$AU_SRC" ]; then
+            echo "Missing built artefacts:"
+            find build/MiAmp_artefacts -maxdepth 3
+            exit 1
+          fi
+
+          codesign --force --deep --sign - "$APP_SRC"
+          codesign --force --deep --sign - "$VST_SRC"
+          codesign --force --deep --sign - "$AU_SRC"
+
+          mkdir -p pkg_stage/app pkg_stage/vst3 pkg_stage/au pkg_out dmg_stage
+          cp -R "$APP_SRC" pkg_stage/app/
+          cp -R "$VST_SRC" pkg_stage/vst3/
+          cp -R "$AU_SRC"  pkg_stage/au/
+
+          pkgbuild --root pkg_stage/app  --install-location "/Applications"                      --identifier "com.popupsaudio.miamp.app"  --version "$VER" pkg_out/app.pkg
+          pkgbuild --root pkg_stage/vst3 --install-location "/Library/Audio/Plug-Ins/VST3"       --identifier "com.popupsaudio.miamp.vst3" --version "$VER" pkg_out/vst3.pkg
+          pkgbuild --root pkg_stage/au   --install-location "/Library/Audio/Plug-Ins/Components" --identifier "com.popupsaudio.miamp.au"   --version "$VER" pkg_out/au.pkg
+
+          productbuild --package pkg_out/app.pkg --package pkg_out/vst3.pkg --package pkg_out/au.pkg Instalar_MI_AMP_macOS_Universal.pkg
+
+          cp Instalar_MI_AMP_macOS_Universal.pkg dmg_stage/
+          cat > dmg_stage/LEEME_MAC.txt << 'EOF'
+          MI AMP - Instalador macOS Universal (Apple Silicon M1/M2/M3/M4 + Intel)
+          =========================================================================
+          1. Haz doble clic (o clic derecho -> Abrir si macOS avisa) en:
+             Instalar_MI_AMP_macOS_Universal.pkg
+          2. Instala automaticamente:
+             - App Standalone: /Applications/MI AMP.app
+             - Plugin VST3:    /Library/Audio/Plug-Ins/VST3/MI AMP.vst3
+             - Plugin AU:      /Library/Audio/Plug-Ins/Components/MI AMP.component
+          EOF
+          hdiutil create -volname "MI AMP Installer" -srcfolder dmg_stage -ov -format UDZO MI_AMP_macOS_Universal.dmg
+
+      - name: Upload macOS Installer Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Universal-Installer
+          path: |
+            Instalar_MI_AMP_macOS_Universal.pkg
+            MI_AMP_macOS_Universal.dmg
+
+  publish-release:
+    name: Publish Multi-Platform Release & version.json
+    needs: [ build-windows, build-macos ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Windows-x64-Installer
+          path: release_assets
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-Universal-Installer
+          path: release_assets
+
+      - name: Generate version.json & Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
         run: |
-          $tag = "v1.0.0-win"
-          $notes = "Instalador oficial de MI AMP para Windows 64-bit (VST3 + App Standalone): Cabezal Guitarra/Bajo, Pedalboard completo, Tone Finder, Exportador NAM/AIDA-X/Proteus/IR, Drop Tuner y Afinador YIN."
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag Instalar_MI_AMP_Windows_x64.exe --clobber
-          } else {
-            gh release create $tag Instalar_MI_AMP_Windows_x64.exe --title "MI AMP v1.0.0 (Windows x64 Installer)" --notes $notes --latest
+          set -e
+          BUILD_NUM=${{ github.run_number }}
+          VER="1.1.${BUILD_NUM}"
+          cat > release_assets/version.json << EOF
+          {
+            "version": "${VER}",
+            "build": ${BUILD_NUM},
+            "windows_url": "https://github.com/Somospopups/Mi-Amp/releases/download/v1.0.0-win/Instalar_MI_AMP_Windows_x64.exe",
+            "macos_url": "https://github.com/Somospopups/Mi-Amp/releases/download/v1.0.0-win/Instalar_MI_AMP_macOS_Universal.pkg"
           }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          EOF
+
+          TAG="v1.0.0-win"
+          NOTES="MI AMP v${VER} — Instaladores oficiales Windows x64 (VST3 + Standalone) y macOS Universal Apple Silicon/Intel (AU + VST3 + Standalone), soporte multilenguaje (ES/EN/PT/FR/DE) y actualización automática."
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release_assets/Instalar_MI_AMP_Windows_x64.exe \
+              release_assets/Instalar_MI_AMP_macOS_Universal.pkg \
+              release_assets/MI_AMP_macOS_Universal.dmg \
+              release_assets/version.json \
+              --repo "${{ github.repository }}" --clobber
+            gh release edit "$TAG" --repo "${{ github.repository }}" --notes "$NOTES"
+          else
+            gh release create "$TAG" \
+              release_assets/Instalar_MI_AMP_Windows_x64.exe \
+              release_assets/Instalar_MI_AMP_macOS_Universal.pkg \
+              release_assets/MI_AMP_macOS_Universal.dmg \
+              release_assets/version.json \
+              --repo "${{ github.repository }}" \
+              --title "MI AMP (Windows & macOS)" \
+              --notes "$NOTES" --latest
+          fi

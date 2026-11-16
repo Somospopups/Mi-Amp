@@ -1,14 +1,14 @@
 Unicode True
 !include "MUI2.nsh"
 
-Name "MI AMP Bass Edition v1.0"
+Name "MI AMP"
 OutFile "Instalar_MI_AMP_Windows_x64.exe"
 InstallDir "$PROGRAMFILES64\Popups Audio\MI AMP"
 RequestExecutionLevel admin
 
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\MI AMP.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Abrir MI AMP (App Standalone con Afinador y Drop Tuner)"
+!define MUI_FINISHPAGE_RUN_TEXT "Abrir MI AMP (Standalone)"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_COMPONENTS
