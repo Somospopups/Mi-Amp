@@ -47,7 +47,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::ampMid,         "Bass Mid",         50.0f);
     addPct  (MiAmpParams::ampFreq,        "Bass Mid Freq",    50.0f);
     addPct  (MiAmpParams::ampTreble,      "Bass Treble",      50.0f);
-    addBool (MiAmpParams::bassHeadBypass, "Bass Head Bypass", false);
+    addBool (MiAmpParams::bassHeadBypass, "Bass Head Bypass", true);
 
     // Shared Pitch Shifter & Tuner
     addBool (MiAmpParams::pitchOn,    "Drop Tune On",  false);
@@ -167,7 +167,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addBool (MiAmpParams::gtrModeBright, "Guitar Bright Cap",  true);
     addInt  (MiAmpParams::gtrChannel,    "Guitar Channel",     0, 2, 2);
     addPct  (MiAmpParams::gtrOutput,     "Guitar Output",      58.0f);
-    addBool (MiAmpParams::gtrHeadBypass, "Guitar Head Bypass", false);
+    addBool (MiAmpParams::gtrHeadBypass, "Guitar Head Bypass", true);
 
     const float defGain[3]   = { 28.0f, 58.0f, 68.0f };
     const float defBass[3]   = { 44.0f, 54.0f, 56.0f };
@@ -1009,6 +1009,17 @@ void MiAmpAudioProcessor::applyPreset (const MiAmpBassPreset& p)
     setParamNormalized (MiAmpParams::reverbTone,  p.rvTone);
     setParamNormalized (MiAmpParams::reverbMix,   p.rvMix);
 
+    auto hasSlot = [&](int id) { return std::find (p.slots.begin(), p.slots.end(), id) != p.slots.end(); };
+    setParamNormalized (MiAmpParams::bddiOn,       hasSlot (5)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::goldOn,       hasSlot (6)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::bfOn,         hasSlot (7)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::oliveOn,      hasSlot (8)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::bassFlangeOn, hasSlot (9)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::bassDelayOn,  hasSlot (10) ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::bassGateOn,   hasSlot (11) ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::bassOctOn,    hasSlot (12) ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::bassEqOn,     hasSlot (13) ? 1.0f : 0.0f);
+
     activeBassPresetName = p.name;
 }
 
@@ -1070,6 +1081,14 @@ void MiAmpAudioProcessor::applyGuitarPreset (const MiAmpGuitarPreset& p)
     setParamNormalized (MiAmpParams::gtrReverbDec,  p.rvDec);
     setParamNormalized (MiAmpParams::gtrReverbTone, p.rvTone);
     setParamNormalized (MiAmpParams::gtrReverbMix,  p.rvMix);
+
+    auto hasSlot = [&](int id) { return std::find (p.slots.begin(), p.slots.end(), id) != p.slots.end(); };
+    setParamNormalized (MiAmpParams::gtrDistOn,   hasSlot (7)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::gtrDualOn,   hasSlot (8)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::gtrFlangeOn, hasSlot (9)  ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::gtrGateOn,   hasSlot (10) ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::gtrOctOn,    hasSlot (11) ? 1.0f : 0.0f);
+    setParamNormalized (MiAmpParams::gtrEqOn,     hasSlot (12) ? 1.0f : 0.0f);
 
     activeGuitarPresetName = p.name;
 }

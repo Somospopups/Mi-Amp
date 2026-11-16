@@ -2857,17 +2857,17 @@ void MiAmpAudioProcessorEditor::resized()
 
 juce::Rectangle<float> MiAmpAudioProcessorEditor::computeEditorPedalStageRect() const
 {
-    // Inside .edit (35, 28, 420, 577) -> fit natural aspect cleanly inside 365x395
+    // Inside .edit (35, 28, 420, 577) -> cap height to 356px so tall pedals (MI-87) never touch bottom parameter readouts
     const bool bass = audioProcessor.isBassMode();
     const int sel = bass ? selectedBassPedal : selectedGuitarPedal;
     const auto& spec = mipedalui::getPedalSpec (bass, sel);
-    const float maxW = 365.0f;
-    const float maxH = 395.0f;
+    const float maxW = 344.0f;
+    const float maxH = 356.0f;
     const float sc = juce::jmin (maxW / static_cast<float> (spec.natW),
                                  maxH / static_cast<float> (spec.natH));
     const float w = static_cast<float> (spec.natW) * sc;
     const float h = static_cast<float> (spec.natH) * sc;
-    return { 35.0f + (420.0f - w) * 0.5f, 28.0f + 50.0f + (maxH - h) * 0.5f, w, h };
+    return { 35.0f + (420.0f - w) * 0.5f, 28.0f + 46.0f + (maxH - h) * 0.5f, w, h };
 }
 
 std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotRects (bool bassMode, const std::vector<int>& chain) const
@@ -2876,11 +2876,12 @@ std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotR
     const int count = static_cast<int> (chain.size());
     if (count <= 0) return rects;
 
-    // Center each row symmetrically inside the inner board (boardSurface: x=585.79, w=921.48 -> center=1046.53, centerY=345.5)
-    const float boardCenterX = 1046.53f;
-    const float boardCenterY = 345.50f;
-    const float rowGap = 208.0f;
-    const float maxRowW = 824.0f;
+    // Velcro interior of board_surface.png: X=[619.5 .. 1470.4], Y=[107.5 .. 587.8]
+    // Equal left & right margin (24px each) and equal top & bottom margin (2 lines only, top-left first!)
+    const float leftX   = 643.5f;
+    const float rightX  = 1446.4f;
+    const float usableW = rightX - leftX; // 802.9f
+    const float rowY[2] = { 239.65f, 455.65f };
 
     auto slotDims = [bassMode](int pt) -> juce::Point<float>
     {
@@ -2897,23 +2898,24 @@ std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotR
         return { w, h };
     };
 
-    std::vector<std::vector<int>> rows;
-    std::vector<int> cur;
-    float used = 0.0f;
-    for (int i = 0; i < count; ++i)
+    // Strictly max 2 rows (top & bottom), always filling top row from left to right first
+    std::vector<std::vector<int>> rows (2);
+    float used0 = 0.0f;
+    int splitIdx = 0;
+    for (; splitIdx < count; ++splitIdx)
     {
-        const float w = slotDims (chain[static_cast<size_t> (i)]).x;
-        if (static_cast<int> (cur.size()) >= 5 || (! cur.empty() && used + 16.0f + w > maxRowW))
-        {
-            rows.push_back (cur);
-            cur.clear();
-            used = 0.0f;
-        }
-        used += (cur.empty() ? 0.0f : 16.0f) + w;
-        cur.push_back (i);
+        const float w = slotDims (chain[static_cast<size_t> (splitIdx)]).x;
+        const bool tooManyLeftForRow1 = (count - splitIdx) > 5;
+        if (rows[0].size() >= 5 || (! rows[0].empty() && ! tooManyLeftForRow1 && used0 + 18.0f + w > usableW))
+            break;
+        used0 += (rows[0].empty() ? 0.0f : 18.0f) + w;
+        rows[0].push_back (splitIdx);
     }
-    if (! cur.empty())
-        rows.push_back (cur);
+    for (int i = splitIdx; i < count; ++i)
+        rows[1].push_back (i);
+
+    if (rows[1].empty())
+        rows.pop_back();
 
     rects.resize (static_cast<size_t> (count));
     for (size_t ri = 0; ri < rows.size(); ++ri)
@@ -2923,20 +2925,27 @@ std::vector<juce::Rectangle<float>> MiAmpAudioProcessorEditor::computeBoardSlotR
         for (int idx : row)
             total += slotDims (chain[static_cast<size_t> (idx)]).x;
 
-        const float space = (row.size() > 1)
-            ? juce::jmin (30.0f, (maxRowW - total) / static_cast<float> (row.size() - 1))
-            : 0.0f;
+        const float minGap = 16.0f;
+        const float minTotalW = total + minGap * static_cast<float> (row.size() > 1 ? row.size() - 1 : 0);
+        const float fitScale = (minTotalW > usableW) ? (usableW / minTotalW) : 1.0f;
+        total *= fitScale;
 
-        const float rowW = total + space * static_cast<float> (row.size() > 1 ? row.size() - 1 : 0);
-        float x = boardCenterX - rowW * 0.5f;
-        const float rowCenterY = (rows.size() == 1)
-            ? boardCenterY
-            : (boardCenterY - rowGap * 0.5f + static_cast<float> (ri) * rowGap);
+        const bool fillFullWidth = (row.size() >= 2) &&
+            (row.size() == 5 || (ri == 0 && rows.size() > 1) || minTotalW >= usableW);
+
+        const float space = (row.size() <= 1) ? 0.0f
+                          : (fillFullWidth ? (usableW - total) / static_cast<float> (row.size() - 1)
+                                           : 34.0f);
+
+        float x = leftX;
+        const float rowCenterY = rowY[ri];
         for (int idx : row)
         {
             const auto d = slotDims (chain[static_cast<size_t> (idx)]);
-            rects[static_cast<size_t> (idx)] = juce::Rectangle<float> (x, rowCenterY - d.y * 0.5f, d.x, d.y);
-            x += d.x + space;
+            const float dw = d.x * fitScale;
+            const float dh = d.y * fitScale;
+            rects[static_cast<size_t> (idx)] = juce::Rectangle<float> (x, rowCenterY - dh * 0.5f, dw, dh);
+            x += dw + space;
         }
     }
     return rects;
@@ -3559,7 +3568,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             paintPedalStateOverlays (g, bass, sel, pedR, selActive);
         }
 
-        // Value readout row below stage
+        // Value readout row below stage (clean margin below pedal so tall chassis never overlap text)
         if (selSpec.eq.hasEq)
         {
             g.setFont (sansFont (juce::jmax (8.0f, 9.5f * s), juce::Font::bold));
@@ -3571,27 +3580,27 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
                 const float db = (v * 0.01f - 0.5f) * 24.0f;
                 const juce::String dbStr = (db >= 0.05f ? "+" : "") + juce::String (db, 0);
                 g.drawText (juce::String (selSpec.eq.bandLabels[static_cast<size_t> (b)]) + "\n" + dbStr,
-                            toScreen (x0 + b * rw, 474.0f, rw, 30.0f), juce::Justification::centred);
+                            toScreen (x0 + b * rw, 462.0f, rw, 30.0f), juce::Justification::centred);
             }
         }
         else if (selSpec.numKnobs > 4)
         {
-            g.setFont (sansFont (juce::jmax (8.5f, 10.2f * s), juce::Font::bold));
+            g.setFont (sansFont (juce::jmax (8.0f, 9.4f * s), juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.92f));
             const int cols = 4;
-            const float x0 = 54.0f, rw = 382.0f / static_cast<float> (cols);
+            const float x0 = 50.0f, rw = 390.0f / static_cast<float> (cols);
             for (int i = 0; i < selSpec.numKnobs; ++i)
             {
                 const auto& ks = selSpec.knobs[static_cast<size_t> (i)];
                 const int v = juce::roundToInt (audioProcessor.apvts.getRawParameterValue (ks.paramId)->load());
                 const int col = i % cols, row = i / cols;
-                const juce::String txt = juce::String (ks.label).substring (0, 5) + " " + juce::String (v);
-                g.drawText (txt, toScreen (x0 + col * rw, 470.0f + row * 18.0f, rw, 17.0f), juce::Justification::centred);
+                const juce::String txt = juce::String (ks.label).substring (0, 8) + " " + juce::String (v);
+                g.drawText (txt, toScreen (x0 + col * rw, 458.0f + row * 20.0f, rw, 18.0f), juce::Justification::centred);
             }
         }
         else if (selSpec.numKnobs > 0)
         {
-            g.setFont (sansFont (juce::jmax (9.5f, 11.5f * s), juce::Font::bold));
+            g.setFont (sansFont (juce::jmax (9.5f, 11.2f * s), juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.94f));
             const float cw = 378.0f / static_cast<float> (selSpec.numKnobs);
             for (int i = 0; i < selSpec.numKnobs; ++i)
@@ -3599,7 +3608,7 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
                 const auto& ks = selSpec.knobs[static_cast<size_t> (i)];
                 const int v = juce::roundToInt (audioProcessor.apvts.getRawParameterValue (ks.paramId)->load());
                 g.drawText (juce::String (ks.label) + " " + juce::String (v),
-                            toScreen (56.0f + i * cw, 484.0f, cw, 22.0f), juce::Justification::centred);
+                            toScreen (56.0f + i * cw, 472.0f, cw, 22.0f), juce::Justification::centred);
             }
         }
 

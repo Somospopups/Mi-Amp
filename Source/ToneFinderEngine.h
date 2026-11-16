@@ -87,7 +87,8 @@ public:
         r.sourceBadge = badge;
         r.explanation = explanation;
         r.bassMode = bassMode;
-        r.headBypass = headBypass;
+        r.headBypass = true; // Predeterminado SOLO PEDALES al buscar tono; el usuario puede probar CON AMPLI despues
+        juce::ignoreUnused (headBypass);
         r.dropSemi = dropSemi;
         if (bassMode)
         {
@@ -134,182 +135,182 @@ public:
             // === THE STORY SO FAR (Guitar & Bass, real rigs verified from Equipboard) ===
             add ("story so far will levy kevin geyer proper dose what you dont see quicksand nerve empty space out of it heavy gloom pop punk",
                  "The Story So Far \u2022 Pop-Punk High Gain",
-                 "Cabezal Dual CH3 + Cab Modern 4x12, empujado con Green Drive (TS), Benson/Dual Crunch sutil, Gate y Chorus/Reverb para estribillos.",
-                 false, false, -2, 2, 1, true, 72.f, 54.f, 64.f, 64.f, 66.f, 58.f,
-                 { 10, 1, 3, 6 },
+                 u8"Modo SOLO PEDALES: Gate + Green Drive suave + MI Dual Crunch (Ganancia equilibrada) + Reverb.",
+                 false, true, -2, 2, 1, true, 72.f, 54.f, 64.f, 64.f, 66.f, 58.f,
+                 { 10, 1, 8, 6 },
                  {
                      { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 34.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 22.f }, { MiAmpParams::gtrDriveTone, 64.f }, { MiAmpParams::gtrDriveLvl, 68.f },
-                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusRate, 32.f }, { MiAmpParams::gtrChorusDepth, 42.f }, { MiAmpParams::gtrChorusMix, 24.f },
-                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 42.f }, { MiAmpParams::gtrReverbTone, 56.f }, { MiAmpParams::gtrReverbMix, 18.f }
+                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 20.f }, { MiAmpParams::gtrDriveTone, 56.f }, { MiAmpParams::gtrDriveLvl, 56.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 46.f }, { MiAmpParams::gtrDualDrive, 44.f }, { MiAmpParams::gtrDualBlend, 54.f }, { MiAmpParams::gtrDualTone, 54.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 40.f }, { MiAmpParams::gtrReverbTone, 56.f }, { MiAmpParams::gtrReverbMix, 18.f }
                  });
 
             add ("story so far clairvoyant placeholder navy blue keep this up take me as you please clean acoustic indie",
                  "The Story So Far \u2022 Clairvoyant Clean",
-                 u8"Canal Clean CH1 en Open 2x12 + Compresor + Chorus estereo + Studio Reverb para arpegios limpios.",
-                 false, false, 0, 0, 2, true, 30.f, 48.f, 56.f, 64.f, 58.f, 62.f,
+                 u8"Modo SOLO PEDALES: Compresor + Chorus est\u00e9reo + Studio Reverb para arpegios limpios.",
+                 false, true, 0, 0, 2, true, 30.f, 48.f, 56.f, 64.f, 58.f, 62.f,
                  { 0, 3, 6 },
                  {
-                     { MiAmpParams::gtrCompOn, 1.f }, { MiAmpParams::gtrCompSus, 54.f }, { MiAmpParams::gtrCompAtt, 38.f }, { MiAmpParams::gtrCompLvl, 58.f },
-                     { MiAmpParams::gtrChorusOn, 1.f }, { MiAmpParams::gtrChorusRate, 34.f }, { MiAmpParams::gtrChorusDepth, 52.f }, { MiAmpParams::gtrChorusMix, 38.f }, { MiAmpParams::gtrChorusMode, 0.f },
-                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 58.f }, { MiAmpParams::gtrReverbTone, 60.f }, { MiAmpParams::gtrReverbMix, 34.f }
+                     { MiAmpParams::gtrCompOn, 1.f }, { MiAmpParams::gtrCompSus, 50.f }, { MiAmpParams::gtrCompAtt, 38.f }, { MiAmpParams::gtrCompLvl, 54.f },
+                     { MiAmpParams::gtrChorusOn, 1.f }, { MiAmpParams::gtrChorusRate, 34.f }, { MiAmpParams::gtrChorusDepth, 50.f }, { MiAmpParams::gtrChorusMix, 36.f }, { MiAmpParams::gtrChorusMode, 0.f },
+                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 54.f }, { MiAmpParams::gtrReverbTone, 60.f }, { MiAmpParams::gtrReverbMix, 30.f }
                  });
 
             add ("story so far bass kelen capener bajo pop punk empty space quicksand proper dose nerve heavy gloom clairvoyant will levy",
-                 "The Story So Far \u2022 Bajo (8x10 + BDDI)",
-                 u8"MI-87 Compresor siempre activo + MI Bass Driver con presencia de p\u00faa sobre cabezal 8x10 cl\u00e1sico.",
-                 true, false, -2, 0, 0, false, 56.f, 56.f, 58.f, 60.f, 52.f, 55.f,
+                 "The Story So Far \u2022 Bajo (SOLO PEDALES)",
+                 u8"Modo SOLO PEDALES: MI-87 Compresor + MI Bass Driver con presencia de p\u00faa definida sin saturar de m\u00e1s.",
+                 true, true, -2, 0, 0, false, 56.f, 56.f, 58.f, 60.f, 52.f, 55.f,
                  { 0, 5 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 58.f }, { MiAmpParams::compAttack, 34.f }, { MiAmpParams::compLevel, 58.f }, { MiAmpParams::compInput, 62.f },
-                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 44.f }, { MiAmpParams::bddiBlend, 64.f }, { MiAmpParams::bddiTreble, 62.f }, { MiAmpParams::bddiPresence, 72.f }, { MiAmpParams::bddiBass, 58.f }, { MiAmpParams::bddiLevel, 58.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f }, { MiAmpParams::compAttack, 34.f }, { MiAmpParams::compLevel, 54.f }, { MiAmpParams::compInput, 54.f },
+                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 30.f }, { MiAmpParams::bddiBlend, 58.f }, { MiAmpParams::bddiTreble, 58.f }, { MiAmpParams::bddiPresence, 66.f }, { MiAmpParams::bddiBass, 56.f }, { MiAmpParams::bddiLevel, 54.f }
                  });
 
             // === POP-PUNK / PUNK / HARDCORE ===
             add ("blink 182 enema dammit whats my age again all the small things anthem feeling this tom delonge pop punk",
                  "90s/00s Cali Pop-Punk \u2022 Dual Crunch",
-                 "Cabezal Dual High-Gain + Brit Crunch en Cab Modern 4x12 con Green Drive adelante y corte firme.",
-                 false, false, 0, 2, 1, true, 68.f, 56.f, 60.f, 64.f, 66.f, 60.f,
-                 { 10, 1, 3 },
+                 u8"Modo SOLO PEDALES: Gate + MI Dual Crunch definido + Sky Chorus sutil sin activar el ampli.",
+                 false, true, 0, 2, 1, true, 68.f, 56.f, 60.f, 64.f, 66.f, 60.f,
+                 { 10, 8, 3 },
                  {
                      { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 28.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 18.f }, { MiAmpParams::gtrDriveTone, 66.f }, { MiAmpParams::gtrDriveLvl, 64.f },
-                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusMix, 24.f }
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 44.f }, { MiAmpParams::gtrDualDrive, 42.f }, { MiAmpParams::gtrDualBlend, 52.f }, { MiAmpParams::gtrDualTone, 56.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusMix, 22.f }
                  });
 
             add ("blink 182 enema dammit whats my age again all the small things anthem feeling this cali pop punk bass mark hoppus bajo",
                  "90s/00s Cali Pop-Punk \u2022 Bajo XV Directo",
-                 u8"Modo SOLO PEDALES con XV Preamp puro (Cab PUNK) + Compresor para ataque cristalino de p\u00faa id\u00e9ntico al original.",
+                 u8"Modo SOLO PEDALES con XV Preamp puro (Cab PUNK) + MI-87 Compresor limpio y definido.",
                  true, true, 0, 0, 0, false, 50.f, 50.f, 50.f, 50.f, 50.f, 50.f,
                  { 0, 1 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 52.f }, { MiAmpParams::compAttack, 30.f }, { MiAmpParams::compLevel, 56.f },
-                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvLevel, 58.f }, { MiAmpParams::xvDrive, 46.f }, { MiAmpParams::xvLow, 66.f },
-                     { MiAmpParams::xvHigh, 58.f }, { MiAmpParams::xvBlend, 66.f }, { MiAmpParams::xvMid, 28.f }, { MiAmpParams::xvPresence, 84.f }, { MiAmpParams::xvCab, 1.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 50.f }, { MiAmpParams::compAttack, 30.f }, { MiAmpParams::compLevel, 54.f },
+                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvLevel, 54.f }, { MiAmpParams::xvDrive, 32.f }, { MiAmpParams::xvLow, 64.f },
+                     { MiAmpParams::xvHigh, 56.f }, { MiAmpParams::xvBlend, 58.f }, { MiAmpParams::xvMid, 28.f }, { MiAmpParams::xvPresence, 78.f }, { MiAmpParams::xvCab, 1.f }
                  });
 
             add ("turnstile glow on blackout mystery hardcore punk pat mccrory brady ebert",
                  "Turnstile \u2022 Hardcore Groove & Chorus",
-                 u8"Gate r\u00e1pido + Green Drive + Cabezal CH3 saturado y Sky Chorus para partes mel\u00f3dicas.",
-                 false, false, -2, 2, 1, true, 76.f, 58.f, 62.f, 64.f, 64.f, 60.f,
-                 { 10, 1, 3, 6 },
+                 u8"Modo SOLO PEDALES: Gate r\u00e1pido + MI Dual Crunch + Sky Chorus y Reverb para estribillos.",
+                 false, true, -2, 2, 1, true, 76.f, 58.f, 62.f, 64.f, 64.f, 60.f,
+                 { 10, 8, 3, 6 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 42.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 28.f }, { MiAmpParams::gtrDriveTone, 64.f }, { MiAmpParams::gtrDriveLvl, 68.f },
-                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusRate, 40.f }, { MiAmpParams::gtrChorusDepth, 55.f }, { MiAmpParams::gtrChorusMix, 34.f },
-                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbMix, 20.f }
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 40.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 50.f }, { MiAmpParams::gtrDualDrive, 48.f }, { MiAmpParams::gtrDualBlend, 58.f }, { MiAmpParams::gtrDualTone, 55.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusRate, 40.f }, { MiAmpParams::gtrChorusDepth, 52.f }, { MiAmpParams::gtrChorusMix, 30.f },
+                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbMix, 18.f }
                  });
 
             add ("neck deep december in bloom gold steps life not out to get you pop punk",
                  "Neck Deep \u2022 Modern UK Pop-Punk",
-                 u8"CH3 apretado con Green Drive + EQ gr\u00e1fico realzando medios altos para riffs r\u00e1pidos.",
-                 false, false, -2, 2, 1, true, 70.f, 52.f, 64.f, 66.f, 66.f, 58.f,
-                 { 10, 1, 12 },
+                 u8"Modo SOLO PEDALES: Gate + MI Dual Crunch + EQ gr\u00e1fico realzando medios altos.",
+                 false, true, -2, 2, 1, true, 70.f, 52.f, 64.f, 66.f, 66.f, 58.f,
+                 { 10, 8, 12 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 34.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 24.f }, { MiAmpParams::gtrDriveTone, 66.f }, { MiAmpParams::gtrDriveLvl, 66.f },
-                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[0], 45.f }, { MiAmpParams::gtrEqBand[2], 58.f }, { MiAmpParams::gtrEqBand[4], 62.f }, { MiAmpParams::gtrEqBand[5], 58.f }
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 32.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 45.f }, { MiAmpParams::gtrDualDrive, 44.f }, { MiAmpParams::gtrDualBlend, 54.f }, { MiAmpParams::gtrDualTone, 56.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[0], 46.f }, { MiAmpParams::gtrEqBand[2], 56.f }, { MiAmpParams::gtrEqBand[4], 60.f }, { MiAmpParams::gtrEqBand[5], 56.f }
                  });
 
             add ("green day dookie basket case american idiot billie joe armstrong crunch punk",
                  "90s Punk Crunch \u2022 Brit High-Mid",
-                 "Canal CH2 Crunch con medios empujados en Vintage 4x12 y overdrive leve de ganancia.",
-                 false, false, -1, 1, 0, true, 64.f, 52.f, 70.f, 62.f, 58.f, 62.f,
+                 u8"Modo SOLO PEDALES: Green Drive + EQ gr\u00e1fico con medios empujados sin saturaci\u00f3n excesiva.",
+                 false, true, -1, 1, 0, true, 64.f, 52.f, 70.f, 62.f, 58.f, 62.f,
                  { 1, 12 },
                  {
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 20.f }, { MiAmpParams::gtrDriveTone, 60.f }, { MiAmpParams::gtrDriveLvl, 62.f },
-                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[2], 60.f }, { MiAmpParams::gtrEqBand[3], 64.f }
+                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 42.f }, { MiAmpParams::gtrDriveTone, 54.f }, { MiAmpParams::gtrDriveLvl, 56.f },
+                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[2], 58.f }, { MiAmpParams::gtrEqBand[3], 62.f }
                  });
 
             add ("green day mike dirnt dookie longview bass bajo punk",
                  "90s Punk Bass \u2022 Pick Mid-Punch",
-                 "Bass Food + Cabezal 8x10 con medios presentes (400-800 Hz) para cortar mezcla.",
-                 true, false, -1, 0, 0, false, 60.f, 54.f, 66.f, 62.f, 54.f, 55.f,
+                 u8"Modo SOLO PEDALES: MI-87 Comp + Bass Food + Bass EQ con medios presentes.",
+                 true, true, -1, 0, 0, false, 60.f, 54.f, 66.f, 62.f, 54.f, 55.f,
                  { 0, 7, 13 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 52.f }, { MiAmpParams::compLevel, 58.f },
-                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 48.f }, { MiAmpParams::bfBlend, 60.f }, { MiAmpParams::bfTreble, 60.f },
-                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[2], 60.f }, { MiAmpParams::bassEqBand[4], 64.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 50.f }, { MiAmpParams::compLevel, 54.f },
+                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 34.f }, { MiAmpParams::bfBlend, 54.f }, { MiAmpParams::bfTreble, 56.f }, { MiAmpParams::bfVol, 54.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[2], 58.f }, { MiAmpParams::bassEqBand[4], 60.f }
                  });
 
             add ("paramore misery business crushcrushcrush thats what you get Hayley pop punk",
                  "2000s Alt Pop-Punk \u2022 Tight Dual",
-                 "CH3 con gate preciso, Green Drive + Dual Crunch para pared de guitarras.",
-                 false, false, -2, 2, 1, true, 72.f, 54.f, 62.f, 65.f, 64.f, 58.f,
-                 { 10, 1, 6 },
+                 u8"Modo SOLO PEDALES: Gate preciso + MI Dual Crunch equilibrado + Reverb corta.",
+                 false, true, -2, 2, 1, true, 72.f, 54.f, 62.f, 65.f, 64.f, 58.f,
+                 { 10, 8, 6 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 36.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 26.f }, { MiAmpParams::gtrDriveTone, 64.f },
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 34.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 46.f }, { MiAmpParams::gtrDualDrive, 44.f }, { MiAmpParams::gtrDualBlend, 55.f }, { MiAmpParams::gtrDualTone, 55.f }, { MiAmpParams::gtrDualOutput, 54.f },
                      { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbMix, 16.f }
                  });
 
             add ("sum 41 fat lip in too deep nofx punk rock",
                  "Fast Skate Punk \u2022 Tight Bite",
-                 "CH3 definido, graves controlados y medios presentes para palm-mutes veloces.",
-                 false, false, 0, 2, 1, true, 70.f, 50.f, 62.f, 66.f, 68.f, 58.f,
-                 { 10, 1 },
+                 u8"Modo SOLO PEDALES: Gate + MI Dual Crunch r\u00e1pido y definido.",
+                 false, true, 0, 2, 1, true, 70.f, 50.f, 62.f, 66.f, 68.f, 58.f,
+                 { 10, 8 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 38.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 22.f }, { MiAmpParams::gtrDriveTone, 68.f }
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 36.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 46.f }, { MiAmpParams::gtrDualDrive, 45.f }, { MiAmpParams::gtrDualTone, 56.f }, { MiAmpParams::gtrDualOutput, 54.f }
                  });
 
             // === ALTERNATIVE / NU-METAL / METAL / HARDCORE ===
             add ("deftones my own summer around the fur white pony stephen carpenter nu metal drop",
                  "Deftones \u2022 Heavy Wall & Shimmer",
-                 "Drop -3 semitonos + Gate + High Gain CH3 con graves gruesos, EQ y Chorus/Delay espacial.",
-                 false, false, -3, 2, 1, true, 80.f, 64.f, 56.f, 64.f, 62.f, 60.f,
-                 { 10, 1, 3, 5, 6 },
+                 u8"Modo SOLO PEDALES: Drop -3 + Gate + MI Dual Crunch grueso + Chorus/Delay/Reverb.",
+                 false, true, -3, 2, 1, true, 80.f, 64.f, 56.f, 64.f, 62.f, 60.f,
+                 { 10, 8, 3, 5, 6 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 44.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 24.f }, { MiAmpParams::gtrDriveTone, 60.f },
-                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusMix, 28.f },
-                     { MiAmpParams::gtrDelayOn, 0.f }, { MiAmpParams::gtrDelayTime, 46.f }, { MiAmpParams::gtrDelayMix, 26.f },
-                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbMix, 24.f }
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 42.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 52.f }, { MiAmpParams::gtrDualDrive, 50.f }, { MiAmpParams::gtrDualBlend, 60.f }, { MiAmpParams::gtrDualTone, 52.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrChorusOn, 0.f }, { MiAmpParams::gtrChorusMix, 26.f },
+                     { MiAmpParams::gtrDelayOn, 0.f }, { MiAmpParams::gtrDelayTime, 46.f }, { MiAmpParams::gtrDelayMix, 24.f },
+                     { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbMix, 22.f }
                  });
 
             add ("metallica master of puppets enter sandman thrash metal scoop",
                  "80s Thrash Metal \u2022 Mid Scoop",
-                 u8"CH3 ganancia alta + EQ 7-Bandas en V cl\u00e1sica (800 Hz recortados, 100 Hz y 3.2 kHz arriba).",
-                 false, false, 0, 2, 1, true, 78.f, 64.f, 36.f, 68.f, 64.f, 60.f,
-                 { 10, 1, 12 },
+                 u8"Modo SOLO PEDALES: Gate + MI Dual Crunch (Scoop) + EQ 7-Bandas en V.",
+                 false, true, 0, 2, 1, true, 78.f, 64.f, 36.f, 68.f, 64.f, 60.f,
+                 { 10, 8, 12 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 42.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 20.f }, { MiAmpParams::gtrDriveLvl, 68.f },
-                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[0], 64.f }, { MiAmpParams::gtrEqBand[2], 38.f }, { MiAmpParams::gtrEqBand[3], 32.f }, { MiAmpParams::gtrEqBand[5], 68.f }
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 40.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 50.f }, { MiAmpParams::gtrDualDrive, 50.f }, { MiAmpParams::gtrDualScoop, 1.f }, { MiAmpParams::gtrDualTone, 55.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[0], 60.f }, { MiAmpParams::gtrEqBand[2], 40.f }, { MiAmpParams::gtrEqBand[3], 36.f }, { MiAmpParams::gtrEqBand[5], 62.f }
                  });
 
             add ("knocked loose metalcore hardcore beatdown modern metal djent drop",
                  "Modern Metalcore \u2022 Ultra Tight Gate",
-                 "Drop -4 semitonos + Gate agresivo + Green Drive Boost + CH3 + EQ corte de barro en 200 Hz.",
-                 false, false, -4, 2, 1, true, 82.f, 50.f, 62.f, 68.f, 70.f, 58.f,
-                 { 10, 1, 12 },
+                 u8"Modo SOLO PEDALES: Drop -4 + Gate agresivo + MI Dual Crunch apretado + EQ.",
+                 false, true, -4, 2, 1, true, 82.f, 50.f, 62.f, 68.f, 70.f, 58.f,
+                 { 10, 8, 12 },
                  {
-                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 58.f }, { MiAmpParams::gtrGateDecay, 18.f },
-                     { MiAmpParams::gtrDriveOn, 1.f }, { MiAmpParams::gtrDriveGain, 12.f }, { MiAmpParams::gtrDriveTone, 70.f }, { MiAmpParams::gtrDriveLvl, 76.f },
-                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[1], 36.f }, { MiAmpParams::gtrEqBand[4], 64.f }
+                     { MiAmpParams::gtrGateOn, 1.f }, { MiAmpParams::gtrGateThresh, 54.f }, { MiAmpParams::gtrGateDecay, 18.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 52.f }, { MiAmpParams::gtrDualDrive, 52.f }, { MiAmpParams::gtrDualScoop, 1.f }, { MiAmpParams::gtrDualTone, 56.f }, { MiAmpParams::gtrDualOutput, 54.f },
+                     { MiAmpParams::gtrEqOn, 1.f }, { MiAmpParams::gtrEqBand[1], 38.f }, { MiAmpParams::gtrEqBand[4], 62.f }
                  });
 
             // === BASS ICONIC TONES ===
             add ("muse hysteria chris wolstenholme fuzz synth bass bajo",
                  "Muse Hysteria \u2022 Fuzz + Octaver Synth",
-                 u8"MI Olive Fuzz (Boost) + Poly Octave + XV Preamp en SOLO PEDALES para bajo sint\u00e9tico grueso.",
+                 u8"Modo SOLO PEDALES: MI-87 Comp + Poly Octave + MI Olive Fuzz + XV equilibrado sin clipping.",
                  true, true, 0, 0, 0, false, 50.f, 50.f, 50.f, 50.f, 50.f, 50.f,
                  { 0, 12, 8, 1 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 60.f },
-                     { MiAmpParams::bassOctOn, 1.f }, { MiAmpParams::bassOctDry, 78.f }, { MiAmpParams::bassOctSub, 68.f }, { MiAmpParams::bassOctUp, 22.f },
-                     { MiAmpParams::oliveOn, 1.f }, { MiAmpParams::oliveSustain, 78.f }, { MiAmpParams::oliveTone, 58.f }, { MiAmpParams::oliveMode, 2.f },
-                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvDrive, 52.f }, { MiAmpParams::xvBlend, 68.f }, { MiAmpParams::xvCab, 1.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f },
+                     { MiAmpParams::bassOctOn, 1.f }, { MiAmpParams::bassOctDry, 78.f }, { MiAmpParams::bassOctSub, 62.f }, { MiAmpParams::bassOctUp, 18.f },
+                     { MiAmpParams::oliveOn, 1.f }, { MiAmpParams::oliveSustain, 56.f }, { MiAmpParams::oliveTone, 54.f }, { MiAmpParams::oliveMode, 1.f },
+                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvDrive, 30.f }, { MiAmpParams::xvBlend, 54.f }, { MiAmpParams::xvLevel, 52.f }, { MiAmpParams::xvCab, 1.f }
                  });
 
             add ("tool schism forty six and 2 justin chancellor bass bajo",
                  "Prog Bass \u2022 Pick Growl + Flanger",
-                 "Drop -2 semitonos + Bass Driver + Violet Flanger sutil + cabezal 8x10 con medios rugientes.",
-                 true, false, -2, 0, 0, false, 60.f, 54.f, 68.f, 64.f, 58.f, 55.f,
+                 u8"Modo SOLO PEDALES: Drop -2 + MI-87 Comp + Bass Driver definido + Violet Flanger sutil.",
+                 true, true, -2, 0, 0, false, 60.f, 54.f, 68.f, 64.f, 58.f, 55.f,
                  { 0, 5, 9, 10 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 56.f },
-                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 54.f }, { MiAmpParams::bddiBlend, 66.f }, { MiAmpParams::bddiPresence, 74.f },
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 52.f },
+                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 36.f }, { MiAmpParams::bddiBlend, 58.f }, { MiAmpParams::bddiPresence, 68.f }, { MiAmpParams::bddiLevel, 54.f },
                      { MiAmpParams::bassFlangeOn, 0.f }, { MiAmpParams::bassFlangeDepth, 45.f }, { MiAmpParams::bassFlangeRate, 24.f },
                      { MiAmpParams::bassDelayOn, 0.f }, { MiAmpParams::bassDelayMix, 24.f }
                  });
@@ -416,100 +417,100 @@ public:
             // === ADDITIONAL BASS RIGS (Full parity for every genre/band when in Bass mode) ===
             add ("turnstile glow on blackout mystery hardcore punk franz lyons bass bajo",
                  "Turnstile \u2022 Bajo Hardcore Groove",
-                 u8"Drop -2 + MI-87 Comp + MI Bass Driver con grit y pegada en medios-bajos sobre 8x10.",
-                 true, false, -2, 0, 0, false, 60.f, 62.f, 62.f, 62.f, 54.f, 55.f,
+                 u8"Modo SOLO PEDALES: Drop -2 + Silent Gate + MI-87 Comp + MI Bass Driver equilibrado.",
+                 true, true, -2, 0, 0, false, 60.f, 62.f, 62.f, 62.f, 54.f, 55.f,
                  { 11, 0, 5 },
                  {
                      { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 32.f },
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 60.f }, { MiAmpParams::compAttack, 30.f },
-                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 52.f }, { MiAmpParams::bddiBlend, 68.f }, { MiAmpParams::bddiPresence, 70.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f }, { MiAmpParams::compAttack, 30.f },
+                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 36.f }, { MiAmpParams::bddiBlend, 60.f }, { MiAmpParams::bddiPresence, 66.f }, { MiAmpParams::bddiLevel, 54.f }
                  });
 
             add ("neck deep december in bloom gold steps paramore sum 41 fat lip skate pop punk bass bajo",
                  "Modern Pop-Punk \u2022 Bajo Pick & Bite",
-                 u8"MI-87 Comp + MI Bass Driver + Bass EQ realzando ataque de p\u00faa en 4.5 kHz.",
-                 true, false, -2, 0, 0, false, 58.f, 58.f, 58.f, 66.f, 58.f, 55.f,
+                 u8"Modo SOLO PEDALES: MI-87 Comp + MI Bass Driver + Bass EQ realzando ataque de p\u00faa.",
+                 true, true, -2, 0, 0, false, 58.f, 58.f, 58.f, 66.f, 58.f, 55.f,
                  { 0, 5, 13 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 58.f },
-                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 48.f }, { MiAmpParams::bddiBlend, 64.f }, { MiAmpParams::bddiPresence, 76.f },
-                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 56.f }, { MiAmpParams::bassEqBand[5], 66.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f },
+                     { MiAmpParams::bddiOn, 1.f }, { MiAmpParams::bddiDrive, 34.f }, { MiAmpParams::bddiBlend, 58.f }, { MiAmpParams::bddiPresence, 70.f }, { MiAmpParams::bddiLevel, 54.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 54.f }, { MiAmpParams::bassEqBand[5], 62.f }
                  });
 
             add ("deftones my own summer around the fur white pony chi cheng sergio vega nu metal drop bass bajo",
                  "Deftones \u2022 Bajo Drop Wall",
-                 u8"Drop -3 + Silent Gate + MI-87 Comp + MI Gold Drive grueso + 8x10 con sub pesado.",
-                 true, false, -3, 0, 0, false, 64.f, 68.f, 56.f, 60.f, 50.f, 55.f,
+                 u8"Modo SOLO PEDALES: Drop -3 + Silent Gate + MI-87 Comp + MI Gold Drive controlado.",
+                 true, true, -3, 0, 0, false, 64.f, 68.f, 56.f, 60.f, 50.f, 55.f,
                  { 11, 0, 6, 2 },
                  {
-                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 38.f },
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 62.f },
-                     { MiAmpParams::goldOn, 1.f }, { MiAmpParams::goldGain, 58.f }, { MiAmpParams::goldBlend, 62.f }, { MiAmpParams::goldEq, 56.f },
+                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 36.f },
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 56.f },
+                     { MiAmpParams::goldOn, 1.f }, { MiAmpParams::goldGain, 40.f }, { MiAmpParams::goldBlend, 56.f }, { MiAmpParams::goldEq, 54.f }, { MiAmpParams::goldLevel, 54.f },
                      { MiAmpParams::chorusOn, 0.f }, { MiAmpParams::chorusMix, 24.f }
                  });
 
             add ("metallica master of puppets enter sandman cliff burton jason newsted thrash metal bass bajo",
                  "80s Thrash \u2022 Bajo Pick & Growl",
-                 u8"MI-87 Comp + Bass Food + Bass EQ en sonrisa para cortar entre guitarras.",
-                 true, false, 0, 0, 0, false, 62.f, 62.f, 44.f, 68.f, 56.f, 55.f,
+                 u8"Modo SOLO PEDALES: MI-87 Comp + Bass Food + Bass EQ en sonrisa definida.",
+                 true, true, 0, 0, 0, false, 62.f, 62.f, 44.f, 68.f, 56.f, 55.f,
                  { 0, 7, 13 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 60.f },
-                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 56.f }, { MiAmpParams::bfBlend, 66.f }, { MiAmpParams::bfPad, 1.f },
-                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 62.f }, { MiAmpParams::bassEqBand[3], 38.f }, { MiAmpParams::bassEqBand[5], 68.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f },
+                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 38.f }, { MiAmpParams::bfBlend, 58.f }, { MiAmpParams::bfVol, 54.f }, { MiAmpParams::bfPad, 1.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 58.f }, { MiAmpParams::bassEqBand[3], 40.f }, { MiAmpParams::bassEqBand[5], 64.f }
                  });
 
             add ("knocked loose metalcore hardcore beatdown modern metal djent drop bass bajo",
-                 "Metalcore / Djent \u2022 Bajo Clank Brutal",
-                 u8"Drop -4 + Silent Gate + MI-87 Comp + XV Preamp en SOLO PEDALES con clank agresivo.",
+                 "Metalcore / Djent \u2022 Bajo Clank Definido",
+                 u8"Modo SOLO PEDALES: Drop -4 + Silent Gate + MI-87 Comp + XV Preamp definido sin clipping.",
                  true, true, -4, 0, 0, false, 50.f, 50.f, 50.f, 50.f, 50.f, 50.f,
                  { 11, 0, 1, 13 },
                  {
-                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 48.f },
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 68.f },
-                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvDrive, 76.f }, { MiAmpParams::xvBlend, 74.f }, { MiAmpParams::xvMid, 32.f }, { MiAmpParams::xvPresence, 86.f }, { MiAmpParams::xvCab, 1.f },
-                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 60.f }, { MiAmpParams::bassEqBand[5], 68.f }
+                     { MiAmpParams::bassGateOn, 1.f }, { MiAmpParams::bassGateThresh, 44.f },
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 58.f },
+                     { MiAmpParams::xvOn, 1.f }, { MiAmpParams::xvDrive, 44.f }, { MiAmpParams::xvBlend, 60.f }, { MiAmpParams::xvLevel, 52.f }, { MiAmpParams::xvMid, 32.f }, { MiAmpParams::xvPresence, 78.f }, { MiAmpParams::xvCab, 1.f },
+                     { MiAmpParams::bassEqOn, 1.f }, { MiAmpParams::bassEqBand[0], 56.f }, { MiAmpParams::bassEqBand[5], 62.f }
                  });
 
             add ("nirvana nevermind smells like teen spirit grunge foo fighters everlong alt rock bass bajo",
                  "90s Grunge / Alt Rock \u2022 Bajo C\u00e1lido",
-                 u8"MI-87 Comp + Bass Food crunch suave + Cabezal 8x10 con graves y medios redondos.",
-                 true, false, 0, 0, 0, false, 58.f, 62.f, 62.f, 56.f, 50.f, 55.f,
+                 u8"Modo SOLO PEDALES: MI-87 Comp + Bass Food crunch suave.",
+                 true, true, 0, 0, 0, false, 58.f, 62.f, 62.f, 56.f, 50.f, 55.f,
                  { 0, 7 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f },
-                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 42.f }, { MiAmpParams::bfBlend, 58.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 52.f },
+                     { MiAmpParams::bfOn, 1.f }, { MiAmpParams::bfDrive, 34.f }, { MiAmpParams::bfBlend, 54.f }, { MiAmpParams::bfVol, 54.f }
                  });
 
             add ("title fight shoegaze post hardcore midwest emo math rock ambient post rock clean bass bajo",
                  "Indie / Emo / Shoegaze \u2022 Bajo Mel\u00f3dico",
-                 u8"MI-87 Comp + MI Deep Chorus sutil + MI Studio Reverb + Cabezal 8x10 limpio y definido.",
-                 true, false, 0, 0, 0, false, 48.f, 58.f, 60.f, 58.f, 52.f, 55.f,
+                 u8"Modo SOLO PEDALES: MI-87 Comp + MI Deep Chorus sutil + MI Studio Reverb limpio.",
+                 true, true, 0, 0, 0, false, 48.f, 58.f, 60.f, 58.f, 52.f, 55.f,
                  { 0, 2, 4 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 58.f },
-                     { MiAmpParams::chorusOn, 1.f }, { MiAmpParams::chorusRate, 32.f }, { MiAmpParams::chorusDepth, 48.f }, { MiAmpParams::chorusMix, 34.f },
-                     { MiAmpParams::reverbOn, 1.f }, { MiAmpParams::reverbDecay, 46.f }, { MiAmpParams::reverbMix, 22.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 54.f },
+                     { MiAmpParams::chorusOn, 1.f }, { MiAmpParams::chorusRate, 32.f }, { MiAmpParams::chorusDepth, 46.f }, { MiAmpParams::chorusMix, 32.f },
+                     { MiAmpParams::reverbOn, 1.f }, { MiAmpParams::reverbDecay, 44.f }, { MiAmpParams::reverbMix, 20.f }
                  });
 
             add ("stoner doom queens of the stone age kyuss fuzz bass bajo",
                  "Stoner / Doom \u2022 Bajo Fuzz Masivo",
-                 u8"Drop -4 + Poly Octave Sub + MI Olive Fuzz + 8x10 con graves gigantes.",
-                 true, false, -4, 0, 0, false, 64.f, 70.f, 58.f, 48.f, 44.f, 55.f,
+                 u8"Modo SOLO PEDALES: Drop -4 + Poly Octave Sub + MI Olive Fuzz controlado.",
+                 true, true, -4, 0, 0, false, 64.f, 70.f, 58.f, 48.f, 44.f, 55.f,
                  { 0, 12, 8 },
                  {
-                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 56.f },
-                     { MiAmpParams::bassOctOn, 1.f }, { MiAmpParams::bassOctDry, 78.f }, { MiAmpParams::bassOctSub, 62.f },
-                     { MiAmpParams::oliveOn, 1.f }, { MiAmpParams::oliveSustain, 78.f }, { MiAmpParams::oliveTone, 48.f }, { MiAmpParams::oliveMode, 1.f }
+                     { MiAmpParams::compOn, 1.f }, { MiAmpParams::compSustain, 52.f },
+                     { MiAmpParams::bassOctOn, 1.f }, { MiAmpParams::bassOctDry, 78.f }, { MiAmpParams::bassOctSub, 56.f },
+                     { MiAmpParams::oliveOn, 1.f }, { MiAmpParams::oliveSustain, 56.f }, { MiAmpParams::oliveTone, 48.f }, { MiAmpParams::oliveVol, 54.f }, { MiAmpParams::oliveMode, 1.f }
                  });
 
             add ("dual directo solo pedales preamp guitar guitarra",
                  "Dual Crunch \u2022 Solo Pedales (Directo)",
-                 u8"Modo SOLO PEDALES con MI Dual Crunch + Pearl Delay + Studio Reverb sin cabezal.",
+                 u8"Modo SOLO PEDALES con MI Dual Crunch equilibrado + Pearl Delay + Studio Reverb.",
                  false, true, 0, 2, 1, true, 60.f, 54.f, 60.f, 60.f, 60.f, 60.f,
                  { 8, 5, 6 },
                  {
-                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualDrive, 62.f }, { MiAmpParams::gtrDualBlend, 55.f }, { MiAmpParams::gtrDualTone, 58.f }, { MiAmpParams::gtrDualOutput, 60.f },
+                     { MiAmpParams::gtrDualOn, 1.f }, { MiAmpParams::gtrDualGain, 44.f }, { MiAmpParams::gtrDualDrive, 44.f }, { MiAmpParams::gtrDualBlend, 54.f }, { MiAmpParams::gtrDualTone, 55.f }, { MiAmpParams::gtrDualOutput, 54.f },
                      { MiAmpParams::gtrDelayOn, 1.f }, { MiAmpParams::gtrDelayTime, 40.f }, { MiAmpParams::gtrDelayFb, 30.f }, { MiAmpParams::gtrDelayMix, 22.f },
                      { MiAmpParams::gtrReverbOn, 1.f }, { MiAmpParams::gtrReverbDec, 42.f }, { MiAmpParams::gtrReverbMix, 22.f }
                  });
@@ -810,7 +811,7 @@ public:
                                     r.title = parsed.getProperty ("title", query).toString();
                                     r.explanation = parsed.getProperty ("explanation", "Cadena armada con busqueda web en vivo.").toString();
                                     r.bassMode = forBass;
-                                    r.headBypass = static_cast<bool> (parsed.getProperty ("headBypass", false));
+                                    r.headBypass = true; // Siempre arrancar en SOLO PEDALES por defecto; usuario puede activar CON AMPLI luego
                                     r.dropSemi = std::clamp (static_cast<int> (parsed.getProperty ("dropSemi", 0)), -12, 12);
                                     r.gtrChannel = std::clamp (static_cast<int> (parsed.getProperty ("channel", 2)), 0, 2);
                                     r.gtrCab = std::clamp (static_cast<int> (parsed.getProperty ("cab", 1)), 0, 4);
@@ -888,9 +889,63 @@ public:
 
         proc.setActiveChain (r.bassMode, r.chainSlots);
 
+        // Turn OFF every pedal of the active instrument before applying the ToneFinder overrides
+        // so leftover pedals from earlier chains never stack extra distortion/gain.
+        if (r.bassMode)
+        {
+            for (const char* pid : { MiAmpParams::compOn, MiAmpParams::xvOn, MiAmpParams::chorusOn,
+                                     MiAmpParams::phaserOn, MiAmpParams::reverbOn, MiAmpParams::bddiOn,
+                                     MiAmpParams::goldOn, MiAmpParams::bfOn, MiAmpParams::oliveOn,
+                                     MiAmpParams::bassFlangeOn, MiAmpParams::bassDelayOn, MiAmpParams::bassGateOn,
+                                     MiAmpParams::bassOctOn, MiAmpParams::bassEqOn })
+                proc.setParamNormalized (pid, 0.0f);
+        }
+        else
+        {
+            for (const char* pid : { MiAmpParams::gtrCompOn, MiAmpParams::gtrDriveOn, MiAmpParams::gtrFuzzOn,
+                                     MiAmpParams::gtrChorusOn, MiAmpParams::gtrPhaserOn, MiAmpParams::gtrDelayOn,
+                                     MiAmpParams::gtrReverbOn, MiAmpParams::gtrDistOn, MiAmpParams::gtrDualOn,
+                                     MiAmpParams::gtrFlangeOn, MiAmpParams::gtrGateOn, MiAmpParams::gtrOctOn,
+                                     MiAmpParams::gtrEqOn })
+                proc.setParamNormalized (pid, 0.0f);
+        }
+
         for (const auto& ov : r.overrides)
             if (ov.paramId != nullptr)
                 proc.setParamNormalized (ov.paramId, ov.value);
+
+        // If a slot has no explicit *On override (e.g. from Gemini JSON), enable it cleanly
+        for (int pt : r.chainSlots)
+        {
+            const char* onId = nullptr;
+            if (r.bassMode)
+            {
+                static constexpr const char* kBOn[14] = {
+                    MiAmpParams::compOn, MiAmpParams::xvOn, MiAmpParams::chorusOn, MiAmpParams::phaserOn,
+                    MiAmpParams::reverbOn, MiAmpParams::bddiOn, MiAmpParams::goldOn, MiAmpParams::bfOn,
+                    MiAmpParams::oliveOn, MiAmpParams::bassFlangeOn, MiAmpParams::bassDelayOn,
+                    MiAmpParams::bassGateOn, MiAmpParams::bassOctOn, MiAmpParams::bassEqOn
+                };
+                if (pt >= 0 && pt < 14) onId = kBOn[pt];
+            }
+            else
+            {
+                static constexpr const char* kGOn[13] = {
+                    MiAmpParams::gtrCompOn, MiAmpParams::gtrDriveOn, MiAmpParams::gtrFuzzOn, MiAmpParams::gtrChorusOn,
+                    MiAmpParams::gtrPhaserOn, MiAmpParams::gtrDelayOn, MiAmpParams::gtrReverbOn, MiAmpParams::gtrDistOn,
+                    MiAmpParams::gtrDualOn, MiAmpParams::gtrFlangeOn, MiAmpParams::gtrGateOn, MiAmpParams::gtrOctOn,
+                    MiAmpParams::gtrEqOn
+                };
+                if (pt >= 0 && pt < 13) onId = kGOn[pt];
+            }
+            if (onId != nullptr)
+            {
+                const bool hasExplicit = std::any_of (r.overrides.begin(), r.overrides.end(),
+                    [onId](const ParamOverride& o) { return o.paramId != nullptr && std::strcmp (o.paramId, onId) == 0; });
+                if (! hasExplicit)
+                    proc.setParamNormalized (onId, 1.0f);
+            }
+        }
 
         proc.setActivePresetName (r.bassMode, r.title);
     }
