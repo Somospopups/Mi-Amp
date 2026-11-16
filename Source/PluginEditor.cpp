@@ -1086,6 +1086,22 @@ public:
         presetViewport.setScrollBarsShown (true, false);
         presetViewport.setScrollBarThickness (6);
 
+        // In-app MI AMP Glass Export Format sub-view (replaces OS PopupMenu)
+        addChildComponent (btnExportBack);
+        btnExportBack.setComponentID ("presetExportBack");
+        btnExportBack.setButtonText (juce::String::fromUTF8 (u8"\u2190 VOLVER"));
+        btnExportBack.onClick = [this]
+        {
+            presetExportSubView = false;
+            exportStatusMsg.clear();
+            setKind (kind, tuner);
+        };
+
+        addChildComponent (exportViewport);
+        exportViewport.setViewedComponent (&exportListHolder, false);
+        exportViewport.setScrollBarsShown (true, false);
+        exportViewport.setScrollBarThickness (6);
+
         // Drop
         addChildComponent (btnDropToggle);
         btnDropToggle.onClick = [this]
@@ -1347,9 +1363,16 @@ public:
 
     void setKind (PopoverKind k, const xvdsp::TunerReading& tr)
     {
+        if (k != PopoverKind::Presets)
+        {
+            presetExportSubView = false;
+            exportStatusMsg.clear();
+        }
         kind = k;
         tuner = tr;
         const bool isP  = (k == PopoverKind::Presets);
+        const bool isPList   = isP && ! presetExportSubView;
+        const bool isPExport = isP && presetExportSubView;
         const bool isD  = (k == PopoverKind::Drop);
         const bool isT  = (k == PopoverKind::Tuner);
         const bool isC  = (k == PopoverKind::Config);
@@ -1373,10 +1396,12 @@ public:
             }
         }
 
-        presetNameEdit.setVisible (isP);
-        btnSavePreset.setVisible (isP);
-        btnImportPreset.setVisible (isP);
-        presetViewport.setVisible (isP);
+        presetNameEdit.setVisible (isPList);
+        btnSavePreset.setVisible (isPList);
+        btnImportPreset.setVisible (isPList);
+        presetViewport.setVisible (isPList);
+        btnExportBack.setVisible (isPExport);
+        exportViewport.setVisible (isPExport);
 
         btnDropToggle.setVisible (showDrop);
         for (auto& c : dropChips) c.setVisible (showDrop);
@@ -1439,8 +1464,10 @@ public:
         g.setColour (inkColour());
         g.setFont (sansFont (16.0f, juce::Font::bold));
         juce::String title = (kind == PopoverKind::Presets)
-                                ? (processor.isBassMode() ? juce::String::fromUTF8 (u8"PRESETS \u00b7 BAJO")
-                                                          : juce::String::fromUTF8 (u8"PRESETS \u00b7 GUITARRA"))
+                                ? (presetExportSubView
+                                    ? juce::String ("EXPORTAR PRESET")
+                                    : (processor.isBassMode() ? juce::String::fromUTF8 (u8"PRESETS \u00b7 BAJO")
+                                                              : juce::String::fromUTF8 (u8"PRESETS \u00b7 GUITARRA")))
                            : (kind == PopoverKind::Drop)       ? "DROP TUNER"
                            : (kind == PopoverKind::Config)     ? juce::String::fromUTF8 (u8"CONFIGURACI\u00d3N")
                            : (kind == PopoverKind::ToneFinder) ? (processor.isBassMode() ? juce::String::fromUTF8 (u8"BUSCAR TONO \u00b7 BAJO")
@@ -1452,12 +1479,41 @@ public:
         {
             const float bx = 18.0f;
             const float bw = static_cast<float> (getWidth()) - 36.0f;
-            const float bottom = static_cast<float> (getHeight()) - 14.0f;
-            g.setFont (sansFont (10.0f, juce::Font::bold));
-            g.setColour (juce::Colour::fromRGBA (244, 234, 217, 184)); // #f4ead9b8
-            g.drawText ("GUARDAR PRESET",
-                        juce::Rectangle<float> (bx, bottom - 102.0f, bw, 16.0f),
-                        juce::Justification::centredLeft);
+            if (presetExportSubView)
+            {
+                g.setFont (sansFont (11.5f, juce::Font::bold));
+                g.setColour (juce::Colour::fromRGB (247, 211, 138));
+                g.drawFittedText (exportTargetName + (exportTargetIsBass ? " (BAJO)" : " (GUITARRA)"),
+                                  juce::Rectangle<int> (18, 46, getWidth() - 120, 22),
+                                  juce::Justification::centredLeft, 1);
+
+                g.setFont (sansFont (10.0f));
+                g.setColour (juce::Colour::fromRGBA (244, 234, 217, 175));
+                g.drawText (juce::String::fromUTF8 (u8"Eleg\u00ed el formato para tu pedalera o DAW:"),
+                            juce::Rectangle<float> (bx, 68.0f, bw, 15.0f),
+                            juce::Justification::centredLeft);
+
+                if (exportStatusMsg.isNotEmpty())
+                {
+                    const float footY = static_cast<float> (getHeight()) - 32.0f;
+                    g.setColour (juce::Colour::fromRGBA (141, 224, 184, 38));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (bx, footY, bw, 22.0f), 6.0f);
+                    g.setColour (juce::Colour::fromRGB (166, 223, 201));
+                    g.setFont (sansFont (10.5f, juce::Font::bold));
+                    g.drawFittedText (exportStatusMsg,
+                                      juce::Rectangle<int> (static_cast<int> (bx) + 6, static_cast<int> (footY), static_cast<int> (bw) - 12, 22),
+                                      juce::Justification::centredLeft, 1);
+                }
+            }
+            else
+            {
+                const float bottom = static_cast<float> (getHeight()) - 14.0f;
+                g.setFont (sansFont (10.0f, juce::Font::bold));
+                g.setColour (juce::Colour::fromRGBA (244, 234, 217, 184)); // #f4ead9b8
+                g.drawText ("GUARDAR PRESET",
+                            juce::Rectangle<float> (bx, bottom - 102.0f, bw, 16.0f),
+                            juce::Justification::centredLeft);
+            }
         }
         else if (kind == PopoverKind::Drop)
         {
@@ -1651,16 +1707,26 @@ public:
 
         if (kind == PopoverKind::Presets)
         {
-            auto importRow = inner.removeFromBottom (26);
-            btnImportPreset.setBounds (importRow);
-            inner.removeFromBottom (10);
-            auto saveRow = inner.removeFromBottom (41);
-            btnSavePreset.setBounds (saveRow.removeFromRight (80));
-            saveRow.removeFromRight (6);
-            presetNameEdit.setBounds (saveRow);
-            inner.removeFromBottom (29); // space for GUARDAR PRESET section title (5px gap)
-            presetViewport.setBounds (inner);
-            layoutPresetButtons();
+            if (presetExportSubView)
+            {
+                btnExportBack.setBounds (getWidth() - 98, 44, 80, 24);
+                const int bottomTrim = exportStatusMsg.isNotEmpty() ? 38 : 14;
+                exportViewport.setBounds (18, 88, getWidth() - 36, juce::jmax (40, getHeight() - 88 - bottomTrim));
+                layoutExportCards();
+            }
+            else
+            {
+                auto importRow = inner.removeFromBottom (26);
+                btnImportPreset.setBounds (importRow);
+                inner.removeFromBottom (10);
+                auto saveRow = inner.removeFromBottom (41);
+                btnSavePreset.setBounds (saveRow.removeFromRight (80));
+                saveRow.removeFromRight (6);
+                presetNameEdit.setBounds (saveRow);
+                inner.removeFromBottom (29); // space for GUARDAR PRESET section title (5px gap)
+                presetViewport.setBounds (inner);
+                layoutPresetButtons();
+            }
         }
         else if (kind == PopoverKind::Drop)
         {
@@ -1809,17 +1875,11 @@ private:
         presetListHolder.removeAllChildren();
 
         auto addRow = [this] (const juce::String& text, bool isActive, bool isUserRow,
-                              std::function<void()> applyOnly,
+                              std::function<void()> openExportCb,
                               std::function<void()> onLoad, std::function<void()> onDel)
         {
             auto row = std::make_unique<PresetRow> (text, isActive, isUserRow, std::move (onLoad), std::move (onDel));
-            auto* rowPtr = row.get();
-            row->onExport = [this, text, applyOnly, rowPtr]
-            {
-                if (applyOnly) applyOnly();
-                if (changedFn) changedFn();
-                showExportFormatMenu (text, &rowPtr->btnExport);
-            };
+            row->onExport = std::move (openExportCb);
             presetListHolder.addAndMakeVisible (*row);
             presetRows.push_back (std::move (row));
         };
@@ -1831,15 +1891,29 @@ private:
             for (int i = 0; i < static_cast<int> (userList.size()); ++i)
             {
                 const auto& up = userList[static_cast<size_t> (i)];
-                addRow (up.name, up.name == activeName, true,
-                    [this, i] { processor.loadUserPreset (i); },
+                const bool isAct = (up.name == activeName);
+                addRow (up.name, isAct, true,
+                    [this, up, isAct]
+                    {
+                        auto bs = isAct ? processor.getBassSnapshot()
+                                        : mipedals::PresetExporter::snapshotFromBassPreset (processor, up);
+                        openExportView (up.name, true, bs, processor.getGuitarSnapshot(),
+                                        [this, up, isAct]() { if (! isAct) processor.applyPreset (up); });
+                    },
                     [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
             }
             for (const auto& fp : MiAmpAudioProcessor::getFactoryPresets())
             {
-                addRow (fp.name, fp.name == activeName, false,
-                    [this, fp] { processor.applyPreset (fp); },
+                const bool isAct = (fp.name == activeName);
+                addRow (fp.name, isAct, false,
+                    [this, fp, isAct]
+                    {
+                        auto bs = isAct ? processor.getBassSnapshot()
+                                        : mipedals::PresetExporter::snapshotFromBassPreset (processor, fp);
+                        openExportView (fp.name, true, bs, processor.getGuitarSnapshot(),
+                                        [this, fp, isAct]() { if (! isAct) processor.applyPreset (fp); });
+                    },
                     [this, fp] { processor.applyPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     nullptr);
             }
@@ -1850,15 +1924,29 @@ private:
             for (int i = 0; i < static_cast<int> (userList.size()); ++i)
             {
                 const auto& up = userList[static_cast<size_t> (i)];
-                addRow (up.name, up.name == activeName, true,
-                    [this, i] { processor.loadUserPreset (i); },
+                const bool isAct = (up.name == activeName);
+                addRow (up.name, isAct, true,
+                    [this, up, isAct]
+                    {
+                        auto gs = isAct ? processor.getGuitarSnapshot()
+                                        : mipedals::PresetExporter::snapshotFromGuitarPreset (processor, up);
+                        openExportView (up.name, false, processor.getBassSnapshot(), gs,
+                                        [this, up, isAct]() { if (! isAct) processor.applyGuitarPreset (up); });
+                    },
                     [this, i] { processor.loadUserPreset (i); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     [this, i] { processor.deleteUserPreset (i); rebuildPresetList(); });
             }
             for (const auto& fp : MiAmpAudioProcessor::getGuitarFactoryPresets())
             {
-                addRow (fp.name, fp.name == activeName, false,
-                    [this, fp] { processor.applyGuitarPreset (fp); },
+                const bool isAct = (fp.name == activeName);
+                addRow (fp.name, isAct, false,
+                    [this, fp, isAct]
+                    {
+                        auto gs = isAct ? processor.getGuitarSnapshot()
+                                        : mipedals::PresetExporter::snapshotFromGuitarPreset (processor, fp);
+                        openExportView (fp.name, false, processor.getBassSnapshot(), gs,
+                                        [this, fp, isAct]() { if (! isAct) processor.applyGuitarPreset (fp); });
+                    },
                     [this, fp] { processor.applyGuitarPreset (fp); if (changedFn) changedFn(); if (closeFn) closeFn(); },
                     nullptr);
             }
@@ -1867,51 +1955,225 @@ private:
         layoutPresetButtons();
     }
 
-    void showExportFormatMenu (const juce::String& presetName, juce::Component* target)
+    struct ExportOptionSpec
     {
-        juce::PopupMenu m;
-        m.addSectionHeader (juce::String::fromUTF8 (u8"\u00bfEn qu\u00e9 formato quer\u00e9s descargarlo?"));
-        m.addItem (1, "IR Cabina + EQ (.wav 44.1kHz 24-bit) - M-Vave Blackbox / Universal");
-        m.addItem (2, "Line 6 Helix / HX Stomp / POD Go (.hlx)");
-        m.addItem (3, "Headrush (.rig)");
-        m.addItem (4, juce::String::fromUTF8 (u8"Gu\u00eda M-Vave Blackbox y Pedaleras (.txt)"));
-        m.addSeparator();
-        m.addItem (5, "Preset Portable MI AMP (.miamp)");
+        mipedals::ExportFormat fmt;
+        const char* ext;
+        const char* title;
+        const char* subtitle;
+        const char* badge;
+        bool highlight = false;
+    };
+
+    struct ExportFormatCard final : public juce::Component
+    {
+        ExportFormatCard (const ExportOptionSpec& s, std::function<void()> onClickFn)
+            : spec (s), onClick (std::move (onClickFn))
+        {
+            setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        }
+
+        void mouseEnter (const juce::MouseEvent&) override { hovered = true; repaint(); }
+        void mouseExit  (const juce::MouseEvent&) override { hovered = false; repaint(); }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (getLocalBounds().contains (e.getPosition()) && onClick)
+                onClick();
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            const auto bgTop = hovered ? juce::Colour::fromRGBA (255, 248, 228, 48)
+                                       : (spec.highlight ? juce::Colour::fromRGBA (247, 211, 138, 32)
+                                                         : juce::Colour::fromRGBA (255, 255, 255, 24));
+            const auto bgBot = hovered ? juce::Colour::fromRGBA (255, 240, 200, 22)
+                                       : juce::Colour::fromRGBA (255, 255, 255, 10);
+            juce::ColourGradient grad (bgTop, r.getX(), r.getY(), bgBot, r.getX(), r.getBottom(), false);
+            g.setGradientFill (grad);
+            g.fillRoundedRectangle (r, 9.0f);
+
+            g.setColour (hovered ? juce::Colour::fromRGB (194, 236, 212)
+                                 : (spec.highlight ? juce::Colour::fromRGBA (247, 211, 138, 165)
+                                                   : juce::Colour::fromRGBA (241, 224, 190, 90)));
+            g.drawRoundedRectangle (r, 9.0f, hovered ? 1.5f : 1.0f);
+
+            // Right extension badge
+            const auto badgeR = juce::Rectangle<float> (r.getRight() - 62.0f, r.getY() + 9.0f, 54.0f, 20.0f);
+            g.setColour (spec.highlight ? juce::Colour::fromRGBA (247, 211, 138, 46)
+                                        : juce::Colour::fromRGBA (166, 223, 201, 34));
+            g.fillRoundedRectangle (badgeR, 5.0f);
+            g.setColour (spec.highlight ? juce::Colour::fromRGB (247, 211, 138)
+                                        : juce::Colour::fromRGB (166, 223, 201));
+            g.setFont (sansFont (9.5f, juce::Font::bold));
+            g.drawText (juce::String::fromUTF8 (spec.ext), badgeR, juce::Justification::centred);
+
+            // Title & subtitle
+            const float textW = r.getWidth() - 78.0f;
+            g.setColour (juce::Colour::fromRGB (252, 246, 235));
+            g.setFont (sansFont (11.5f, juce::Font::bold));
+            g.drawFittedText (juce::String::fromUTF8 (spec.title),
+                              juce::Rectangle<int> (10, 6, static_cast<int> (textW), 16),
+                              juce::Justification::centredLeft, 1);
+
+            g.setColour (juce::Colour::fromRGBA (241, 228, 205, 195));
+            g.setFont (sansFont (9.5f));
+            g.drawFittedText (juce::String::fromUTF8 (spec.subtitle),
+                              juce::Rectangle<int> (10, 23, static_cast<int> (textW), 14),
+                              juce::Justification::centredLeft, 1);
+        }
+
+        ExportOptionSpec spec;
+        std::function<void()> onClick;
+        bool hovered = false;
+    };
+
+    struct ProprietaryNoteLabel final : public juce::Component
+    {
+        void paint (juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            g.setColour (juce::Colour::fromRGBA (20, 24, 22, 130));
+            g.fillRoundedRectangle (r, 8.0f);
+            g.setColour (juce::Colour::fromRGBA (241, 224, 190, 55));
+            g.drawRoundedRectangle (r, 8.0f, 1.0f);
+            g.setColour (juce::Colour::fromRGBA (241, 228, 205, 170));
+            g.setFont (sansFont (9.2f));
+            g.drawFittedText (
+                juce::String::fromUTF8 (u8"Nota: Kemper (.kipr), Neural Capture, IK TONEX y Fractal son formatos cerrados propietarios; us\u00e1 .nam o .aidax como puente."),
+                getLocalBounds().reduced (8, 5), juce::Justification::centredLeft, 3);
+        }
+    };
+
+    void openExportView (const juce::String& presetName,
+                         bool targetIsBass,
+                         const miamp::BassControlSnapshot& bassSnap,
+                         const zenbox::GuitarControlSnapshot& gtrSnap,
+                         std::function<void()> applyForMiAmpXml)
+    {
+        exportTargetName     = presetName;
+        exportTargetIsBass   = targetIsBass;
+        exportTargetBassSnap = bassSnap;
+        exportTargetGtrSnap  = gtrSnap;
+        exportApplyForXml    = std::move (applyForMiAmpXml);
+        exportStatusMsg.clear();
+        presetExportSubView  = true;
+
+        rebuildExportCards();
+        setKind (PopoverKind::Presets, tuner);
+    }
+
+    void rebuildExportCards()
+    {
+        exportCards.clear();
+        exportPropNote.reset();
+        exportListHolder.removeAllChildren();
+
+        static const ExportOptionSpec kSpecs[] = {
+            { mipedals::ExportFormat::NamA2,        ".nam",   u8"NAM A2 \u00b7 M-Vave / TONE3000",   u8"Lite 3ch + Full 8ch \u00b7 JuiceBox & ANNlab", "A2", true },
+            { mipedals::ExportFormat::NamA1,        ".nam",   u8"NAM A1 \u00b7 WaveNet Est\u00e1ndar", u8"Neural Amp Modeler cl\u00e1sico (48 kHz)",      "A1", false },
+            { mipedals::ExportFormat::NamLstm,      ".nam",   u8"NAM \u00b7 LSTM Ligero",           u8"Baja latencia / consumo m\u00ednimo CPU",      "LSTM", false },
+            { mipedals::ExportFormat::AidaX,        ".aidax", u8"AIDA-X \u00b7 MOD Dwarf / Genome", u8"RTNeural Keras LSTM-12",                       "AIDA", false },
+            { mipedals::ExportFormat::ProteusJson,  ".json",  u8"GuitarML Proteus",                 u8"Proteus Capture Player (LSTM-40)",             "PROT", false },
+            { mipedals::ExportFormat::NeuralPiJson, ".json",  u8"GuitarML NeuralPi",                u8"NeuralPi / Raspberry Pi (LSTM-20)",            "NPI",  false },
+            { mipedals::ExportFormat::IrWav24_44k,  ".wav",   u8"M-Vave Blackbox \u00b7 IR Cabina", u8"44.1 kHz / 24-bit mono (IR CAB + EQ)",         "IR",   false },
+            { mipedals::ExportFormat::BlackboxTxt,  ".txt",   u8"M-Vave Blackbox \u00b7 Gu\u00eda",  u8"Mapeo de m\u00f3dulos y perillas",             "TXT",  false },
+            { mipedals::ExportFormat::HelixHlx,     ".hlx",   u8"Line 6 Helix / HX Stomp",          u8"Preset JSON v6 compatible POD Go",             "HLX",  false },
+            { mipedals::ExportFormat::HeadrushRig,  ".rig",   u8"HeadRush Pedalboard",              u8"Rig JSON (Amp + Cab + FX)",                    "RIG",  false },
+            { mipedals::ExportFormat::MiAmpXml,     ".miamp", u8"MI AMP \u00b7 Backup Portable",    u8"Preset completo importable en MI AMP",         "XML",  false }
+        };
+
+        for (const auto& sp : kSpecs)
+        {
+            auto card = std::make_unique<ExportFormatCard> (sp, [this, sp]
+            {
+                triggerFormatExport (sp.fmt, juce::String::fromUTF8 (sp.ext));
+            });
+            exportListHolder.addAndMakeVisible (*card);
+            exportCards.push_back (std::move (card));
+        }
+
+        exportPropNote = std::make_unique<ProprietaryNoteLabel>();
+        exportListHolder.addAndMakeVisible (*exportPropNote);
+        layoutExportCards();
+    }
+
+    void triggerFormatExport (mipedals::ExportFormat fmt, const juce::String& ext)
+    {
+        const juce::String clean = mipedals::PresetExporter::sanitizeFileName (exportTargetName);
+        const auto initFile = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                                  .getChildFile (clean + ext);
 
         juce::Component::SafePointer<GlassPopover> safeThis (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (target),
-            [safeThis, presetName] (int choice)
+        activeChooser = std::make_unique<juce::FileChooser> (
+            "Exportar " + exportTargetName + " (" + ext + ")",
+            initFile,
+            "*" + ext);
+        activeChooser->launchAsync (
+            juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+            [safeThis, fmt, ext] (const juce::FileChooser& fc)
             {
-                if (safeThis == nullptr || choice <= 0)
-                    return;
+                if (safeThis == nullptr) return;
+                const auto out = fc.getResult();
+                if (out.getFullPathName().isEmpty()) return;
 
-                const juce::String clean = mipedals::PresetExporter::sanitizeFileName (presetName);
-                const char* ext = (choice == 1) ? ".wav"
-                                : (choice == 2) ? ".hlx"
-                                : (choice == 3) ? ".rig"
-                                : (choice == 4) ? ".txt"
-                                                : ".miamp";
-                const auto initFile = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                                          .getChildFile (clean + ext);
-                safeThis->activeChooser = std::make_unique<juce::FileChooser> (
-                    "Descargar preset para pedalera (" + juce::String (ext) + ")",
-                    initFile,
-                    "*" + juce::String (ext));
-                safeThis->activeChooser->launchAsync (
-                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                    [safeThis, choice, presetName] (const juce::FileChooser& fc)
-                    {
-                        if (safeThis == nullptr) return;
-                        const auto out = fc.getResult();
-                        if (out.getFullPathName().isEmpty()) return;
+                bool ok = false;
+                float esr = -1.0f;
+                const bool bass = safeThis->exportTargetIsBass;
+                const auto& bs  = safeThis->exportTargetBassSnap;
+                const auto& gs  = safeThis->exportTargetGtrSnap;
+                const auto& nm  = safeThis->exportTargetName;
 
-                        if (choice == 1)      mipedals::PresetExporter::exportIrWav44k24Bit (safeThis->processor, out);
-                        else if (choice == 2) mipedals::PresetExporter::exportHelixHlx (safeThis->processor, presetName, out);
-                        else if (choice == 3) mipedals::PresetExporter::exportHeadrushRig (safeThis->processor, presetName, out);
-                        else if (choice == 4) mipedals::PresetExporter::exportBlackboxGuideTxt (safeThis->processor, presetName, out);
-                        else if (choice == 5) mipedals::PresetExporter::exportMiAmpXml (safeThis->processor, presetName, out);
-                    });
+                switch (fmt)
+                {
+                    case mipedals::ExportFormat::NamA2:        ok = mipedals::PresetExporter::exportNamA2 (bass, bs, gs, nm, out, &esr); break;
+                    case mipedals::ExportFormat::NamA1:        ok = mipedals::PresetExporter::exportNamA1 (bass, bs, gs, nm, out, &esr); break;
+                    case mipedals::ExportFormat::NamLstm:      ok = mipedals::PresetExporter::exportNamLstm (bass, bs, gs, nm, out, &esr); break;
+                    case mipedals::ExportFormat::AidaX:        ok = mipedals::PresetExporter::exportAidaX (bass, bs, gs, nm, out, &esr); break;
+                    case mipedals::ExportFormat::ProteusJson:  ok = mipedals::PresetExporter::exportGuitarMlJson (bass, bs, gs, 40, out, &esr); break;
+                    case mipedals::ExportFormat::NeuralPiJson: ok = mipedals::PresetExporter::exportGuitarMlJson (bass, bs, gs, 20, out, &esr); break;
+                    case mipedals::ExportFormat::IrWav24_44k:  ok = mipedals::PresetExporter::exportIrWav44k24Bit (bass, bs, gs, out); break;
+                    case mipedals::ExportFormat::BlackboxTxt:  ok = mipedals::PresetExporter::exportBlackboxGuide (bass, bs, gs, nm, out); break;
+                    case mipedals::ExportFormat::HelixHlx:     ok = mipedals::PresetExporter::exportHelixHlx (bass, bs, gs, nm, out); break;
+                    case mipedals::ExportFormat::HeadrushRig:  ok = mipedals::PresetExporter::exportHeadrushRig (bass, bs, gs, nm, out); break;
+                    case mipedals::ExportFormat::MiAmpXml:
+                        if (safeThis->exportApplyForXml) safeThis->exportApplyForXml();
+                        if (safeThis->changedFn) safeThis->changedFn();
+                        ok = mipedals::PresetExporter::exportMiAmpXml (safeThis->processor, nm, out);
+                        break;
+                }
+
+                if (ok)
+                {
+                    safeThis->exportStatusMsg = juce::String::fromUTF8 (u8"\u00a1Exportado! ") + out.getFileName();
+                    if (esr >= 0.0f)
+                        safeThis->exportStatusMsg += " (ESR " + juce::String (esr, 2) + ")";
+                }
+                else
+                {
+                    safeThis->exportStatusMsg = "Error al guardar el archivo.";
+                }
+                safeThis->resized();
+                safeThis->repaint();
             });
+    }
+
+    void layoutExportCards()
+    {
+        const int vw = juce::jmax (160, exportViewport.getWidth() - 10);
+        const int cardH = 44;
+        int y = 0;
+        for (auto& c : exportCards)
+        {
+            c->setBounds (0, y, vw, cardH - 4);
+            y += cardH;
+        }
+        if (exportPropNote != nullptr)
+        {
+            exportPropNote->setBounds (0, y + 2, vw, 44);
+            y += 50;
+        }
+        exportListHolder.setSize (vw, juce::jmax (10, y));
     }
 
     void layoutPresetButtons()
@@ -2092,6 +2354,18 @@ private:
     juce::Component presetListHolder;
     std::vector<std::unique_ptr<PresetRow>> presetRows;
     std::unique_ptr<juce::FileChooser> activeChooser;
+
+    bool presetExportSubView = false;
+    juce::TextButton btnExportBack;
+    juce::Viewport exportViewport;
+    juce::Component exportListHolder;
+    std::vector<std::unique_ptr<ExportFormatCard>> exportCards;
+    std::unique_ptr<ProprietaryNoteLabel> exportPropNote;
+    juce::String exportTargetName, exportStatusMsg;
+    bool exportTargetIsBass = false;
+    miamp::BassControlSnapshot exportTargetBassSnap;
+    zenbox::GuitarControlSnapshot exportTargetGtrSnap;
+    std::function<void()> exportApplyForXml;
 
     juce::TextButton btnDropToggle;
     juce::TextButton dropChips[6];
