@@ -88,7 +88,21 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMIAMP_BUILD_NUMBER=${{ github.run_number }}
 
       - name: Build Plugin (AU + VST3 + Standalone)
-        run: cmake --build build --config Release --parallel
+        run: |
+          set -o pipefail
+          if ! cmake --build build --config Release --parallel 2>&1 | tee macos_build.log; then
+            ERR=$(grep -E "error:|fatal error:|Undefined symbols|ld:|clang:|make\[" macos_build.log | tail -n 12 | tr '\n' ' ')
+            echo "::error::macOS build failed: ${ERR}"
+            tail -n 80 macos_build.log
+            exit 1
+          fi
+
+      - name: Upload macOS Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Build-Log
+          path: macos_build.log
 
       - name: Ad-hoc Code Sign & Package macOS (.pkg + .dmg)
         run: |

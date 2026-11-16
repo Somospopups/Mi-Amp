@@ -169,7 +169,7 @@ target_link_libraries(MiAmp
         juce::juce_graphics
     PUBLIC
         juce::juce_recommended_config_flags
-        juce::juce_recommended_lto_flags
+        $<$<NOT:$<PLATFORM_ID:Darwin>>:juce::juce_recommended_lto_flags>
         juce::juce_recommended_warning_flags
 )
 
