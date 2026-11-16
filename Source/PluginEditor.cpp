@@ -3792,27 +3792,6 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, static_cast<uint8_t> (102.0f * uiAlpha)));
     g.drawRoundedRectangle (swBox, 8.0f * s, 1.0f);
 
-    // Subtle banner in Head View when SOLO PEDALES (Head Bypass) is active
-    if (audioProcessor.isHeadBypassed (bass))
-    {
-        auto bR = toScreen (465, 25, 620, 34);
-        paintGlassPanel (g, bR, 12.0f, uiAlpha);
-        g.setColour (mintBorder().withAlpha (uiAlpha));
-        g.setFont (sansFont (juce::jmax (10.0f, 12.0f * s), juce::Font::bold));
-        g.drawText ("MODO SOLO PEDALES ACTIVO (CABEZAL EN BYPASS)", bR, juce::Justification::centred);
-    }
-
-    if (miamp_standalone::isRunningStandalone() && miamp_standalone::isAudioInputMuted())
-    {
-        const float ay = audioProcessor.isHeadBypassed (bass) ? 66.0f : 25.0f;
-        auto aR = toScreen (465, ay, 620, 30);
-        paintGlassPanel (g, aR, 10.0f, uiAlpha);
-        g.setColour (juce::Colour::fromRGB (247, 211, 138).withAlpha (uiAlpha));
-        g.setFont (sansFont (juce::jmax (9.5f, 11.2f * s), juce::Font::bold));
-        g.drawText (juce::String::fromUTF8 (u8"ENTRADA SILENCIADA (SIN INTERFAZ) \u00b7 CLIC PARA ELEGIR PLACA"),
-                    aR, juce::Justification::centred);
-    }
-
     // Integrated status LED + IN / OUT meters inside right panel (1305, 276, 195, 37)
     auto meterBox = toScreen (1305, 276, 195, 37);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, static_cast<uint8_t> (16.0f * uiAlpha)));
@@ -4254,23 +4233,6 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
         {
             audioProcessor.isClipping.store (false, std::memory_order_relaxed);
             return;
-        }
-        // Banner click in Head View jumps to Pedals floor view
-        if (audioProcessor.isHeadBypassed (bass) && juce::Rectangle<float> (465, 25, 620, 34).contains (stagePt))
-        {
-            setFloorMode (true);
-            return;
-        }
-        // Standalone muted-input banner click opens Audio/Interface settings
-        if (miamp_standalone::isRunningStandalone() && miamp_standalone::isAudioInputMuted())
-        {
-            const float ay = audioProcessor.isHeadBypassed (bass) ? 66.0f : 25.0f;
-            if (juce::Rectangle<float> (465, ay, 620, 30).contains (stagePt))
-            {
-                miamp_standalone::openAudioSettingsDialog();
-                repaint();
-                return;
-            }
         }
         // Close open popover if clicking outside it
         if (activePopover != PopoverKind::None)
