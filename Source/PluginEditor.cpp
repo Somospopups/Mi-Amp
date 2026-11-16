@@ -1473,25 +1473,25 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
-            g.setFont (sansFont (11.0f, juce::Font::bold));
+            g.setFont (sansFont (10.5f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.88f));
-            const float x = inner.getX();
-            const float w = inner.getWidth();
-            g.drawText ("MODO DE RUTA", juce::Rectangle<float> (x, inner.getY() + 2.0f, w, 15.0f), juce::Justification::centredLeft);
-            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, inner.getY() + 56.0f, w, 15.0f), juce::Justification::centredLeft);
+            const float x = 18.0f;
+            const float w = static_cast<float> (getWidth()) - 36.0f;
+            g.drawText ("MODO DE RUTA", juce::Rectangle<float> (x, 44.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText (bass ? "CABINA 8x10" : "CABINA DE GUITARRA", juce::Rectangle<float> (x, 92.0f, w, 14.0f), juce::Justification::centredLeft);
             if (! bass)
             {
-                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, inner.getY() + 140.0f, w, 15.0f), juce::Justification::centredLeft);
-                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, inner.getY() + 220.0f, w, 15.0f), juce::Justification::centredLeft);
-                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, inner.getY() + 264.0f, w, 15.0f), juce::Justification::centredLeft);
+                g.drawText ("CANAL DEL CABEZAL", juce::Rectangle<float> (x, 165.0f, w, 14.0f), juce::Justification::centredLeft);
+                g.drawText ("NOISE GATE",        juce::Rectangle<float> (x, 238.0f, w, 14.0f), juce::Justification::centredLeft);
+                g.drawText ("INPUT TRIM",        juce::Rectangle<float> (x, 278.0f, w, 14.0f), juce::Justification::centredLeft);
             }
-            const float keyY = static_cast<float> (getHeight()) - 68.0f;
-            g.drawText ("GEMINI AI KEY (OPCIONAL / WEB EN VIVO)", juce::Rectangle<float> (x, keyY, w, 15.0f), juce::Justification::centredLeft);
+            const float keyY = bass ? 156.0f : 322.0f;
+            g.drawText ("GEMINI AI KEY (OPCIONAL)", juce::Rectangle<float> (x, keyY, w, 14.0f), juce::Justification::centredLeft);
             if (tfStatusMsg.isNotEmpty())
             {
                 g.setFont (sansFont (10.0f));
                 g.setColour (mintBorder().withAlpha (0.9f));
-                g.drawText (tfStatusMsg, juce::Rectangle<float> (x, keyY + 46.0f, w, 15.0f), juce::Justification::centredLeft);
+                g.drawText (tfStatusMsg, juce::Rectangle<float> (x, keyY + 48.0f, w, 15.0f), juce::Justification::centredLeft);
             }
         }
         else if (kind == PopoverKind::ToneFinder)
@@ -1573,36 +1573,38 @@ public:
             const bool active = tuner.hasSignal && tuner.freqHz > 20.0f;
             const bool inTune = active && std::fabs (tuner.cents) < 6.0f;
             const juce::String noteStr = active ? MiAmpAudioProcessorEditor::formatNoteName (tuner.noteName, tuner.octave, useSolfege) : "--";
+            const float x = 18.0f;
+            const float w = static_cast<float> (getWidth()) - 36.0f;
 
-            g.setFont (sansFont (useSolfege ? 32.0f : 38.0f, juce::Font::bold));
+            g.setFont (sansFont (useSolfege ? 26.0f : 31.0f, juce::Font::bold));
             g.setColour (active ? (inTune ? mintBorder() : inkColour()) : inkColour().withAlpha (0.55f));
-            g.drawText (noteStr, inner.removeFromTop (42.0f), juce::Justification::centred);
+            g.drawText (noteStr, juce::Rectangle<float> (x, 36.0f, w, 34.0f), juce::Justification::centred);
 
-            g.setFont (sansFont (12.0f));
+            g.setFont (sansFont (11.5f));
             g.setColour (inkColour().withAlpha (0.85f));
             const juce::String hz = active
                 ? (juce::String (tuner.freqHz, 1) + " Hz  (" + (tuner.cents >= 0 ? "+" : "") + juce::String (tuner.cents, 1) + " ct)")
                 : juce::String::fromUTF8 (u8"Esperando se\u00f1al");
-            g.drawText (hz, inner.removeFromTop (17.0f), juce::Justification::centred);
+            g.drawText (hz, juce::Rectangle<float> (x, 70.0f, w, 15.0f), juce::Justification::centred);
 
-            auto meter = inner.removeFromTop (22.0f).reduced (6.0f, 5.0f);
+            auto meter = juce::Rectangle<float> (x + 6.0f, 89.0f, w - 12.0f, 11.0f);
             juce::ColourGradient mg (juce::Colour::fromRGB (183, 115, 85), meter.getX(), meter.getY(),
                                      juce::Colour::fromRGB (183, 115, 85), meter.getRight(), meter.getY(), false);
             mg.addColour (0.25, juce::Colour::fromRGB (208, 186, 128));
             mg.addColour (0.50, juce::Colour::fromRGB (154, 215, 180));
             mg.addColour (0.75, juce::Colour::fromRGB (208, 186, 128));
             g.setGradientFill (mg);
-            g.fillRoundedRectangle (meter, 6.0f);
+            g.fillRoundedRectangle (meter, 5.5f);
 
             g.setColour (juce::Colours::white);
-            g.fillRect (meter.getCentreX() - 1.5f, meter.getY() - 3.0f, 3.0f, meter.getHeight() + 6.0f);
+            g.fillRect (meter.getCentreX() - 1.5f, meter.getY() - 2.0f, 3.0f, meter.getHeight() + 4.0f);
 
             const float normCents = active ? juce::jlimit (-1.0f, 1.0f, tuner.cents / 50.0f) : 0.0f;
             const float nx = meter.getCentreX() + normCents * (meter.getWidth() * 0.46f);
             g.setColour (juce::Colour::fromRGB (23, 39, 34));
-            g.fillRect (nx - 2.0f, meter.getY() - 4.0f, 4.0f, meter.getHeight() + 8.0f);
+            g.fillRect (nx - 2.0f, meter.getY() - 3.0f, 4.0f, meter.getHeight() + 6.0f);
 
-            auto row = inner.removeFromTop (28.0f).reduced (2.0f, 2.0f);
+            auto row = juce::Rectangle<float> (x + 2.0f, 105.0f, w - 4.0f, 22.0f);
             const char* notesBass[4] = { "E", "A", "D", "G" };
             const int   octsBass[4]  = { 1, 1, 2, 2 };
             const char* notesGtr[6]  = { "E", "A", "D", "G", "B", "E" };
@@ -1626,21 +1628,19 @@ public:
                 g.drawText (txt, cell, juce::Justification::centred);
             }
 
-            // Divider + Integrated Drop section labels
-            const float x = inner.getX();
-            const float w = inner.getWidth();
+            // Divider + Integrated Drop section labels (zero overlap with tuner controls above or sliders below)
             g.setColour (juce::Colour::fromRGBA (241, 224, 190, 58));
-            g.drawLine (x, 166.0f, x + w, 166.0f, 1.0f);
+            g.drawLine (x, 163.0f, x + w, 163.0f, 1.0f);
 
             g.setFont (sansFont (10.0f, juce::Font::bold));
             g.setColour (inkColour().withAlpha (0.76f));
-            g.drawText ("DROP TUNE", juce::Rectangle<float> (x, 171.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText ("DROP TUNE", juce::Rectangle<float> (x, 168.0f, w, 14.0f), juce::Justification::centredLeft);
 
             g.setFont (sansFont (10.5f));
             g.setColour (inkColour().withAlpha (0.84f));
-            g.drawText ("Semitonos", juce::Rectangle<float> (x, 281.0f, w, 13.0f), juce::Justification::centredLeft);
-            g.drawText ("Cents",     juce::Rectangle<float> (x, 313.0f, w, 13.0f), juce::Justification::centredLeft);
-            g.drawText ("Mix %",     juce::Rectangle<float> (x, 345.0f, w, 13.0f), juce::Justification::centredLeft);
+            g.drawText ("Semitonos", juce::Rectangle<float> (x, 265.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText ("Cents",     juce::Rectangle<float> (x, 303.0f, w, 14.0f), juce::Justification::centredLeft);
+            g.drawText ("Mix %",     juce::Rectangle<float> (x, 341.0f, w, 14.0f), juce::Justification::centredLeft);
         }
     }
 
@@ -1677,32 +1677,34 @@ public:
         else if (kind == PopoverKind::Config)
         {
             const bool bass = processor.isBassMode();
-            const int hw = (inner.getWidth() - 6) / 2;
-            btnCfgRouteAmp.setBounds    (inner.getX(),          inner.getY() + 20, hw, 28);
-            btnCfgRoutePedals.setBounds (inner.getX() + hw + 6, inner.getY() + 20, hw, 28);
+            const int x = 18;
+            const int w = getWidth() - 36;
+            const int hw = (w - 6) / 2;
+            btnCfgRouteAmp.setBounds    (x,          60, hw, 24);
+            btnCfgRoutePedals.setBounds (x + hw + 6, 60, hw, 24);
 
             if (bass)
             {
-                cfgCabBtns[0].setBounds (inner.getX(),          inner.getY() + 74, hw, 32);
-                cfgCabBtns[1].setBounds (inner.getX() + hw + 6, inner.getY() + 74, hw, 32);
+                cfgCabBtns[0].setBounds (x,          108, hw, 30);
+                cfgCabBtns[1].setBounds (x + hw + 6, 108, hw, 30);
             }
             else
             {
-                const int cw = inner.getWidth() / 3;
+                const int cw = w / 3;
                 for (int i = 0; i < 5; ++i)
-                    cfgCabBtns[i].setBounds (inner.getX() + (i % 3) * cw + 2,
-                                             inner.getY() + 73 + (i / 3) * 30,
-                                             cw - 4, 26);
+                    cfgCabBtns[i].setBounds (x + (i % 3) * cw + 2,
+                                             108 + (i / 3) * 26,
+                                             cw - 4, 23);
                 for (int c = 0; c < 3; ++c)
-                    cfgChBtns[c].setBounds (inner.getX() + c * cw + 2, inner.getY() + 157, cw - 4, 26);
-                btnCfgOs4x.setBounds (inner.getX(), inner.getY() + 188, inner.getWidth(), 26);
-                slGate.setBounds     (inner.getX(), inner.getY() + 236, inner.getWidth(), 22);
-                slInput.setBounds    (inner.getX(), inner.getY() + 280, inner.getWidth(), 22);
+                    cfgChBtns[c].setBounds (x + c * cw + 2, 181, cw - 4, 23);
+                btnCfgOs4x.setBounds (x, 208, w, 23);
+                slGate.setBounds     (x, 253, w, 20);
+                slInput.setBounds    (x, 293, w, 20);
             }
 
-            const int keyRowY = getHeight() - 50;
-            btnSaveGeminiKey.setBounds (inner.getRight() - 68, keyRowY, 68, 28);
-            geminiKeyEdit.setBounds    (inner.getX(), keyRowY, inner.getWidth() - 74, 28);
+            const int keyRowY = bass ? 174 : 338;
+            btnSaveGeminiKey.setBounds (x + w - 68, keyRowY, 68, 28);
+            geminiKeyEdit.setBounds    (x, keyRowY, w - 74, 28);
         }
         else if (kind == PopoverKind::ToneFinder)
         {
@@ -1727,19 +1729,21 @@ public:
         }
         else if (kind == PopoverKind::Tuner)
         {
-            btnDropToggle.setBounds (inner.getX(), 188, inner.getWidth(), 28);
-            const int cw = inner.getWidth() / 3;
-            for (int i = 0; i < 6; ++i)
-                dropChips[i].setBounds (inner.getX() + (i % 3) * cw + 2,
-                                        221 + (i / 3) * 27,
-                                        cw - 4, 24);
-            slSemi.setBounds  (inner.getX(), 293, inner.getWidth(), 19);
-            slCents.setBounds (inner.getX(), 325, inner.getWidth(), 19);
-            slMix.setBounds   (inner.getX(), 357, inner.getWidth(), 19);
+            const int x = 18;
+            const int w = getWidth() - 36;
+            const int hw = (w - 6) / 2;
+            btnTunerNotation.setBounds (x,          133, hw, 24);
+            btnTunerMute.setBounds     (x + hw + 6, 133, hw, 24);
 
-            const int hw = (inner.getWidth() - 6) / 2;
-            btnTunerNotation.setBounds (inner.getX(),          getHeight() - 41, hw, 28);
-            btnTunerMute.setBounds     (inner.getX() + hw + 6, getHeight() - 41, hw, 28);
+            btnDropToggle.setBounds (x, 185, w, 24);
+            const int cw = w / 3;
+            for (int i = 0; i < 6; ++i)
+                dropChips[i].setBounds (x + (i % 3) * cw + 2,
+                                        213 + (i / 3) * 25,
+                                        cw - 4, 21);
+            slSemi.setBounds  (x, 279, w, 20);
+            slCents.setBounds (x, 317, w, 20);
+            slMix.setBounds   (x, 355, w, 20);
         }
     }
 
@@ -2863,8 +2867,8 @@ void MiAmpAudioProcessorEditor::timerCallback()
         const bool expanded = ! editorOpen && ! popFloor;
 
         const float targetTx    = popFloor ? -390.0f : (expanded ? -271.5f : 0.0f);
-        const float targetTy    = popFloor ?    0.0f : (expanded ?  -25.0f : 0.0f);
-        const float targetScale = popFloor ?   0.94f : (expanded ?   1.12f : 1.0f);
+        const float targetTy    = popFloor ?    0.0f : (expanded ?    6.0f : 0.0f);
+        const float targetScale = popFloor ?   0.94f : (expanded ?   1.06f : 1.0f);
 
         boardTx    += 0.16f * (targetTx    - boardTx);
         boardTy    += 0.16f * (targetTy    - boardTy);
@@ -3179,7 +3183,7 @@ void MiAmpAudioProcessorEditor::layoutAll()
 
         // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 304)
         if (popover->isVisible())
-            popover->setBounds (toScreenInt (1215, 338, 300, 418));
+            popover->setBounds (toScreenInt (1206, 336, 309, 424));
     }
     else
     {
