@@ -473,7 +473,10 @@ public:
             }
 
             if (thumb.isValid())
+            {
+                g.setOpacity (1.0f);
                 g.drawImage (thumb, imgBox, juce::RectanglePlacement::centred);
+            }
             else if (isOff)
             {
                 g.setColour (juce::Colour::fromRGBA (250, 243, 227, 130));
@@ -561,7 +564,7 @@ public:
                 const auto f = fc.getResult();
                 if (f.existsAsFile() && processor.loadCustomCabIR (bass, f))
                 {
-                    const int customIdx = bass ? 6 : 7;
+                    const int customIdx = bass ? 7 : 8;
                     setParamPlain (processor.apvts, bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab, static_cast<float> (customIdx));
                     if (selectCb) selectCb();
                     repaint();
@@ -582,7 +585,7 @@ private:
     std::vector<juce::Rectangle<float>> computeCells (juce::Rectangle<float> card) const
     {
         const bool bass = processor.isBassMode();
-        const int count = (mode == Mode::Heads) ? 9 : (bass ? 8 : 9);
+        const int count = (mode == Mode::Heads) ? 9 : (bass ? 9 : 10);
         const int cols = 3;
         const int rows = (count + cols - 1) / cols;
         auto area = card.reduced (24.0f, 18.0f).withTrimmedTop (42.0f);

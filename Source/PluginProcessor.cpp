@@ -161,7 +161,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::gtrInput,      "Guitar Input",       56.0f);
     addPct  (MiAmpParams::gtrGate,       "Guitar Gate",        32.0f);
     addBool (MiAmpParams::gtrOs4x,       "Guitar 4x OS",       true);
-    addInt  (MiAmpParams::gtrCab,        "Guitar Cab",         0, 8, 1);
+    addInt  (MiAmpParams::gtrCab,        "Guitar Cab",         0, 9, 7); // 7 = 4x12 MI ZENBOX (Mint)
     addBool (MiAmpParams::gtrPower,      "Guitar Power",       true);
     addBool (MiAmpParams::gtrStandby,    "Guitar Standby",     false);
     addBool (MiAmpParams::gtrModeBright, "Guitar Bright Cap",  true);
@@ -286,7 +286,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addInt  (MiAmpParams::gtrVoiceSw,    "Guitar Voice Sw",    0, 2, 1);
 
     addInt  (MiAmpParams::bassHeadModel, "Bass Head Model",    0, 8, 8); // 8 = MI AMP CLASSIC (Mint)
-    addInt  (MiAmpParams::bassCabModel,  "Bass Cab Model",     0, 7, 4); // 4 = 8x10 CLASSIC
+    addInt  (MiAmpParams::bassCabModel,  "Bass Cab Model",     0, 8, 6); // 6 = 8x10 MI CLASSIC (Mint)
     addPct  (MiAmpParams::bassMaster,    "Bass Master",        58.0f);
     addPct  (MiAmpParams::bassTubeGain,  "Bass Tube Gain",     50.0f);
     addPct  (MiAmpParams::bassCompCtrl,  "Bass Head Comp",     35.0f);
@@ -1215,7 +1215,7 @@ std::vector<MiAmpGuitarPreset> MiAmpAudioProcessor::getGuitarFactoryPresets()
     {
         MiAmpGuitarPreset p;
         p.name = juce::String::fromUTF8 (u8"MI \u2022 Cab Off (IR Externo)");
-        p.channel = 1; p.cab = 4; p.bright = true; p.os4x = true;
+        p.channel = 1; p.cab = 9; p.bright = true; p.os4x = true;
         p.input = 50.0f; p.gate = 20.0f; p.output = 56.0f;
         p.gain = 58.0f; p.bass = 54.0f; p.mid = 58.0f; p.treble = 58.0f; p.presence = 56.0f; p.master = 58.0f;
         p.slots = { 1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
@@ -1304,7 +1304,7 @@ void MiAmpAudioProcessor::applyGuitarPreset (const MiAmpGuitarPreset& p)
     setParamNormalized (MiAmpParams::gtrStandby,    0.0f);
     setParamNormalized (MiAmpParams::gtrHeadBypass, p.headBypass ? 1.0f : 0.0f);
     setParamNormalized (MiAmpParams::gtrChannel,    static_cast<float> (ch));
-    setParamNormalized (MiAmpParams::gtrCab,        static_cast<float> (std::clamp (p.cab, 0, 4)));
+    setParamNormalized (MiAmpParams::gtrCab,        static_cast<float> (std::clamp (p.cab, 0, 9)));
     setParamNormalized (MiAmpParams::gtrModeBright, p.bright ? 1.0f : 0.0f);
     setParamNormalized (MiAmpParams::gtrOs4x,       p.os4x ? 1.0f : 0.0f);
     setParamNormalized (MiAmpParams::gtrInput,      p.input);

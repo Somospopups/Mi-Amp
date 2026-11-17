@@ -153,6 +153,7 @@ juce_add_binary_data(MiAmpAssets
         Resources/rig/bass_cab_4x10_gk.png
         Resources/rig/bass_cab_6x10_heavy.png
         Resources/rig/bass_cab_8x10_classic.png
+        Resources/rig/bass_cab_8x10_mint.png
         Resources/rig/bass_cab_8x10_tangerine.png
         Resources/rig/bass_head_aguilar.png
         Resources/rig/bass_head_b15.png
@@ -170,6 +171,7 @@ juce_add_binary_data(MiAmpAssets
         Resources/rig/cab_4x12_green.png
         Resources/rig/cab_4x12_recto.png
         Resources/rig/cab_4x12_tangerine.png
+        Resources/rig/cab_4x12_zenbox.png
         Resources/rig/head_mi6505.png
         Resources/rig/head_mi800.png
         Resources/rig/head_miac30.png

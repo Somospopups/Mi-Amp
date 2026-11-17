@@ -132,9 +132,9 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
     const auto id = b.getComponentID();
     const auto r  = b.getLocalBounds().toFloat().reduced (0.5f);
 
-    if (id == "popoverClose" || id == "presetLoad")
+    if (id == "popoverClose" || id == "popoverBack" || id == "presetLoad")
     {
-        if (id == "popoverClose" && (highlighted || down))
+        if ((id == "popoverClose" || id == "popoverBack") && (highlighted || down))
         {
             g.setColour (juce::Colour::fromRGBA (255, 255, 255, down ? 42 : 24));
             g.fillEllipse (r.reduced (1.0f));
@@ -204,6 +204,22 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
         g.setFont (sansFont (24.0f, juce::Font::plain));
         g.setColour (juce::Colour::fromRGB (255, 247, 234));
         g.drawText (juce::String::fromUTF8 (u8"\u00d7"), bounds.toFloat(), juce::Justification::centred);
+        return;
+    }
+
+    if (id == "popoverBack")
+    {
+        const auto bf = bounds.toFloat();
+        const float cx = bf.getCentreX();
+        const float cy = bf.getCentreY();
+        juce::Path arrow;
+        arrow.startNewSubPath (cx + 5.5f, cy);
+        arrow.lineTo          (cx - 5.5f, cy);
+        arrow.startNewSubPath (cx - 0.5f, cy - 5.0f);
+        arrow.lineTo          (cx - 5.5f, cy);
+        arrow.lineTo          (cx - 0.5f, cy + 5.0f);
+        g.setColour (juce::Colour::fromRGB (255, 247, 234));
+        g.strokePath (arrow, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         return;
     }
 
@@ -1053,6 +1069,23 @@ public:
         btnClose.setButtonText (juce::String::fromUTF8 (u8"\u00d7"));
         btnClose.onClick = [this] { if (closeFn) closeFn(); };
 
+        addChildComponent (btnBack);
+        btnBack.setComponentID ("popoverBack");
+        btnBack.setButtonText ("");
+        btnBack.onClick = [this]
+        {
+            if (kind == PopoverKind::Presets && presetExportSubView)
+            {
+                presetExportSubView = false;
+                exportStatusMsg.clear();
+                setKind (kind, tuner);
+            }
+            else if (closeFn)
+            {
+                closeFn();
+            }
+        };
+
         // Presets (.save-row matching index.html 1:1)
         addChildComponent (presetNameEdit);
         presetNameEdit.setFont (sansFont (13.0f));
@@ -1441,6 +1474,9 @@ public:
         kind = k;
         tuner = tr;
         const bool isP  = (k == PopoverKind::Presets);
+        const bool showBack = useBackNavigation || (isP && presetExportSubView);
+        btnBack.setVisible (showBack);
+        btnClose.setVisible (! showBack);
         const bool isPList   = isP && ! presetExportSubView;
         const bool isPExport = isP && presetExportSubView;
         const bool isD  = (k == PopoverKind::Drop);
@@ -1554,6 +1590,28 @@ public:
         repaint();
     }
 
+    void setBackNavigation (bool b) { useBackNavigation = b; }
+
+    int getPreferredHeight (int maxH) const
+    {
+        int h = maxH;
+        if (kind == PopoverKind::Tuner)
+            h = 394; // ends cleanly right below slMix (355 + 20 + 19 margin)
+        else if (kind == PopoverKind::Drop)
+            h = 294; // ends cleanly right below slMix (48 + 202 + 24 + 20 margin)
+        else if (kind == PopoverKind::Config)
+        {
+            const bool bass = processor.isBassMode();
+            const bool isStand = miamp_standalone::isRunningStandalone();
+            const int updBtnY = isStand ? (bass ? 270 : 450) : (bass ? 218 : 398);
+            h = 46 + updBtnY + 34 + 16; // fits full configHolder cleanly without dead space
+        }
+        else if (kind == PopoverKind::ToneFinder && ! tfSearching && ! lastToneResult.found && ! tfNotFound)
+            h = 316; // ends right below intro card when idle; expands up to maxH on search/result
+        // Presets & active ToneFinder expand up to maxH (top of menu y=25 down to y=698)
+        return juce::jlimit (220, maxH, h);
+    }
+
     void setUpdateStatusMessage (const juce::String& msg)
     {
         updateStatusMsg = msg;
@@ -1589,7 +1647,12 @@ public:
                            : (kind == PopoverKind::ToneFinder) ? miamp_i18n::tr (processor.isBassMode() ? miamp_i18n::Msg::TitleToneFinderBass
                                                                                                         : miamp_i18n::Msg::TitleToneFinderGuitar)
                                                                : miamp_i18n::tr (miamp_i18n::Msg::TitleTunerDrop);
-        g.drawText (title, inner.removeFromTop (24.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft);
+        const bool showBack = useBackNavigation || (kind == PopoverKind::Presets && presetExportSubView);
+        auto titleBox = inner.removeFromTop (24.0f).withTrimmedRight (showBack ? 4.0f : 26.0f);
+        if (showBack)
+            titleBox = titleBox.withTrimmedLeft (32.0f);
+        g.setFont (sansFont (14.5f, juce::Font::bold));
+        g.drawFittedText (title, titleBox.toNearestInt(), juce::Justification::centredLeft, 1);
 
         if (kind == PopoverKind::Presets)
         {
@@ -1799,6 +1862,7 @@ public:
     void resized() override
     {
         btnClose.setBounds (getWidth() - 38, 10, 26, 28);
+        btnBack.setBounds  (14, 13, 28, 28);
         auto inner = getLocalBounds().reduced (18, 0).withTop (48).withTrimmedBottom (14);
 
         if (kind == PopoverKind::Presets)
@@ -2525,7 +2589,7 @@ private:
     PopoverKind kind = PopoverKind::None;
     xvdsp::TunerReading tuner;
 
-    juce::TextButton btnClose;
+    juce::TextButton btnClose, btnBack;
     juce::TextEditor presetNameEdit;
     juce::TextButton btnSavePreset, btnImportPreset;
     juce::Viewport presetViewport;
@@ -2533,6 +2597,7 @@ private:
     std::vector<std::unique_ptr<PresetRow>> presetRows;
     std::unique_ptr<juce::FileChooser> activeChooser;
 
+    bool useBackNavigation = true;
     bool presetExportSubView = false;
     juce::TextButton btnExportBack;
     juce::Viewport exportViewport;
@@ -2805,7 +2870,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     {
         const bool bass = audioProcessor.isBassMode();
         const char* id = bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab;
-        const int total = bass ? 8 : 9;
+        const int total = bass ? 9 : 10;
         const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (id)->load()));
         const int nxt = (cur + delta + total) % total;
         miamp_rig::setParamPlain (audioProcessor.apvts, id, static_cast<float> (nxt));
@@ -3649,7 +3714,7 @@ void MiAmpAudioProcessorEditor::computeRigStageLayout (
 
     const auto& hSpec = headList[static_cast<size_t> (headIdx)];
     const auto& cSpec = cabList[static_cast<size_t> (cabIdx)];
-    const int visualCabIdx = cSpec.isOff ? (bass ? 4 : 1) : cabIdx;
+    const int visualCabIdx = cSpec.isOff ? (bass ? 6 : 7) : cabIdx;
     const auto& visualCab = cabList[static_cast<size_t> (juce::jlimit (0, static_cast<int> (cabList.size()) - 1, visualCabIdx))];
 
     const auto hImg = juce::ImageCache::getFromMemory (hSpec.chassisData, hSpec.chassisSize);
@@ -3663,14 +3728,15 @@ void MiAmpAudioProcessorEditor::computeRigStageLayout (
             switch (visualCabIdx)
             {
                 case 0: return { 0.820f, 0.036f }; // 4x12 green
-                case 1:
-                case 7: return { 0.802f, 0.036f }; // 4x12 britv30 (side handles)
+                case 1: return { 0.802f, 0.036f }; // 4x12 britv30 (side handles)
                 case 2: return { 0.822f, 0.036f }; // 4x12 recto
                 case 3: return { 0.831f, 0.036f }; // 4x12 evh
                 case 4: return { 0.840f, 0.034f }; // 2x12 classa
                 case 5: return { 0.825f, 0.036f }; // 4x12 tangerine
                 case 6: return { 0.843f, 0.029f }; // 2x12 twin
-                default: return { 0.802f, 0.036f };
+                case 7:
+                case 8: return { 0.820f, 0.036f }; // 4x12 MI ZENBOX (Mint) + Custom IR
+                default: return { 0.820f, 0.036f };
             }
         }
         switch (visualCabIdx)
@@ -3679,9 +3745,10 @@ void MiAmpAudioProcessorEditor::computeRigStageLayout (
             case 1: return { 0.816f, 0.036f }; // 4x10 aguilar
             case 2: return { 0.819f, 0.036f }; // 4x10 gk
             case 3: return { 0.845f, 0.039f }; // 6x10 heavy
-            case 4:
-            case 6: return { 0.905f, 0.043f }; // 8x10 classic
+            case 4: return { 0.905f, 0.043f }; // 8x10 classic
             case 5: return { 0.905f, 0.043f }; // 8x10 tangerine
+            case 6:
+            case 7: return { 0.905f, 0.043f }; // 8x10 MI CLASSIC (Mint) + Custom IR
             default: return { 0.905f, 0.043f };
         }
     };
@@ -3840,11 +3907,12 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     btnInstGuitar.setToggleState (! bass, juce::dontSendNotification);
     btnInstBass.setToggleState   (bass,   juce::dontSendNotification);
 
+    const bool showRightMenu = showHeadUi && (activePopover == PopoverKind::None);
     for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
                      &btnMainCabs, &btnMainStudioFx, &btnDockConfig })
     {
-        b->setVisible (showHeadUi);
-        b->setAlpha (showHeadUi ? uiAlpha : 1.0f);
+        b->setVisible (showRightMenu);
+        b->setAlpha (showRightMenu ? uiAlpha : 1.0f);
     }
     btnMainHeads.setVisible   (false);
     btnMainConsole.setVisible (false);
@@ -3981,7 +4049,7 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     btnFloorTuner.setVisible      (isFloorMode);
     btnFloorToneFinder.setVisible (isFloorMode);
     btnFloorDrop.setVisible       (false);
-    btnFloorConfig.setVisible     (isFloorMode);
+    btnFloorConfig.setVisible     (false);
     btnBackToAmp.setVisible       (isFloorMode);
     btnSkipIntro.setVisible       (introRunning && ! isFloorMode && introElapsed < 2.38f);
 }
@@ -3992,14 +4060,13 @@ void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
     {
         activePopover = PopoverKind::None;
         popover->setVisible (false);
+        if (! isFloorMode)
+            syncHeadControls();
     }
     else
     {
         if (! isFloorMode)
-        {
             closeFloatingOverlays ("popover");
-            syncHeadControls();
-        }
         // In floor mode, opening Presets/Drop/Config/ToneFinder closes the left editor & slides board left
         if (isFloorMode && (kind == PopoverKind::Presets || kind == PopoverKind::Drop
                          || kind == PopoverKind::Config || kind == PopoverKind::ToneFinder))
@@ -4009,8 +4076,11 @@ void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
             syncPedalEditorControls();
         }
         activePopover = kind;
+        popover->setBackNavigation (! isFloorMode);
         popover->setKind (kind, tunerReading);
         popover->setVisible (true);
+        if (! isFloorMode)
+            syncHeadControls();
         layoutAll();
         popover->toFront (true);
     }
@@ -4600,7 +4670,7 @@ void MiAmpAudioProcessorEditor::layoutAll()
             for (size_t i = 0; i < rigSliders.size() && i < hSpec.sliders.size(); ++i)
             {
                 const auto& sl = hSpec.sliders[i];
-                const float slW = headR.getWidth() * 0.024f;
+                const float slW = headR.getWidth() * 0.0175f;
                 const float y0 = headR.getY() + sl.yTop * headR.getHeight();
                 const float y1 = headR.getY() + sl.yBot * headR.getHeight();
                 const float cx = headR.getX() + sl.cx * headR.getWidth();
@@ -4691,9 +4761,9 @@ void MiAmpAudioProcessorEditor::layoutAll()
             }
         }
 
-        // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 406) -> y=442..698
+        // Right-menu panels start at y=25, end where content finishes, capped at y=698 (maxH=673)
         if (popover->isVisible())
-            popover->setBounds (toScreenInt (1206, 442, 309, 256));
+            popover->setBounds (toScreenInt (1206, 25, 309, popover->getPreferredHeight (673)));
     }
     else
     {
@@ -4751,12 +4821,12 @@ void MiAmpAudioProcessorEditor::layoutAll()
         btnFloorTunerNotation.setBounds (toScreenInt (1030, 640, 175, 36));
         btnFloorTunerMute.setBounds     (toScreenInt (1030, 684, 175, 39));
 
-        // .palette-nav (right side of .palette, w=250 -> x=1246..1496)
-        btnFloorPresets.setBounds    (toScreenInt (1246, 630, 122, 34));
-        btnFloorTuner.setBounds      (toScreenInt (1374, 630, 122, 34));
-        btnFloorToneFinder.setBounds (toScreenInt (1246, 668, 122, 34));
-        btnFloorConfig.setBounds     (toScreenInt (1374, 668, 122, 34));
-        btnBackToAmp.setBounds       (toScreenInt (1246, 706, 250, 34));
+        // .palette-nav inside dock (36, 623, 1478, 125, r=22):
+        // 14px top/bottom margin (637..733), 28px right margin (x_end=1486, well clear of r=22 corner), 16px gap from '>' arrow
+        btnFloorPresets.setBounds    (toScreenInt (1246, 637, 117, 28));
+        btnFloorTuner.setBounds      (toScreenInt (1369, 637, 117, 28));
+        btnFloorToneFinder.setBounds (toScreenInt (1246, 671, 240, 28));
+        btnBackToAmp.setBounds       (toScreenInt (1246, 705, 240, 28));
 
         if (popover->isVisible())
             popover->setBounds (toScreenInt (1215, 110, 300, 474));
@@ -4956,28 +5026,25 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     const float s = stageScale();
 
     // Layer 0: Single tall continuous Venice Beach Skatepark background (1550x1924)
+    // Smoothly interpolate closeUpView zoom in sync with vertical camera descent (zero jump at t=1.5s)
     if (imgs.skateparkTall.isValid())
     {
-        const float camY = juce::jlimit (0.0f, 1156.0f, 1156.0f - yOff);
-        const int fullW = imgs.skateparkTall.getWidth();
-        const int fullH = juce::jmin (768, imgs.skateparkTall.getHeight() - juce::roundToInt (camY));
-        const int panOffsetPx = juce::roundToInt (-52.0f * cabDrawerAnim);
-        if (closeUpView && (! introRunning || introElapsed >= 1.5f))
-        {
-            const float zoom = 1.22f;
-            const int srcW = juce::roundToInt (fullW / zoom);
-            const int srcH = juce::roundToInt (fullH / zoom);
-            const int srcX = juce::jlimit (0, fullW - srcW, (fullW - srcW) / 2 + panOffsetPx);
-            const int srcY = juce::roundToInt (camY) + (fullH - srcH) / 3;
-            g.drawImage (imgs.skateparkTall, 0, 0, getWidth(), getHeight(),
-                         srcX, srcY, srcW, srcH);
-        }
-        else
-        {
-            const int srcY = juce::roundToInt (camY);
-            g.drawImage (imgs.skateparkTall, 0, 0, getWidth(), getHeight(),
-                         0, srcY, fullW, fullH);
-        }
+        const float fullW = static_cast<float> (imgs.skateparkTall.getWidth());
+        const float fullH = 768.0f;
+        const float maxCamY = juce::jmax (1.0f, static_cast<float> (imgs.skateparkTall.getHeight()) - fullH);
+        const float camY = juce::jlimit (0.0f, maxCamY, maxCamY - yOff);
+        const float introDown = 1.0f - juce::jlimit (0.0f, 1.0f, yOff / maxCamY);
+        const float zoom = closeUpView ? (1.0f + 0.22f * introDown) : 1.0f;
+        const float srcW = fullW / zoom;
+        const float srcH = fullH / zoom;
+        const float panOffsetPx = -52.0f * cabDrawerAnim;
+        const float srcX = juce::jlimit (0.0f, fullW - srcW, (fullW - srcW) * 0.5f + panOffsetPx);
+        const float srcY = juce::jlimit (0.0f, static_cast<float> (imgs.skateparkTall.getHeight()) - srcH,
+                                         camY + (fullH - srcH) * (1.0f / 3.0f));
+        auto tr = juce::AffineTransform::translation (-srcX, -srcY)
+                      .scaled (static_cast<float> (getWidth())  / srcW,
+                               static_cast<float> (getHeight()) / srcH);
+        g.drawImageTransformed (imgs.skateparkTall, tr, false);
     }
 
     // Layer 1 (Cabinet) & Layer 2 (Amp Head) seated flush with realistic contact shadows
@@ -4995,7 +5062,7 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     const auto& cSpec = cabList[static_cast<size_t> (cabIdx)];
     const auto& hSpec = headList[static_cast<size_t> (headIdx)];
 
-    const int visualCabIdx = cSpec.isOff ? (bass ? 4 : 1) : cabIdx;
+    const int visualCabIdx = cSpec.isOff ? (bass ? 6 : 7) : cabIdx;
     const auto& visualCab = cabList[static_cast<size_t> (juce::jlimit (0, static_cast<int> (cabList.size()) - 1, visualCabIdx))];
 
     // Ground contact shadow beneath cabinet base
@@ -5015,12 +5082,11 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
         {
             if (cSpec.isOff)
             {
-                auto dimmed = cImg.createCopy();
-                dimmed.desaturate();
-                g.setColour (juce::Colours::white.withBrightness (0.44f).withAlpha (0.94f));
+                auto dimmed = miamp_rig::makeDimmedCabImage (cImg, 0.44f);
+                g.setOpacity (0.94f);
                 g.drawImage (dimmed, toScreen (cabR.getX(), cabR.getY(), cabR.getWidth(), cabR.getHeight()),
-                             juce::RectanglePlacement::stretchToFit, true);
-                g.setColour (juce::Colours::white);
+                             juce::RectanglePlacement::stretchToFit, false);
+                g.setOpacity (1.0f);
             }
             else
             {
@@ -5082,6 +5148,8 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
 
     const float uiAlpha = introRunning ? juce::jlimit (0.0f, 1.0f, (introElapsed - 2.42f) / 0.40f) : 1.0f;
 
+    if (activePopover == PopoverKind::None)
+    {
     // Layer 4a: Unified right glass panel (.menu 1290, 25, 225, 406)
     paintGlassPanel (g, toScreen (1290, 25, 225, 406), 22.0f, uiAlpha);
 
@@ -5128,6 +5196,7 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     };
     drawMeter (387.0f, inFrac);
     drawMeter (401.0f, outFrac);
+    }
 
     // Layer 4b: Bottom Analog Studio Console Strip (34, 636, 1482, 114) - only when consoleOpen
     if (consoleOpen)

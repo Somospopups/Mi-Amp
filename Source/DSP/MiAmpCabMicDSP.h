@@ -38,10 +38,10 @@ struct CabMicSnapshot
 class MiAmpCabMicDSP
 {
 public:
-    static constexpr int kCustomGtrIdx = 7;
-    static constexpr int kOffGtrIdx    = 8;
-    static constexpr int kCustomBassIdx = 6;
-    static constexpr int kOffBassIdx    = 7;
+    static constexpr int kCustomGtrIdx = 8;
+    static constexpr int kOffGtrIdx    = 9;
+    static constexpr int kCustomBassIdx = 7;
+    static constexpr int kOffBassIdx    = 8;
 
     void prepare (double sampleRate, int samplesPerBlock, int numChannels = 2)
     {
@@ -181,7 +181,7 @@ public:
             }
             else
             {
-                const int builtIdx = (snap.cabIndex == customIdx) ? 0 : std::clamp (snap.cabIndex, 0, snap.isBass ? 5 : 6);
+                const int builtIdx = (snap.cabIndex == customIdx) ? (snap.isBass ? 6 : 7) : std::clamp (snap.cabIndex, 0, snap.isBass ? 6 : 7);
                 if (lastBuiltInBass != snap.isBass || lastBuiltInIdx != builtIdx)
                     loadBuiltInCab (snap.isBass, builtIdx);
 
@@ -400,7 +400,7 @@ private:
                     lp1.setLowPass (baseSr, 4600.0f, 0.85f);
                     lp2.setLowPass (baseSr, 5600.0f, 0.72f);
                     break;
-                default: // 6: 2x12 TWIN (Clean sparkling Jensen headroom)
+                case 6: // 2x12 TWIN (Clean sparkling Jensen headroom)
                     hp.setHighPass (baseSr, 85.0f, 0.75f);
                     resLow.setPeaking (baseSr, 118.0f, 2.8f, 1.1f);
                     midScoop.setPeaking (baseSr, 460.0f, -3.4f, 0.9f);
@@ -409,6 +409,16 @@ private:
                     notch2.setPeaking (baseSr, 6200.0f, -2.8f, 2.2f);
                     lp1.setLowPass (baseSr, 6500.0f, 0.76f);
                     lp2.setLowPass (baseSr, 7900.0f, 0.68f);
+                    break;
+                default: // 7: 4x12 MI ZENBOX (Mint Tolex Original Stack: balanced punch + articulated bite)
+                    hp.setHighPass (baseSr, 84.0f, 0.90f);
+                    resLow.setPeaking (baseSr, 108.0f, 3.8f, 1.45f);
+                    midScoop.setPeaking (baseSr, 460.0f, -2.4f, 1.05f);
+                    conePeak.setPeaking (baseSr, 2250.0f, 4.5f, 1.50f);
+                    notch1.setPeaking (baseSr, 3550.0f, -4.4f, 3.4f);
+                    notch2.setPeaking (baseSr, 4850.0f, -3.2f, 2.5f);
+                    lp1.setLowPass (baseSr, 5400.0f, 0.84f);
+                    lp2.setLowPass (baseSr, 6500.0f, 0.70f);
                     break;
             }
         }
@@ -466,7 +476,7 @@ private:
                     lp1.setLowPass (baseSr, 4300.0f, 0.78f);
                     lp2.setLowPass (baseSr, 5500.0f, 0.68f);
                     break;
-                default: // 5: 8x10 TANGERINE (Thick gritty low-mid 8x10)
+                case 5: // 8x10 TANGERINE (Thick gritty low-mid 8x10)
                     hp.setHighPass (baseSr, 40.0f, 0.88f);
                     resLow.setPeaking (baseSr, 88.0f, 4.6f, 1.2f);
                     midScoop.setPeaking (baseSr, 460.0f, 2.4f, 1.1f);
@@ -475,6 +485,16 @@ private:
                     notch2.setPeaking (baseSr, 3600.0f, -3.6f, 2.4f);
                     lp1.setLowPass (baseSr, 3900.0f, 0.80f);
                     lp2.setLowPass (baseSr, 5000.0f, 0.70f);
+                    break;
+                default: // 6: 8x10 MI CLASSIC (Mint Tolex Original Fridge: deep sub + clear studio punch)
+                    hp.setHighPass (baseSr, 40.0f, 0.86f);
+                    resLow.setPeaking (baseSr, 86.0f, 4.8f, 1.2f);
+                    midScoop.setPeaking (baseSr, 360.0f, -2.0f, 1.0f);
+                    conePeak.setPeaking (baseSr, 1550.0f, 3.6f, 1.3f);
+                    notch1.setPeaking (baseSr, 2750.0f, -3.3f, 2.7f);
+                    notch2.setPeaking (baseSr, 4000.0f, -2.8f, 2.3f);
+                    lp1.setLowPass (baseSr, 4500.0f, 0.78f);
+                    lp2.setLowPass (baseSr, 5800.0f, 0.68f);
                     break;
             }
         }

@@ -90,6 +90,27 @@ private:
 
 //==============================================================================
 // Helper: draw red circle-slash "OFF / DI" sign matching preview SVG
+inline juce::Image makeDimmedCabImage (const juce::Image& src, float brightness = 0.42f)
+{
+    if (! src.isValid()) return {};
+    auto dim = src.convertedToFormat (juce::Image::ARGB);
+    dim.desaturate();
+    juce::Image::BitmapData bd (dim, juce::Image::BitmapData::readWrite);
+    const int mult = juce::roundToInt (juce::jlimit (0.0f, 1.0f, brightness) * 256.0f);
+    for (int y = 0; y < bd.height; ++y)
+    {
+        auto* row = bd.getLinePointer (y);
+        for (int x = 0; x < bd.width; ++x)
+        {
+            auto* px = row + x * bd.pixelStride;
+            px[juce::PixelARGB::indexR] = static_cast<juce::uint8> ((px[juce::PixelARGB::indexR] * mult) >> 8);
+            px[juce::PixelARGB::indexG] = static_cast<juce::uint8> ((px[juce::PixelARGB::indexG] * mult) >> 8);
+            px[juce::PixelARGB::indexB] = static_cast<juce::uint8> ((px[juce::PixelARGB::indexB] * mult) >> 8);
+        }
+    }
+    return dim;
+}
+
 inline void paintCabOffSign (juce::Graphics& g, juce::Point<float> centre, float diam)
 {
     const float r = diam * 0.375f;
@@ -173,7 +194,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& fallbackCab = cabs[static_cast<size_t> (bass ? 4 : 1)];
+        const auto& fallbackCab = cabs[static_cast<size_t> (bass ? 6 : 7)];
         const auto& visualCab = cSpec.isOff ? fallbackCab : cSpec;
 
         // Header title
@@ -214,15 +235,15 @@ public:
             {
                 if (cSpec.isOff)
                 {
-                    auto dim = im.createCopy();
-                    dim.desaturate();
-                    g.setColour (juce::Colours::white.withBrightness (0.42f).withAlpha (0.92f));
-                    g.drawImage (dim, heroImgBox, juce::RectanglePlacement::centred, true);
-                    g.setColour (juce::Colours::white);
+                    auto dim = makeDimmedCabImage (im, 0.44f);
+                    g.setOpacity (0.94f);
+                    g.drawImage (dim, heroImgBox, juce::RectanglePlacement::centred, false);
+                    g.setOpacity (1.0f);
                     paintCabOffSign (g, heroImgBox.getCentre(), 54.0f * s);
                 }
                 else
                 {
+                    g.setOpacity (1.0f);
                     g.drawImage (im, heroImgBox, juce::RectanglePlacement::centred);
                 }
             }
@@ -264,15 +285,15 @@ public:
                 {
                     if (item.isOff)
                     {
-                        auto dim = im.createCopy();
-                        dim.desaturate();
-                        g.setColour (juce::Colours::white.withBrightness (0.42f).withAlpha (0.90f));
-                        g.drawImage (dim, imgR, juce::RectanglePlacement::centred, true);
-                        g.setColour (juce::Colours::white);
+                        auto dim = makeDimmedCabImage (im, 0.44f);
+                        g.setOpacity (0.92f);
+                        g.drawImage (dim, imgR, juce::RectanglePlacement::centred, false);
+                        g.setOpacity (1.0f);
                         paintCabOffSign (g, imgR.getCentre(), 32.0f * s);
                     }
                     else
                     {
+                        g.setOpacity (1.0f);
                         g.drawImage (im, imgR, juce::RectanglePlacement::centred);
                     }
                 }
@@ -330,7 +351,7 @@ public:
             const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
                 static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
             const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-            const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+            const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
             const auto gr = computeZoomGrilleRect (b, s, visualCab);
             if (! gr.isEmpty())
             {
@@ -370,7 +391,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
         const auto gr = computeZoomGrilleRect (b, s, visualCab);
         if (! gr.isEmpty())
             updateZoomMicFromPt (e.position, gr);
@@ -388,7 +409,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
         const auto gr = computeZoomGrilleRect (b, s, visualCab);
         if (gr.isEmpty()) return;
         const auto p1 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth(),
@@ -421,7 +442,7 @@ private:
     void cycleCab (int delta)
     {
         const bool bass = processor.isBassMode();
-        const int total = bass ? 8 : 9;
+        const int total = bass ? 9 : 10;
         const char* id = bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab;
         const int cur = static_cast<int> (std::lround (processor.apvts.getRawParameterValue (id)->load()));
         const int nxt = (cur + delta + total) % total;
@@ -438,8 +459,9 @@ private:
     std::vector<juce::Rectangle<float>> computeGridCells (juce::Rectangle<float> b, float s) const
     {
         const bool bass = processor.isBassMode();
-        const int count = bass ? 8 : 9;
-        const int cols = 3, rows = 3;
+        const int count = bass ? 9 : 10;
+        const int cols = 3;
+        const int rows = (count + cols - 1) / cols;
         const float topY = 214.0f * s;
         const float botY = b.getHeight() - 42.0f * s;
         const float gap = 8.0f * s;
@@ -503,14 +525,14 @@ private:
             {
                 if (cSpec.isOff)
                 {
-                    auto dim = im.createCopy();
-                    dim.desaturate();
-                    g.setColour (juce::Colours::white.withBrightness (0.42f).withAlpha (0.92f));
-                    g.drawImage (dim, cabR, juce::RectanglePlacement::stretchToFit, true);
-                    g.setColour (juce::Colours::white);
+                    auto dim = makeDimmedCabImage (im, 0.44f);
+                    g.setOpacity (0.94f);
+                    g.drawImage (dim, cabR, juce::RectanglePlacement::stretchToFit, false);
+                    g.setOpacity (1.0f);
                 }
                 else
                 {
+                    g.setOpacity (1.0f);
                     g.drawImage (im, cabR, juce::RectanglePlacement::stretchToFit);
                 }
             }
@@ -722,7 +744,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
 
         const auto innerR = padR.reduced (4.0f * s);
         if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
@@ -732,11 +754,10 @@ public:
             {
                 if (cSpec.isOff)
                 {
-                    auto dim = im.createCopy();
-                    dim.desaturate();
-                    g.setColour (juce::Colours::white.withBrightness (0.35f).withAlpha (0.55f));
-                    g.drawImage (dim, innerR, juce::RectanglePlacement::centred, true);
-                    g.setColour (juce::Colours::white);
+                    auto dim = makeDimmedCabImage (im, 0.36f);
+                    g.setOpacity (0.86f);
+                    g.drawImage (dim, innerR, juce::RectanglePlacement::centred, false);
+                    g.setOpacity (1.0f);
                 }
                 else
                 {
@@ -827,7 +848,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
         const auto gr = computeMiniGrilleRect (padR, s, visualCab);
         if (gr.isEmpty()) return;
 
@@ -850,7 +871,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
         const auto gr = computeMiniGrilleRect (padR, s, visualCab);
         if (! gr.isEmpty())
             updateFromPt (e.position, gr);
@@ -869,7 +890,7 @@ public:
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 4 : 1)] : cSpec;
+        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
         const auto gr = computeMiniGrilleRect (padR, s, visualCab);
         if (gr.isEmpty()) return;
         const auto p1 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth(),

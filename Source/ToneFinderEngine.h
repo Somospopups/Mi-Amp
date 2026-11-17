@@ -876,7 +876,7 @@ public:
                                     r.headBypass = true; // Siempre arrancar en SOLO PEDALES por defecto; usuario puede activar CON AMPLI luego
                                     r.dropSemi = std::clamp (static_cast<int> (parsed.getProperty ("dropSemi", 0)), -12, 12);
                                     r.gtrChannel = std::clamp (static_cast<int> (parsed.getProperty ("channel", 2)), 0, 2);
-                                    r.gtrCab = std::clamp (static_cast<int> (parsed.getProperty ("cab", 1)), 0, 4);
+                                    r.gtrCab = std::clamp (static_cast<int> (parsed.getProperty ("cab", 7)), 0, 9);
                                     r.gtrGain = std::clamp (static_cast<float> (parsed.getProperty ("gain", 66.0)), 0.f, 100.f);
                                     r.gtrBass = std::clamp (static_cast<float> (parsed.getProperty ("bass", 54.0)), 0.f, 100.f);
                                     r.gtrMid = std::clamp (static_cast<float> (parsed.getProperty ("mid", 58.0)), 0.f, 100.f);
@@ -939,7 +939,7 @@ public:
             proc.setParamNormalized (MiAmpParams::gtrPower, 1.0f);
             proc.setParamNormalized (MiAmpParams::gtrStandby, 0.0f);
             proc.setParamNormalized (MiAmpParams::gtrChannel, static_cast<float> (ch));
-            proc.setParamNormalized (MiAmpParams::gtrCab, static_cast<float> (std::clamp (r.gtrCab, 0, 4)));
+            proc.setParamNormalized (MiAmpParams::gtrCab, static_cast<float> (std::clamp (r.gtrCab, 0, 9)));
             proc.setParamNormalized (MiAmpParams::gtrModeBright, r.gtrBright ? 1.0f : 0.0f);
             proc.setParamNormalized (MiAmpParams::gtrChGain[ch], r.gtrGain);
             proc.setParamNormalized (MiAmpParams::gtrChBass[ch], r.gtrBass);
