@@ -453,6 +453,8 @@ public:
         addAndMakeVisible (*compMixKnob); addAndMakeVisible (*compXLoKnob); addAndMakeVisible (*compXHiKnob);
         for (int b = 0; b < 3; ++b)
         {
+            btnCompBOn[b].setButtonText ("ON");
+            btnCompBSolo[b].setButtonText ("S");
             bindToggle (btnCompBOn[b], MiAmpParams::sfxCompBOn[b]);
             bindToggle (btnCompBSolo[b], MiAmpParams::sfxCompBSol[b]);
             compThr[b] = std::make_unique<StudioMiniKnob> (processor.apvts, MiAmpParams::sfxCompBThr[b], "THR", "dB");
@@ -495,8 +497,10 @@ public:
 
         // 4. DIGITAL REVERB controls
         bindToggle (btnRevOn, MiAmpParams::sfxRevOn);
+        static constexpr const char* kRevModeNames[4] = { "PLATE", "HALL", "ROOM", "AMBIENT" };
         for (int m = 0; m < 4; ++m)
         {
+            btnRevMode[m].setButtonText (kRevModeNames[m]);
             btnRevMode[m].onClick = [this, m]
             {
                 setParamPlain (processor.apvts, MiAmpParams::sfxRevMode, static_cast<float> (m));
@@ -735,7 +739,7 @@ private:
     int eqReadoutBand = -1;
     juce::TextButton btnClose { juce::String::fromUTF8 (u8"\u00d7") };
 
-    juce::TextButton btnCompOn { "ON" }, btnCompBOn[3] { {"ON"},{"ON"},{"ON"} }, btnCompBSolo[3] { {"S"},{"S"},{"S"} };
+    juce::TextButton btnCompOn { "ON" }, btnCompBOn[3], btnCompBSolo[3];
     std::unique_ptr<StudioMiniKnob> compMixKnob, compXLoKnob, compXHiKnob;
     std::unique_ptr<StudioMiniKnob> compThr[3], compRat[3], compAtt[3], compRel[3], compGn[3];
 
@@ -747,7 +751,7 @@ private:
     std::unique_ptr<StudioMiniKnob> dlyTimeKnob, dlyFbKnob, dlyLoCutKnob, dlyHiCutKnob, dlyMixKnob;
 
     juce::TextButton btnRevOn { "ON" };
-    juce::TextButton btnRevMode[4] { {"PLATE"}, {"HALL"}, {"ROOM"}, {"AMBIENT"} };
+    juce::TextButton btnRevMode[4];
     std::unique_ptr<StudioMiniKnob> revPreKnob, revDecayKnob, revDampKnob, revWidthKnob, revMixKnob;
 };
 } // namespace miamp_rig
