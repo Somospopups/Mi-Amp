@@ -24,6 +24,8 @@ enum class Msg : int
     BtnTuner,
     BtnToneFinder,
     BtnPedals,
+    BtnCabs,
+    BtnStudioFx,
     BtnConfig,
     BtnSkip,
     BtnClose,
@@ -264,6 +266,10 @@ inline juce::String tr (Msg id)
         { u8"BUSCAR TONO", u8"TONE FINDER", u8"BUSCAR TIMBRE", u8"CHERCHER SON", u8"TONE FINDER" },
         // BtnPedals
         { u8"PEDALES", u8"PEDALS", u8"PEDAIS", u8"P\u00c9DALES", u8"PEDALE" },
+        // BtnCabs
+        { u8"CAJAS", u8"CABS", u8"CAIXAS", u8"BAFFLES", u8"BOXEN" },
+        // BtnStudioFx
+        { u8"STUDIO FX", u8"STUDIO FX", u8"STUDIO FX", u8"STUDIO FX", u8"STUDIO FX" },
         // BtnConfig
         { u8"CONFIG", u8"CONFIG", u8"CONFIG", u8"CONFIG", u8"CONFIG" },
         // BtnSkip

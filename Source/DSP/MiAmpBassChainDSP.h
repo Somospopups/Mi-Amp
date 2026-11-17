@@ -39,16 +39,35 @@ struct BassControlSnapshot
     float pitchCents     = 0.0f;
     float pitchMix       = 100.0f;
 
-    // Bass Amp Head
+    // Bass Amp Head & Model Selection (0..7 new + 8=Classic Mint)
+    int   headModel  = 0;
+    bool  useExternalCabEngine = true;
     bool  ampPower   = true;
     bool  ampStandby = false;
-    bool  ampUltraHi = false; // false = ULTRA-LO, true = ULTRA-HI
+    bool  ampUltraHi = false;
     bool  ampCabOn   = true;
     float ampGain    = 50.0f;
     float ampBass    = 50.0f;
     float ampMid     = 50.0f;
     float ampFreq    = 50.0f;
     float ampTreble  = 50.0f;
+
+    // Extended controls for modeled bass heads (v25)
+    float master     = 58.0f;
+    float tubeGain   = 50.0f;
+    float compCtrl   = 35.0f;
+    float driveCtrl  = 45.0f;
+    float toneCtrl   = 55.0f;
+    float blendCtrl  = 50.0f;
+    float loMid      = 50.0f;
+    float biAmpLo    = 55.0f;
+    bool  pad        = false;
+    bool  muteSw     = false;
+    bool  ultraLo    = false;
+    bool  brightSw   = false;
+    bool  deepSw     = false;
+    bool  headEqOn   = true;
+    std::array<float, 10> headEq { 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f, 50.0f };
 
     // Tuner Mute & Direct Pedalboard Mode (Head Bypass)
     bool  tunerMuted = false;
@@ -499,81 +518,204 @@ public:
         flHi.setHighShelf (sr, 4200.0, 0.0);
         eqBass.setLowShelf (sr, 80.0, 0.0);
         eqMid.setPeaking (sr, 600.0, 0.0, 1.2);
+        eqLoMid.setPeaking (sr, 250.0, 0.0, 1.1);
         eqTreble.setHighShelf (sr, 3200.0, 0.0);
+        driveToneLp.setLowPass (sr, 4200.0, 0.7071);
+        static constexpr double kGeHz[9] = { 31.0, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0 };
+        for (int b = 0; b < 9; ++b)
+            geBands[static_cast<size_t> (b)].setPeaking (sr, kGeHz[b], 0.0, 1.4);
         cab.prepare (sr);
         muteSmooth = 1.0f;
         cabSmooth  = 1.0f;
-        lastUltraHi = false;
-        lastBass = lastMid = lastFreq = lastTreble = -1.0f;
+        compEnv = 0.0f;
+        lastModel = -1;
+        lastUltraHi = lastUltraLo = lastBright = lastDeep = false;
+        lastBass = lastMid = lastFreq = lastLoMid = lastTreble = -1.0f;
+        lastHeadEq.fill (-1.0f);
     }
 
     void reset() noexcept
     {
         inHpf.reset(); flLo.reset(); flMid.reset(); flHi.reset();
-        eqBass.reset(); eqMid.reset(); eqTreble.reset();
+        eqBass.reset(); eqMid.reset(); eqLoMid.reset(); eqTreble.reset(); driveToneLp.reset();
+        for (auto& g : geBands) g.reset();
         cab.reset();
+        compEnv = 0.0f;
     }
 
     inline float process (float x, const BassControlSnapshot& snap, bool useHeadCab) noexcept
     {
-        const bool activeOut = snap.ampPower && ! snap.ampStandby && ! snap.tunerMuted;
+        const bool activeOut = snap.ampPower && ! snap.ampStandby && ! snap.tunerMuted && ! snap.muteSw;
         muteSmooth += 0.006f * ((activeOut ? 1.0f : 0.0f) - muteSmooth);
 
-        if (snap.ampUltraHi != lastUltraHi
-            || std::fabs (snap.ampBass - lastBass) > 0.25f
-            || std::fabs (snap.ampMid - lastMid) > 0.25f
-            || std::fabs (snap.ampFreq - lastFreq) > 0.25f
-            || std::fabs (snap.ampTreble - lastTreble) > 0.25f)
-        {
-            lastUltraHi = snap.ampUltraHi;
-            lastBass    = snap.ampBass;
-            lastMid     = snap.ampMid;
-            lastFreq    = snap.ampFreq;
-            lastTreble  = snap.ampTreble;
+        const int model = std::clamp (snap.headModel, 0, 8);
+        bool eqDirty = (model != lastModel
+                        || snap.ampUltraHi != lastUltraHi || snap.ultraLo != lastUltraLo
+                        || snap.brightSw != lastBright || snap.deepSw != lastDeep
+                        || std::fabs (snap.ampBass - lastBass) > 0.25f
+                        || std::fabs (snap.ampMid - lastMid) > 0.25f
+                        || std::fabs (snap.ampFreq - lastFreq) > 0.25f
+                        || std::fabs (snap.loMid - lastLoMid) > 0.25f
+                        || std::fabs (snap.ampTreble - lastTreble) > 0.25f);
+        for (int b = 0; b < 9 && ! eqDirty; ++b)
+            if (std::fabs (snap.headEq[static_cast<size_t> (b)] - lastHeadEq[static_cast<size_t> (b)]) > 0.25f)
+                eqDirty = true;
 
-            if (snap.ampUltraHi)
+        if (eqDirty)
+        {
+            lastModel   = model;
+            lastUltraHi = snap.ampUltraHi; lastUltraLo = snap.ultraLo;
+            lastBright  = snap.brightSw;   lastDeep    = snap.deepSw;
+            lastBass    = snap.ampBass;    lastMid     = snap.ampMid;
+            lastFreq    = snap.ampFreq;    lastLoMid   = snap.loMid;
+            lastTreble  = snap.ampTreble;
+            lastHeadEq  = snap.headEq;
+
+            if (model == 8)
             {
-                flLo.setLowShelf (sr, 65.0, 0.0);
-                flMid.setPeaking (sr, 450.0, 0.0, 0.9);
-                flHi.setHighShelf (sr, 4200.0, 4.8);
+                if (snap.ampUltraHi)
+                {
+                    flLo.setLowShelf (sr, 65.0, 0.0);
+                    flMid.setPeaking (sr, 450.0, 0.0, 0.9);
+                    flHi.setHighShelf (sr, 4200.0, 4.8);
+                }
+                else
+                {
+                    flLo.setLowShelf (sr, 65.0, 4.0);
+                    flMid.setPeaking (sr, 450.0, -2.5, 0.9);
+                    flHi.setHighShelf (sr, 4200.0, 0.0);
+                }
+                eqBass.setLowShelf (sr, 80.0, (snap.ampBass * 0.01 - 0.5) * 18.0);
+                const double midHz = 220.0 * std::pow (2800.0 / 220.0, snap.ampFreq * 0.01);
+                eqMid.setPeaking (sr, midHz, (snap.ampMid * 0.01 - 0.5) * 18.0, 1.2);
+                eqLoMid.setPeaking (sr, 250.0, 0.0, 1.0);
+                eqTreble.setHighShelf (sr, 3200.0, (snap.ampTreble * 0.01 - 0.5) * 18.0);
             }
             else
             {
-                flLo.setLowShelf (sr, 65.0, 4.0);
-                flMid.setPeaking (sr, 450.0, -2.5, 0.9);
-                flHi.setHighShelf (sr, 4200.0, 0.0);
-            }
+                const double loBoost = (snap.ultraLo || snap.deepSw) ? 4.2 : 0.0;
+                const double hiBoost = (snap.ampUltraHi || snap.brightSw) ? 5.2 : 0.0;
+                const double hpfHz   = (model == 3 && snap.ultraLo) ? 62.0 : (model == 5 ? 36.0 : 30.0); // GK Lo-Cut
+                inHpf.setHighPass (sr, hpfHz, 0.7071);
 
-            eqBass.setLowShelf (sr, 80.0, (snap.ampBass * 0.01 - 0.5) * 18.0);
-            const double midHz = 220.0 * std::pow (2800.0 / 220.0, snap.ampFreq * 0.01);
-            eqMid.setPeaking (sr, midHz, (snap.ampMid * 0.01 - 0.5) * 18.0, 1.2);
-            eqTreble.setHighShelf (sr, 3200.0, (snap.ampTreble * 0.01 - 0.5) * 18.0);
+                flLo.setLowShelf (sr, 65.0, loBoost);
+                flMid.setPeaking (sr, 460.0, (snap.ultraLo ? -2.8 : 0.0), 0.9);
+                flHi.setHighShelf (sr, 4200.0, hiBoost);
+
+                const double bassHz = (model == 5) ? 95.0 : (model == 4 ? 70.0 : 78.0);
+                const double trebHz = (model == 5) ? 2600.0 : (model == 3 ? 4000.0 : 3200.0);
+                eqBass.setLowShelf (sr, bassHz, (snap.ampBass * 0.01 - 0.5) * 16.0);
+                eqTreble.setHighShelf (sr, trebHz, (snap.ampTreble * 0.01 - 0.5) * 16.0);
+
+                if (model == 0 || model == 1) // CL-300 / PRO-450 5-pos Freq
+                {
+                    static constexpr double kSvtFreqs[5] = { 220.0, 450.0, 800.0, 1600.0, 3000.0 };
+                    const int step = std::clamp (static_cast<int> (std::floor (snap.ampFreq / 20.01f)), 0, 4);
+                    eqMid.setPeaking (sr, kSvtFreqs[step], (snap.ampMid * 0.01 - 0.5) * 16.0, 1.25);
+                    eqLoMid.setPeaking (sr, 250.0, 0.0, 1.0);
+                }
+                else if (model == 3 || model == 4) // RB-800 / M-900 dual mid (Lo-Mid + Hi-Mid)
+                {
+                    eqLoMid.setPeaking (sr, (model == 4 ? 320.0 : 280.0), (snap.loMid * 0.01 - 0.5) * 15.0, 1.15);
+                    eqMid.setPeaking   (sr, (model == 4 ? 1600.0 : 1150.0), (snap.ampMid * 0.01 - 0.5) * 15.0, 1.15);
+                }
+                else
+                {
+                    eqMid.setPeaking   (sr, (model == 6 ? 520.0 : 620.0), (snap.ampMid * 0.01 - 0.5) * 15.0, 1.1);
+                    eqLoMid.setPeaking (sr, 250.0, 0.0, 1.0);
+                }
+
+                // 9-band (PRO-450) or 6-band (M-900) Graphic EQ
+                if (model == 1)
+                {
+                    static constexpr double kProHz[9] = { 31.0, 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0 };
+                    for (int b = 0; b < 9; ++b)
+                        geBands[static_cast<size_t> (b)].setPeaking (sr, kProHz[b], (snap.headEq[static_cast<size_t> (b)] * 0.01 - 0.5) * 20.0, 1.6);
+                }
+                else if (model == 4)
+                {
+                    static constexpr double kDgHz[6] = { 80.0, 250.0, 500.0, 1500.0, 3000.0, 6000.0 };
+                    for (int b = 0; b < 6; ++b)
+                        geBands[static_cast<size_t> (b)].setPeaking (sr, kDgHz[b], (snap.headEq[static_cast<size_t> (b)] * 0.01 - 0.5) * 20.0, 1.4);
+                }
+            }
         }
 
+        const float padScale = snap.pad ? 0.40f : 1.0f;
+        float s = inHpf.processSample (x * padScale);
         const float gn = std::clamp (snap.ampGain * 0.01f, 0.0f, 1.0f);
-        const float driveScale = 0.55f + gn * 2.6f;
-        const float compGain   = 1.0f / (0.65f + gn * 0.55f);
 
-        float s = inHpf.processSample (x);
-        const float v = s * driveScale;
-        s = (std::tanh (v * 3.4f + 0.12f * v * std::fabs (v)) * 0.85f) * compGain;
-        s = flHi.processSample (flMid.processSample (flLo.processSample (s)));
-        s = eqTreble.processSample (eqMid.processSample (eqBass.processSample (s)));
+        if (model == 8)
+        {
+            const float driveScale = 0.55f + gn * 2.6f;
+            const float compGain   = 1.0f / (0.65f + gn * 0.55f);
+            const float v = s * driveScale;
+            s = (std::tanh (v * 3.4f + 0.12f * v * std::fabs (v)) * 0.85f) * compGain;
+            s = flHi.processSample (flMid.processSample (flLo.processSample (s)));
+            s = eqTreble.processSample (eqMid.processSample (eqBass.processSample (s)));
+        }
+        else if (model == 4) // M-900: Built-in Comp + Parallel Microtubes Drive/Blend + 6-band EQ
+        {
+            const float compAmt = std::clamp (snap.compCtrl * 0.01f, 0.0f, 1.0f);
+            const float pk = std::fabs (s);
+            compEnv = (pk > compEnv) ? (0.985f * compEnv + 0.015f * pk) : (0.9992f * compEnv + 0.0008f * pk);
+            const float cGain = (compAmt > 0.02f && compEnv > 0.08f) ? (1.0f / (1.0f + compAmt * (compEnv - 0.08f) * 4.0f)) : 1.0f;
+            s *= cGain * (1.0f + compAmt * 0.35f);
+
+            const float cleanPath = s * (0.75f + gn * 0.85f);
+            const float drvGain = 1.6f + (snap.driveCtrl * 0.01f) * 14.0f + gn * 4.0f;
+            driveToneLp.setLowPass (sr, 1200.0 + (snap.toneCtrl * 0.01) * 5200.0, 0.7071);
+            float dirtyPath = std::tanh (cleanPath * drvGain + (snap.brightSw ? 0.14f : -0.10f)) - (snap.brightSw ? 0.14f : -0.10f);
+            dirtyPath = driveToneLp.processSample (dirtyPath) * 0.82f;
+            const float bl = std::clamp (snap.blendCtrl * 0.01f, 0.0f, 1.0f);
+            s = cleanPath * (1.0f - bl * 0.65f) + dirtyPath * bl;
+            s = eqTreble.processSample (eqMid.processSample (eqLoMid.processSample (eqBass.processSample (s))));
+            if (snap.headEqOn)
+                for (int b = 0; b < 6; ++b)
+                    s = geBands[static_cast<size_t> (b)].processSample (s);
+        }
+        else
+        {
+            const float tubeExtra = (model == 1) ? (snap.tubeGain * 0.01f * 1.4f) : ((model == 3 && snap.brightSw) ? (snap.driveCtrl * 0.01f * 1.8f) : 0.0f);
+            const float driveScale = (model == 5 ? 0.45f : 0.55f) + gn * (model == 6 ? 3.1f : 2.5f) + tubeExtra;
+            const float compGain   = 1.0f / (0.65f + gn * 0.55f);
+            const float asym = (model == 5 || model == 2) ? 0.08f : 0.14f;
+            const float v = s * driveScale;
+            s = (std::tanh (v * 3.1f + asym * v * std::fabs (v)) * 0.86f) * compGain;
+            s = flHi.processSample (flMid.processSample (flLo.processSample (s)));
+            s = eqTreble.processSample (eqMid.processSample (eqLoMid.processSample (eqBass.processSample (s))));
+
+            if (model == 1 && snap.headEqOn) // PRO-450 9-band Graphic EQ + Level
+            {
+                for (int b = 0; b < 9; ++b)
+                    s = geBands[static_cast<size_t> (b)].processSample (s);
+                const float eqLvl = std::pow (10.0f, ((snap.headEq[9] * 0.01f - 0.5f) * 14.0f) / 20.0f);
+                s *= eqLvl;
+            }
+        }
+
+        const float mastGain = (model == 8) ? 1.0f : (0.45f + std::clamp (snap.master * 0.01f, 0.0f, 1.0f) * 1.25f);
+        s *= mastGain;
+
+        if (snap.useExternalCabEngine)
+            return std::tanh (s * 0.92f) * 0.94f * muteSmooth;
 
         cabSmooth += 0.008f * ((useHeadCab ? 1.0f : 0.0f) - cabSmooth);
         const float cabSig = cab.processSample (s, 0) * 0.85f;
         const float mixed  = cabSig * cabSmooth + s * (1.0f - cabSmooth);
-
         return std::tanh (mixed * 0.95f) * 0.94f * muteSmooth;
     }
 
 private:
     double sr = 48000.0;
-    xvdsp::Biquad inHpf, flLo, flMid, flHi, eqBass, eqMid, eqTreble;
+    xvdsp::Biquad inHpf, flLo, flMid, flHi, eqBass, eqMid, eqLoMid, eqTreble, driveToneLp;
+    std::array<xvdsp::Biquad, 9> geBands;
     xvdsp::CabIrConvolver cab;
-    float muteSmooth = 1.0f, cabSmooth = 1.0f;
-    bool  lastUltraHi = false;
-    float lastBass = -1.0f, lastMid = -1.0f, lastFreq = -1.0f, lastTreble = -1.0f;
+    float muteSmooth = 1.0f, cabSmooth = 1.0f, compEnv = 0.0f;
+    int   lastModel = -1;
+    bool  lastUltraHi = false, lastUltraLo = false, lastBright = false, lastDeep = false;
+    float lastBass = -1.0f, lastMid = -1.0f, lastFreq = -1.0f, lastLoMid = -1.0f, lastTreble = -1.0f;
+    std::array<float, 10> lastHeadEq {};
 };
 
 class MiAmpBassChannel

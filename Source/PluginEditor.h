@@ -3,6 +3,10 @@
 #include "ToneFinderEngine.h"
 #include "Localization.h"
 #include "AutoUpdater.h"
+#include "AmpCatalogSpecs.h"
+#include "RigStageComponents.h"
+#include "StudioFxModal.h"
+#include "CabPanels.h"
 
 class MiAmpAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                         private juce::Timer
@@ -14,6 +18,7 @@ public:
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
     void resized() override;
+    bool keyPressed (const juce::KeyPress& key) override;
 
     static juce::String formatNoteName (const char* noteName, int octave, bool useSolfege);
     static juce::String formatNoteNameOnly (const char* noteName, bool useSolfege);
@@ -32,6 +37,7 @@ private:
     struct Images
     {
         juce::Image introSky, introLogo, popupsCredit, guitarKnobRing;
+        juce::Image skateparkTall, mic57, mic87;
         juce::Image guitarBg, bassBg, bassKnobCap, toggleUp, toggleDown;
         juce::Image floorBg, boardSurface;
         juce::Image xvActive, xvBypass, xvKnobPtr, xvCabBass, xvCabPunk, xvCabClean;
@@ -202,11 +208,16 @@ private:
     void setFloorMode (bool floor);
     void switchInstrument (bool toBass);
     void togglePopover (PopoverKind kind);
+    void closeFloatingOverlays (const char* except = nullptr);
+    void cycleActiveHead (int delta);
     void applyLanguageTexts();
     void startAutoUpdateCheck (bool manualFromConfig = false);
     void beginAutoUpdateDownload (const miamp_updater::UpdateInfo& info);
     void dismissUpdateModal();
     void syncHeadControls();
+    void rebuildRigHeadControls();
+    void computeRigStageLayout (juce::Rectangle<float>& cabRectOut, juce::Rectangle<float>& headRectOut,
+                                juce::Rectangle<float>& grilleRectOut) const;
     void syncPedalEditorControls();
     void syncPalettePositions();
     void layoutAll();
@@ -243,6 +254,11 @@ private:
     Images imgs;
 
     bool isFloorMode = false;
+    bool closeUpView = true; // true = Primer Plano (default, close to head), false = Rig & Mics (full stack + draggable mics)
+    bool consoleOpen = false; // bottom console strip hidden by default
+    bool cabDrawerOpen = false; // left cabinet picker & dual-mics drawer
+    bool cabMicZoom = false; // full-size cab inside cabPickerPanel when MOVER EN CAB active
+    float cabDrawerAnim = 0.0f; // smooth 0..1 pan animation for stage & skatepark
     bool editorOpen = true;
     bool floorTunerOpen = false;
     bool useSolfege = false; // false = C D E F G A B, true = Do Re Mi Fa Sol La Si
@@ -280,10 +296,36 @@ private:
 
     // Head right menu (.menu) - unified right glass panel
     juce::TextButton btnInstGuitar { "GUITARRA" }, btnInstBass { "BAJO" };
-    juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainToneFinder { "BUSCAR TONO" }, btnMainPedals { "PEDALES" };
+    juce::TextButton btnMainHeads { "CABEZALES" }, btnMainCabs { "CAJAS" };
+    juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainToneFinder { "BUSCAR TONO" },
+                     btnMainPedals { "PEDALES" }, btnMainStudioFx { "STUDIO FX" }, btnMainConsole { "CONSOLA" };
     juce::TextButton btnDockDrop { "DROP" }, btnDockConfig { "CONFIG" };
+    juce::TextButton btnViewCloseUp { "PRIMER PLANO" }, btnViewRigMics { "RIG & MICS" };
 
-    // Head physical knobs & switches
+    // Modular v25 Rig Controls + Console Strip + Dual Mics + Overlays
+    std::vector<std::unique_ptr<miamp_rig::RigHeadKnob>> rigKnobs;
+    std::vector<std::unique_ptr<miamp_rig::RigHeadSwitch>> rigSwitches;
+    std::vector<std::unique_ptr<miamp_rig::RigHeadSlider>> rigSliders;
+    int lastBuiltRigModel = -1;
+    bool lastBuiltRigBass = false;
+
+    std::unique_ptr<miamp_rig::RigMicBody> mic1Body, mic2Body;
+    std::unique_ptr<miamp_rig::HeadSideArrowButton> btnHeadSidePrev, btnHeadSideNext;
+    std::unique_ptr<miamp_rig::CabPickerPanel> cabPickerPanel;
+    std::unique_ptr<miamp_rig::CabMicsPanel> cabMicsPanel;
+    std::unique_ptr<miamp_rig::RigBrowserOverlay> rigBrowser;
+    std::unique_ptr<miamp_rig::StudioFxModal> studioFxModal;
+
+    // Bottom Analog Console Controls
+    juce::TextButton btnAmpPrev { "<" }, btnAmpNext { ">" }, btnAmpBrowse { "AMP" };
+    juce::TextButton btnCabPrev { "<" }, btnCabNext { ">" }, btnCabBrowse { "CABINET" }, btnCabLoadWav { ".WAV" };
+    juce::TextButton btnMic1On { "MI-57" }, btnMic1Dist { "CLS" }, btnMic1Phase { "Ø" };
+    juce::TextButton btnMic2On { "MI-87" }, btnMic2Dist { "MID" }, btnMic2Phase { "Ø" };
+    juce::TextButton btnConsoleStudioFx { "STUDIO FX" }, btnConsolePower { "POWER" };
+    std::unique_ptr<miamp_rig::StudioMiniKnob> conKnobs[5]; // Gain, Bass, Mid, Treble, Master
+    std::unique_ptr<miamp_rig::StudioMiniKnob> conMicMixKnob, conRoomKnob;
+
+    // Legacy Mint Head physical knobs & switches (used when Zenbox/Classic Mint selected)
     std::unique_ptr<ImageRotaryKnob> guitarHeadKnobs[19];
     std::unique_ptr<ImageToggleSwitch> guitarHeadSwitches[3];
     std::unique_ptr<ImageRotaryKnob> bassHeadKnobs[5];

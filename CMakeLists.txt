@@ -63,6 +63,10 @@ target_sources(MiAmp
         Source/PluginProcessor.h
         Source/PluginEditor.cpp
         Source/PluginEditor.h
+        Source/AmpCatalogSpecs.h
+        Source/RigStageComponents.h
+        Source/StudioFxModal.h
+        Source/CabPanels.h
         Source/PedalCatalogSpecs.h
         Source/ToneFinderEngine.h
         Source/PresetExporter.h
@@ -71,6 +75,8 @@ target_sources(MiAmp
         Source/StandaloneAudioBridge.h
         Source/DSP/MiAmpBassChainDSP.h
         Source/DSP/MiAmpGuitarChainDSP.h
+        Source/DSP/MiAmpCabMicDSP.h
+        Source/DSP/MiAmpStudioFxDSP.h
         Source/DSP/MiAmpBoutiquePedalsDSP.h
         Source/DSP/ZenboxCabIRs.h
         Source/DSP/XVBassDSP.h
@@ -142,6 +148,66 @@ juce_add_binary_data(MiAmpAssets
         Resources/ped2_mi_violet_body.png
         Resources/ped2_mi_violet_knob.png
         Resources/ped2_slider_eq_cap.png
+        Resources/rig/bass_cab_1x15_b15.png
+        Resources/rig/bass_cab_4x10_aguilar.png
+        Resources/rig/bass_cab_4x10_gk.png
+        Resources/rig/bass_cab_6x10_heavy.png
+        Resources/rig/bass_cab_8x10_classic.png
+        Resources/rig/bass_cab_8x10_tangerine.png
+        Resources/rig/bass_head_aguilar.png
+        Resources/rig/bass_head_b15.png
+        Resources/rig/bass_head_bassman.png
+        Resources/rig/bass_head_dg900.png
+        Resources/rig/bass_head_gk800.png
+        Resources/rig/bass_head_mint.png
+        Resources/rig/bass_head_orange200.png
+        Resources/rig/bass_head_svt.png
+        Resources/rig/bass_head_svt3pro.png
+        Resources/rig/cab_2x12_classa.png
+        Resources/rig/cab_2x12_twin.png
+        Resources/rig/cab_4x12_britv30.png
+        Resources/rig/cab_4x12_evh.png
+        Resources/rig/cab_4x12_green.png
+        Resources/rig/cab_4x12_recto.png
+        Resources/rig/cab_4x12_tangerine.png
+        Resources/rig/head_mi6505.png
+        Resources/rig/head_mi800.png
+        Resources/rig/head_miac30.png
+        Resources/rig/head_mibe100.png
+        Resources/rig/head_miplexi.png
+        Resources/rig/head_mirecto.png
+        Resources/rig/head_mirocker.png
+        Resources/rig/head_mitwin.png
+        Resources/rig/head_zenbox_mint.png
+        Resources/rig/knob_aguilar_silver.png
+        Resources/rig/knob_bass_mint.png
+        Resources/rig/knob_be_black.png
+        Resources/rig/knob_chicken_cream.png
+        Resources/rig/knob_dg_alum.png
+        Resources/rig/knob_fender_skirt.png
+        Resources/rig/knob_gk_black.png
+        Resources/rig/knob_marshall_gold.png
+        Resources/rig/knob_mesa_chrome.png
+        Resources/rig/knob_orange_black.png
+        Resources/rig/knob_peavey_black.png
+        Resources/rig/knob_svt_fluted.png
+        Resources/rig/knob_zenbox_mint.png
+        Resources/rig/mic_mi57_clean.png
+        Resources/rig/mic_mi87_clean.png
+        Resources/rig/fader_cap_hq.png
+        Resources/rig/sw_push_round_off.png
+        Resources/rig/sw_push_round_on.png
+        Resources/rig/sw_push_square_off.png
+        Resources/rig/sw_push_square_on.png
+        Resources/rig/sw_rocker_black_off.png
+        Resources/rig/sw_rocker_black_on.png
+        Resources/rig/sw_rocker_red_off.png
+        Resources/rig/sw_rocker_red_on.png
+        Resources/rig/sw_slide_black_off.png
+        Resources/rig/sw_slide_black_on.png
+        Resources/rig/sw_toggle_silver_off.png
+        Resources/rig/sw_toggle_silver_on.png
+        Resources/rig/skatepark_tall_capa0.jpg
 )
 
 target_compile_definitions(MiAmp

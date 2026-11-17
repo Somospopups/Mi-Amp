@@ -254,29 +254,30 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
         return;
     }
 
-    if (id == "headMenuPresets" || id == "headMenuTuner" || id == "headMenuToneFinder" || id == "headMenuPedals" || id == "headMenuConfig")
+    if (id == "headMenuPresets" || id == "headMenuTuner" || id == "headMenuToneFinder" || id == "headMenuPedals"
+        || id == "headMenuCabs" || id == "headMenuStudioFx" || id == "headMenuConfig")
     {
         const float bh = static_cast<float> (bounds.getHeight());
-        const float sc = bh / 38.0f;
-        const float hFont = juce::jlimit (9.5f, 13.0f, bh * 0.34f);
+        const float sc = bh / 36.0f;
+        const float hFont = juce::jlimit (9.5f, 12.5f, bh * 0.33f);
         g.setFont (sansFont (hFont, juce::Font::bold));
         g.setColour (b.isEnabled() ? juce::Colour::fromRGB (250, 243, 227)
                                    : juce::Colour::fromRGBA (250, 243, 227, 105));
 
-        // All words aligned cleanly on the left; all icons aligned cleanly on the right
-        const float leftPad = 34.0f * sc;
-        const float rightPad = 34.0f * sc;
+        // Left-aligned text & right-aligned thin icons (matching preview #right-menu .menu-btn)
+        const float leftPad = 14.0f * sc;
+        const float rightPad = 14.0f * sc;
         auto txtR = juce::Rectangle<float> (static_cast<float> (bounds.getX()) + leftPad,
                                             static_cast<float> (bounds.getY()),
-                                            static_cast<float> (bounds.getWidth()) - leftPad - rightPad - 18.0f * sc,
+                                            static_cast<float> (bounds.getWidth()) - leftPad - rightPad - 20.0f * sc,
                                             bh);
         g.drawFittedText (b.getButtonText(), txtR.toNearestInt(), juce::Justification::centredLeft, 1);
 
-        const float sz = 12.5f * sc;
+        const float sz = 14.0f * sc;
         const float cx = static_cast<float> (bounds.getRight()) - rightPad - sz * 0.5f;
         const float cy = bounds.toFloat().getCentreY();
         const float lw = juce::jmax (1.1f, 1.35f * sc);
-        g.setColour (juce::Colour::fromRGBA (244, 234, 214, 185));
+        g.setColour (juce::Colour::fromRGBA (244, 234, 214, 195));
 
         if (id == "headMenuPresets")
         {
@@ -323,6 +324,32 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
             g.drawEllipse (cx + bw * 0.44f - kr, cy - bh2 * 0.44f - kr, kr * 2.0f, kr * 2.0f, lw);
             const float fr = sz * 0.095f;
             g.drawEllipse (cx - fr, cy + bh2 * 0.36f - fr, fr * 2.0f, fr * 2.0f, lw);
+        }
+        else if (id == "headMenuCabs")
+        {
+            // 2x2 speaker cabinet icon matching preview
+            const float bw = sz * 0.44f;
+            g.drawRoundedRectangle (juce::Rectangle<float> (cx - bw, cy - bw, bw * 2.0f, bw * 2.0f), sz * 0.10f, lw);
+            const float sr = sz * 0.135f;
+            const float off = sz * 0.19f;
+            g.drawEllipse (cx - off - sr, cy - off - sr, sr * 2.0f, sr * 2.0f, lw * 0.9f);
+            g.drawEllipse (cx + off - sr, cy - off - sr, sr * 2.0f, sr * 2.0f, lw * 0.9f);
+            g.drawEllipse (cx - off - sr, cy + off - sr, sr * 2.0f, sr * 2.0f, lw * 0.9f);
+            g.drawEllipse (cx + off - sr, cy + off - sr, sr * 2.0f, sr * 2.0f, lw * 0.9f);
+        }
+        else if (id == "headMenuStudioFx")
+        {
+            // Stereo waveform / EQ rack icon
+            const float x0 = cx - sz * 0.46f, x1 = cx + sz * 0.46f;
+            g.drawRoundedRectangle (juce::Rectangle<float> (x0, cy - sz * 0.36f, x1 - x0, sz * 0.72f), sz * 0.10f, lw);
+            const float barW = sz * 0.10f;
+            const float hs[4] = { 0.36f, 0.56f, 0.28f, 0.48f };
+            for (int k = 0; k < 4; ++k)
+            {
+                const float bx = cx - sz * 0.28f + k * sz * 0.18f;
+                const float bh2 = sz * hs[k];
+                g.fillRoundedRectangle (bx - barW * 0.5f, cy - bh2 * 0.5f, barW, bh2, barW * 0.4f);
+            }
         }
         else // headMenuConfig (gear)
         {
@@ -2622,11 +2649,15 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
     setLookAndFeel (&glassLaf);
+    setWantsKeyboardFocus (true);
     loadImages();
 
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
-                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
-                     &btnDockDrop, &btnDockConfig,
+                     &btnInstGuitar, &btnInstBass, &btnMainHeads, &btnMainCabs, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainStudioFx, &btnMainConsole,
+                     &btnDockDrop, &btnDockConfig, &btnViewCloseUp, &btnViewRigMics,
+                     &btnAmpPrev, &btnAmpNext, &btnAmpBrowse, &btnCabPrev, &btnCabNext, &btnCabBrowse, &btnCabLoadWav,
+                     &btnMic1On, &btnMic1Dist, &btnMic1Phase, &btnMic2On, &btnMic2Dist, &btnMic2Phase,
+                     &btnConsoleStudioFx, &btnConsolePower,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
                      &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
                      &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
@@ -2657,13 +2688,210 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     btnMainToneFinder.onClick = [this] { togglePopover (PopoverKind::ToneFinder); };
     addAndMakeVisible (btnMainPedals);
     btnMainPedals.setComponentID ("headMenuPedals");
-    btnMainPedals.onClick = [this] { setFloorMode (true); };
+    btnMainPedals.onClick = [this] { closeFloatingOverlays(); setFloorMode (true); };
+
+    addAndMakeVisible (btnMainCabs);
+    btnMainCabs.setComponentID ("headMenuCabs");
+    btnMainCabs.onClick = [this]
+    {
+        const bool next = ! cabDrawerOpen;
+        closeFloatingOverlays (next ? "cabDrawer" : nullptr);
+        cabDrawerOpen = next;
+        if (! next) cabMicZoom = false;
+        syncHeadControls();
+        layoutAll();
+        repaint();
+    };
+
+    addAndMakeVisible (btnMainStudioFx);
+    btnMainStudioFx.setComponentID ("headMenuStudioFx");
+    btnMainStudioFx.onClick = [this]
+    {
+        if (studioFxModal != nullptr)
+        {
+            const bool openNext = ! studioFxModal->isVisible();
+            if (openNext) closeFloatingOverlays ("studioFx");
+            studioFxModal->syncControls();
+            studioFxModal->setVisible (openNext);
+            if (openNext) studioFxModal->toFront (true);
+            syncHeadControls();
+            layoutAll();
+        }
+    };
 
     addChildComponent (btnDockDrop); // Drop is now integrated inside AFINADOR
     btnDockDrop.onClick = [this] { togglePopover (PopoverKind::Tuner); };
     addAndMakeVisible (btnDockConfig);
     btnDockConfig.setComponentID ("headMenuConfig");
     btnDockConfig.onClick = [this] { togglePopover (PopoverKind::Config); };
+
+    // View mode & legacy menu buttons kept hidden so right menu matches 7-button preview layout
+    addChildComponent (btnViewCloseUp);
+    addChildComponent (btnViewRigMics);
+    addChildComponent (btnMainHeads);
+    addChildComponent (btnMainConsole);
+    btnViewCloseUp.onClick = [this] { closeUpView = true;  syncHeadControls(); layoutAll(); repaint(); };
+    btnViewRigMics.onClick = [this] { closeUpView = false; syncHeadControls(); layoutAll(); repaint(); };
+
+    // Mirrored side head-selector arrows + left cabinet/mics frosted drawer
+    btnHeadSidePrev = std::make_unique<miamp_rig::HeadSideArrowButton> (false);
+    btnHeadSideNext = std::make_unique<miamp_rig::HeadSideArrowButton> (true);
+    btnHeadSidePrev->onClick = [this] { cycleActiveHead (-1); };
+    btnHeadSideNext->onClick = [this] { cycleActiveHead (+1); };
+    addAndMakeVisible (*btnHeadSidePrev);
+    addAndMakeVisible (*btnHeadSideNext);
+
+    cabPickerPanel = std::make_unique<miamp_rig::CabPickerPanel> (
+        audioProcessor,
+        [this]
+        {
+            syncHeadControls();
+            layoutAll();
+            repaint();
+        },
+        [this]
+        {
+            cabDrawerOpen = false;
+            cabMicZoom = false;
+            syncHeadControls();
+            layoutAll();
+            repaint();
+        },
+        [this]
+        {
+            cabMicZoom = false;
+            if (cabPickerPanel) cabPickerPanel->setMicZoom (false);
+            if (cabMicsPanel) cabMicsPanel->setMicZoomActive (false);
+            layoutAll();
+            repaint();
+        },
+        [this] { if (rigBrowser) rigBrowser->openWavChooser(); });
+    cabPickerPanel->setLookAndFeel (&glassLaf);
+    addChildComponent (*cabPickerPanel);
+
+    cabMicsPanel = std::make_unique<miamp_rig::CabMicsPanel> (
+        audioProcessor,
+        [this]
+        {
+            if (cabPickerPanel && cabMicZoom) cabPickerPanel->repaint();
+            syncHeadControls();
+            layoutAll();
+            repaint();
+        },
+        [this]
+        {
+            cabMicZoom = ! cabMicZoom;
+            if (cabPickerPanel) cabPickerPanel->setMicZoom (cabMicZoom);
+            if (cabMicsPanel) cabMicsPanel->setMicZoomActive (cabMicZoom);
+            layoutAll();
+            repaint();
+        });
+    cabMicsPanel->setLookAndFeel (&glassLaf);
+    addChildComponent (*cabMicsPanel);
+
+    // Bottom Analog Console Strip Controls
+    auto cycleHead = [this] (int delta)
+    {
+        const bool bass = audioProcessor.isBassMode();
+        const char* id = bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel;
+        const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (id)->load()));
+        const int nxt = (cur + delta + 9) % 9;
+        miamp_rig::setParamPlain (audioProcessor.apvts, id, static_cast<float> (nxt));
+        syncHeadControls();
+        layoutAll();
+        repaint();
+    };
+    auto cycleCab = [this] (int delta)
+    {
+        const bool bass = audioProcessor.isBassMode();
+        const char* id = bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab;
+        const int total = bass ? 8 : 9;
+        const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (id)->load()));
+        const int nxt = (cur + delta + total) % total;
+        miamp_rig::setParamPlain (audioProcessor.apvts, id, static_cast<float> (nxt));
+        syncHeadControls();
+        layoutAll();
+        repaint();
+    };
+
+    addAndMakeVisible (btnAmpPrev);   btnAmpPrev.onClick   = [cycleHead] { cycleHead (-1); };
+    addAndMakeVisible (btnAmpNext);   btnAmpNext.onClick   = [cycleHead] { cycleHead (+1); };
+    addAndMakeVisible (btnAmpBrowse); btnAmpBrowse.onClick = [this] { closeFloatingOverlays ("rigBrowser"); if (rigBrowser) rigBrowser->openMode (miamp_rig::RigBrowserOverlay::Mode::Heads); syncHeadControls(); };
+
+    addAndMakeVisible (btnCabPrev);    btnCabPrev.onClick    = [cycleCab] { cycleCab (-1); };
+    addAndMakeVisible (btnCabNext);    btnCabNext.onClick    = [cycleCab] { cycleCab (+1); };
+    addAndMakeVisible (btnCabBrowse);  btnCabBrowse.onClick  = [this] { closeFloatingOverlays ("rigBrowser"); if (rigBrowser) rigBrowser->openMode (miamp_rig::RigBrowserOverlay::Mode::Cabs); syncHeadControls(); };
+    addAndMakeVisible (btnCabLoadWav); btnCabLoadWav.onClick = [this] { closeFloatingOverlays ("rigBrowser"); if (rigBrowser) rigBrowser->openWavChooser(); syncHeadControls(); };
+
+    auto bindMicToggle = [this] (juce::TextButton& b, const char* id)
+    {
+        b.setClickingTogglesState (true);
+        b.onClick = [this, &b, id] { miamp_rig::setParamPlain (audioProcessor.apvts, id, b.getToggleState() ? 1.0f : 0.0f); syncHeadControls(); layoutAll(); repaint(); };
+        addAndMakeVisible (b);
+    };
+    bindMicToggle (btnMic1On, MiAmpParams::mic1On);
+    bindMicToggle (btnMic1Phase, MiAmpParams::mic1Phase);
+    bindMicToggle (btnMic2On, MiAmpParams::mic2On);
+    bindMicToggle (btnMic2Phase, MiAmpParams::mic2Phase);
+
+    auto cycleMicDist = [this] (const char* id)
+    {
+        const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (id)->load()));
+        miamp_rig::setParamPlain (audioProcessor.apvts, id, static_cast<float> ((cur + 1) % 3));
+        syncHeadControls();
+        layoutAll();
+        repaint();
+    };
+    addAndMakeVisible (btnMic1Dist); btnMic1Dist.onClick = [cycleMicDist] { cycleMicDist (MiAmpParams::mic1Dist); };
+    addAndMakeVisible (btnMic2Dist); btnMic2Dist.onClick = [cycleMicDist] { cycleMicDist (MiAmpParams::mic2Dist); };
+
+    addAndMakeVisible (btnConsoleStudioFx);
+    btnConsoleStudioFx.onClick = [this]
+    {
+        if (studioFxModal != nullptr)
+        {
+            const bool openNext = ! studioFxModal->isVisible();
+            if (openNext) closeFloatingOverlays ("studioFx");
+            studioFxModal->syncControls();
+            studioFxModal->setVisible (openNext);
+            if (openNext) studioFxModal->toFront (true);
+            syncHeadControls();
+            layoutAll();
+        }
+    };
+    addAndMakeVisible (btnConsolePower);
+    btnConsolePower.setClickingTogglesState (true);
+    btnConsolePower.onClick = [this]
+    {
+        const bool bass = audioProcessor.isBassMode();
+        miamp_rig::setParamPlain (audioProcessor.apvts, bass ? MiAmpParams::ampPower : MiAmpParams::gtrPower,
+                                  btnConsolePower.getToggleState() ? 1.0f : 0.0f);
+        syncHeadControls();
+        repaint();
+    };
+
+    const char* conNames[5] = { "GAIN", "BASS", "MID", "TREBLE", "MASTER" };
+    const char* conIds[5]   = { MiAmpParams::gtrChGain[1], MiAmpParams::gtrChBass[1], MiAmpParams::gtrChMid[1],
+                                MiAmpParams::gtrChTreble[1], MiAmpParams::gtrChMaster[1] };
+    for (int i = 0; i < 5; ++i)
+    {
+        conKnobs[i] = std::make_unique<miamp_rig::StudioMiniKnob> (audioProcessor.apvts, conIds[i], conNames[i], "%");
+        addAndMakeVisible (*conKnobs[i]);
+    }
+    conMicMixKnob = std::make_unique<miamp_rig::StudioMiniKnob> (audioProcessor.apvts, MiAmpParams::cabMicMix, "MIC MIX", "%");
+    conRoomKnob   = std::make_unique<miamp_rig::StudioMiniKnob> (audioProcessor.apvts, MiAmpParams::cabRoom, "ROOM", "%");
+    addAndMakeVisible (*conMicMixKnob);
+    addAndMakeVisible (*conRoomKnob);
+
+    // Layer 3 Bare Draggable Microphones (MI-57 & MI-87)
+    mic1Body = std::make_unique<miamp_rig::RigMicBody> (audioProcessor.apvts, false, imgs.mic57,
+        [this] (const juce::String& t) { showHud (t); },
+        [this] { layoutAll(); repaint(); });
+    mic2Body = std::make_unique<miamp_rig::RigMicBody> (audioProcessor.apvts, true, imgs.mic87,
+        [this] (const juce::String& t) { showHud (t); },
+        [this] { layoutAll(); repaint(); });
+    addChildComponent (*mic1Body);
+    addChildComponent (*mic2Body);
 
     // Bass Head Knobs & Switches
     for (int i = 0; i < 5; ++i)
@@ -2875,6 +3103,19 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     updateOverlay = std::make_unique<UpdateOverlayComponent> (*this);
     addChildComponent (*updateOverlay);
 
+    rigBrowser = std::make_unique<miamp_rig::RigBrowserOverlay> (
+        audioProcessor,
+        [this] { syncHeadControls(); layoutAll(); repaint(); },
+        [this] { if (rigBrowser) rigBrowser->setVisible (false); });
+    rigBrowser->setLookAndFeel (&glassLaf);
+    addChildComponent (*rigBrowser);
+
+    studioFxModal = std::make_unique<miamp_rig::StudioFxModal> (
+        audioProcessor,
+        [this] { if (studioFxModal) studioFxModal->setVisible (false); });
+    studioFxModal->setLookAndFeel (&glassLaf);
+    addChildComponent (*studioFxModal);
+
     updateOverlay->addChildComponent (btnUpdateNow);
     btnUpdateNow.setLookAndFeel (&glassLaf);
     btnUpdateNow.setComponentID ("presetSave");
@@ -2896,7 +3137,7 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     // Start with the 2.9s intro animation matching index.html!
     introRunning = true;
     introElapsed = 0.0f;
-    headSceneYOffsetStage = kStageH;
+    headSceneYOffsetStage = 1156.0f;
     setFloorMode (false);
     startTimerHz (60);
 
@@ -2922,8 +3163,11 @@ MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
     if (updateDownloadThread != nullptr)
         updateDownloadThread->stopThread (1200);
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
-                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
-                     &btnDockDrop, &btnDockConfig,
+                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainCabs, &btnMainStudioFx,
+                     &btnDockDrop, &btnDockConfig, &btnViewCloseUp, &btnViewRigMics,
+                     &btnAmpPrev, &btnAmpNext, &btnAmpBrowse, &btnCabPrev, &btnCabNext, &btnCabBrowse, &btnCabLoadWav,
+                     &btnMic1On, &btnMic1Dist, &btnMic1Phase, &btnMic2On, &btnMic2Dist, &btnMic2Phase,
+                     &btnConsoleStudioFx, &btnConsolePower,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
                      &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
                      &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
@@ -2931,6 +3175,14 @@ MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
     {
         b->setLookAndFeel (nullptr);
     }
+    if (cabPickerPanel != nullptr)
+        cabPickerPanel->setLookAndFeel (nullptr);
+    if (cabMicsPanel != nullptr)
+        cabMicsPanel->setLookAndFeel (nullptr);
+    if (rigBrowser != nullptr)
+        rigBrowser->setLookAndFeel (nullptr);
+    if (studioFxModal != nullptr)
+        studioFxModal->setLookAndFeel (nullptr);
     if (popover != nullptr)
         popover->setLookAndFeel (nullptr);
     setLookAndFeel (nullptr);
@@ -2944,6 +3196,9 @@ void MiAmpAudioProcessorEditor::loadImages()
     imgs.introLogo      = img (BinaryData::intro_logo_png,       BinaryData::intro_logo_pngSize);
     imgs.popupsCredit   = img (BinaryData::popups_credit_png,    BinaryData::popups_credit_pngSize);
     imgs.guitarKnobRing = img (BinaryData::guitar_knob_ring_png, BinaryData::guitar_knob_ring_pngSize);
+    imgs.skateparkTall  = img (BinaryData::skatepark_tall_capa0_jpg, BinaryData::skatepark_tall_capa0_jpgSize);
+    imgs.mic57          = img (BinaryData::mic_mi57_clean_png,   BinaryData::mic_mi57_clean_pngSize);
+    imgs.mic87          = img (BinaryData::mic_mi87_clean_png,   BinaryData::mic_mi87_clean_pngSize);
 
     imgs.guitarBg    = img (BinaryData::main_bg_png,       BinaryData::main_bg_pngSize);
     imgs.bassBg      = img (BinaryData::bass_bg_png,       BinaryData::bass_bg_pngSize);
@@ -3056,7 +3311,7 @@ void MiAmpAudioProcessorEditor::finishIntro()
     introRunning = false;
     headSceneYOffsetStage = 0.0f;
     btnSkipIntro.setVisible (false);
-    for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnDockConfig })
+    for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainCabs, &btnMainStudioFx, &btnDockConfig })
         b->setAlpha (1.0f);
     if (miamp_standalone::isRunningStandalone())
         miamp_standalone::ensureAudioInputActive();
@@ -3093,6 +3348,8 @@ void MiAmpAudioProcessorEditor::applyLanguageTexts()
     btnMainTuner.setButtonText       (miamp_i18n::tr (miamp_i18n::Msg::BtnTuner));
     btnMainToneFinder.setButtonText  (miamp_i18n::tr (miamp_i18n::Msg::BtnToneFinder));
     btnMainPedals.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnPedals));
+    btnMainCabs.setButtonText        (miamp_i18n::tr (miamp_i18n::Msg::BtnCabs));
+    btnMainStudioFx.setButtonText    (miamp_i18n::tr (miamp_i18n::Msg::BtnStudioFx));
     btnDockConfig.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnConfig));
 
     btnHeadModeAmp.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnWithAmp));
@@ -3258,6 +3515,78 @@ void MiAmpAudioProcessorEditor::showHud (const juce::String& text)
     repaint();
 }
 
+void MiAmpAudioProcessorEditor::closeFloatingOverlays (const char* except)
+{
+    const juce::String ex (except != nullptr ? except : "");
+    if (ex != "popover" && activePopover != PopoverKind::None)
+    {
+        activePopover = PopoverKind::None;
+        if (popover != nullptr) popover->setVisible (false);
+    }
+    if (ex != "studioFx" && studioFxModal != nullptr && studioFxModal->isVisible())
+        studioFxModal->setVisible (false);
+    if (ex != "rigBrowser" && rigBrowser != nullptr && rigBrowser->isVisible())
+        rigBrowser->setVisible (false);
+    if (ex != "cabDrawer" && cabDrawerOpen)
+    {
+        cabDrawerOpen = false;
+        cabMicZoom = false;
+    }
+}
+
+void MiAmpAudioProcessorEditor::cycleActiveHead (int delta)
+{
+    if (isFloorMode || introRunning) return;
+    const bool bass = audioProcessor.isBassMode();
+    const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
+    const char* id = bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel;
+    const int n = static_cast<int> (headList.size());
+    const int cur = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (id)->load()));
+    const int nxt = (cur + delta + n) % n;
+    miamp_rig::setParamPlain (audioProcessor.apvts, id, static_cast<float> (nxt));
+    showHud (headList[static_cast<size_t> (nxt)].displayName);
+    syncHeadControls();
+    layoutAll();
+    repaint();
+}
+
+bool MiAmpAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
+{
+    if (creditOpen)
+    {
+        if (key == juce::KeyPress::escapeKey)
+        {
+            creditOpen = false;
+            btnCreditClose.setVisible (false);
+            repaint();
+            return true;
+        }
+        return false;
+    }
+    if (isFloorMode || introRunning)
+        return false;
+
+    if (key == juce::KeyPress::escapeKey)
+    {
+        closeFloatingOverlays();
+        consoleOpen = false;
+        closeUpView = true;
+        syncHeadControls();
+        layoutAll();
+        repaint();
+        return true;
+    }
+
+    const bool modalBlocking = (studioFxModal != nullptr && studioFxModal->isVisible())
+                            || (rigBrowser != nullptr && rigBrowser->isVisible());
+    if (! modalBlocking)
+    {
+        if (key == juce::KeyPress::leftKey)  { cycleActiveHead (-1); return true; }
+        if (key == juce::KeyPress::rightKey) { cycleActiveHead (+1); return true; }
+    }
+    return false;
+}
+
 void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
 {
     if (audioProcessor.isBassMode() == toBass)
@@ -3266,6 +3595,7 @@ void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
     audioProcessor.setInstrumentMode (toBass);
     activePopover = PopoverKind::None;
     popover->setVisible (false);
+    cabMicZoom = false;
     animPedalHasPos.fill (false);
     paletteScrollTarget = 0.0f;
     paletteScrollCur = 0.0f;
@@ -3282,8 +3612,7 @@ void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
         finishIntro();
 
     isFloorMode = floor;
-    activePopover = PopoverKind::None;
-    popover->setVisible (false);
+    closeFloatingOverlays();
     draggingPedalActive = false;
     dragLiftScale = 1.0f;
     animPedalHasPos.fill (false);
@@ -3304,29 +3633,343 @@ void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
     repaint();
 }
 
+void MiAmpAudioProcessorEditor::computeRigStageLayout (
+    juce::Rectangle<float>& cabRectOut,
+    juce::Rectangle<float>& headRectOut,
+    juce::Rectangle<float>& grilleRectOut) const
+{
+    const bool bass = audioProcessor.isBassMode();
+    const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
+    const auto& cabList  = bass ? miamp_rig::getBassCabSpecs()  : miamp_rig::getGuitarCabSpecs();
+
+    const int headIdx = juce::jlimit (0, static_cast<int> (headList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel)->load())));
+    const int cabIdx = juce::jlimit (0, static_cast<int> (cabList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
+
+    const auto& hSpec = headList[static_cast<size_t> (headIdx)];
+    const auto& cSpec = cabList[static_cast<size_t> (cabIdx)];
+    const int visualCabIdx = cSpec.isOff ? (bass ? 4 : 1) : cabIdx;
+    const auto& visualCab = cabList[static_cast<size_t> (juce::jlimit (0, static_cast<int> (cabList.size()) - 1, visualCabIdx))];
+
+    const auto hImg = juce::ImageCache::getFromMemory (hSpec.chassisData, hSpec.chassisSize);
+    const float hAspect = static_cast<float> (hImg.getWidth()) / juce::jmax (1, hImg.getHeight());
+
+    struct CabSeatMetrics { float topRatio; float seatRatio; };
+    const auto getCabSeatMetrics = [&] () -> CabSeatMetrics
+    {
+        if (! bass)
+        {
+            switch (visualCabIdx)
+            {
+                case 0: return { 0.820f, 0.036f }; // 4x12 green
+                case 1:
+                case 7: return { 0.802f, 0.036f }; // 4x12 britv30 (side handles)
+                case 2: return { 0.822f, 0.036f }; // 4x12 recto
+                case 3: return { 0.831f, 0.036f }; // 4x12 evh
+                case 4: return { 0.840f, 0.034f }; // 2x12 classa
+                case 5: return { 0.825f, 0.036f }; // 4x12 tangerine
+                case 6: return { 0.843f, 0.029f }; // 2x12 twin
+                default: return { 0.802f, 0.036f };
+            }
+        }
+        switch (visualCabIdx)
+        {
+            case 0: return { 0.836f, 0.037f }; // 1x15 b15
+            case 1: return { 0.816f, 0.036f }; // 4x10 aguilar
+            case 2: return { 0.819f, 0.036f }; // 4x10 gk
+            case 3: return { 0.845f, 0.039f }; // 6x10 heavy
+            case 4:
+            case 6: return { 0.905f, 0.043f }; // 8x10 classic
+            case 5: return { 0.905f, 0.043f }; // 8x10 tangerine
+            default: return { 0.905f, 0.043f };
+        }
+    };
+    const auto cabMetrics = getCabSeatMetrics();
+    const float topRatio = cabMetrics.topRatio;
+    const float seatRatio = cabMetrics.seatRatio;
+
+    if (closeUpView)
+    {
+        const float centerX = juce::jmap (cabDrawerAnim, 685.0f, 870.0f);
+        const float actualW = juce::jmap (cabDrawerAnim, 820.0f, 680.0f);
+        const float hh = actualW / juce::jmax (0.5f, hAspect);
+        const float cabTopY = juce::jmap (cabDrawerAnim, 530.0f, 505.0f);
+        float seatDepth = 0.0f;
+
+        if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
+        {
+            const auto cImg = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
+            const float aspect = static_cast<float> (cImg.getWidth()) / juce::jmax (1, cImg.getHeight());
+            const float cw = actualW / topRatio;
+            const float ch = cw / juce::jmax (0.2f, aspect);
+            seatDepth = cw * seatRatio;
+            cabRectOut = { centerX - cw * 0.5f, cabTopY, cw, ch };
+            grilleRectOut = {};
+        }
+        else
+        {
+            cabRectOut = { centerX - 240.0f, cabTopY + 12.0f, 480.0f, 42.0f };
+            grilleRectOut = {};
+        }
+
+        const float headTop = cabTopY - hh + seatDepth;
+        headRectOut = { centerX - actualW * 0.5f, headTop, actualW, hh };
+        return;
+    }
+
+    const float centerX = juce::jmap (cabDrawerAnim, 640.0f, 870.0f);
+    const float floorY  = consoleOpen ? 618.0f : 720.0f;
+    const float rigScale = consoleOpen ? juce::jmap (cabDrawerAnim, 1.0f, 0.96f)
+                                       : juce::jmap (cabDrawerAnim, 1.15f, 1.06f);
+
+    float cabTopY = floorY - 38.0f;
+    float cabW = 480.0f * rigScale;
+
+    if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
+    {
+        const auto cImg = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
+        const float aspect = static_cast<float> (cImg.getWidth()) / juce::jmax (1, cImg.getHeight());
+        float ch = 336.0f * rigScale * visualCab.heightScale;
+        float cw = ch * aspect;
+        const float maxW = 450.0f * rigScale * visualCab.widthScale;
+        if (cw > maxW)
+        {
+            cw = maxW;
+            ch = cw / juce::jmax (0.2f, aspect);
+        }
+        cabW = cw;
+        cabTopY = floorY - ch;
+        cabRectOut = { centerX - cw * 0.5f, cabTopY, cw, ch };
+        grilleRectOut = cSpec.isOff ? juce::Rectangle<float>{} : juce::Rectangle<float>{
+            cabRectOut.getX() + visualCab.grilleX * cabRectOut.getWidth(),
+            cabRectOut.getY() + visualCab.grilleY * cabRectOut.getHeight(),
+            visualCab.grilleW * cabRectOut.getWidth(),
+            visualCab.grilleH * cabRectOut.getHeight()
+        };
+    }
+    else
+    {
+        cabRectOut = { centerX - 180.0f, floorY - 38.0f, 360.0f, 38.0f };
+        grilleRectOut = {};
+    }
+
+    // Exact same width as cabinet top surface, seated INSIDE the 3D top depth of the cabinet
+    const float actualW = cabW * topRatio;
+    const float hh = actualW / juce::jmax (0.5f, hAspect);
+    const float seatDepth = cabW * seatRatio;
+    headRectOut = { centerX - actualW * 0.5f, cabTopY - hh + seatDepth, actualW, hh };
+}
+
+void MiAmpAudioProcessorEditor::rebuildRigHeadControls()
+{
+    const bool bass = audioProcessor.isBassMode();
+    const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
+    const int headIdx = juce::jlimit (0, static_cast<int> (headList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel)->load())));
+
+    if (headIdx == lastBuiltRigModel && bass == lastBuiltRigBass)
+        return;
+
+    lastBuiltRigModel = headIdx;
+    lastBuiltRigBass  = bass;
+
+    rigKnobs.clear();
+    rigSwitches.clear();
+    rigSliders.clear();
+
+    const auto& hSpec = headList[static_cast<size_t> (headIdx)];
+    if (hSpec.useClassicOverlay)
+        return;
+
+    const auto knobSprite = juce::ImageCache::getFromMemory (hSpec.knobSpriteData, hSpec.knobSpriteSize);
+    for (const auto& ks : hSpec.knobs)
+    {
+        auto k = std::make_unique<miamp_rig::RigHeadKnob> (audioProcessor.apvts, ks, knobSprite, [this] (const juce::String& t) { showHud (t); });
+        addChildComponent (*k);
+        rigKnobs.push_back (std::move (k));
+    }
+
+    auto switchImgs = [] (miamp_rig::AmpSwitchKind kind) -> std::pair<juce::Image, juce::Image>
+    {
+        using K = miamp_rig::AmpSwitchKind;
+        switch (kind)
+        {
+            case K::RockerRed:   return { juce::ImageCache::getFromMemory (BinaryData::sw_rocker_red_on_png,   BinaryData::sw_rocker_red_on_pngSize),
+                                          juce::ImageCache::getFromMemory (BinaryData::sw_rocker_red_off_png,  BinaryData::sw_rocker_red_off_pngSize) };
+            case K::RockerBlack: return { juce::ImageCache::getFromMemory (BinaryData::sw_rocker_black_on_png, BinaryData::sw_rocker_black_on_pngSize),
+                                          juce::ImageCache::getFromMemory (BinaryData::sw_rocker_black_off_png,BinaryData::sw_rocker_black_off_pngSize) };
+            case K::PushRound:   return { juce::ImageCache::getFromMemory (BinaryData::sw_push_round_on_png,   BinaryData::sw_push_round_on_pngSize),
+                                          juce::ImageCache::getFromMemory (BinaryData::sw_push_round_off_png,  BinaryData::sw_push_round_off_pngSize) };
+            case K::PushSquare:  return { juce::ImageCache::getFromMemory (BinaryData::sw_push_square_on_png,  BinaryData::sw_push_square_on_pngSize),
+                                          juce::ImageCache::getFromMemory (BinaryData::sw_push_square_off_png, BinaryData::sw_push_square_off_pngSize) };
+            case K::SlideBlack:  return { juce::ImageCache::getFromMemory (BinaryData::sw_slide_black_on_png,  BinaryData::sw_slide_black_on_pngSize),
+                                          juce::ImageCache::getFromMemory (BinaryData::sw_slide_black_off_png, BinaryData::sw_slide_black_off_pngSize) };
+            case K::ToggleSilver:
+            default:             return { juce::ImageCache::getFromMemory (BinaryData::sw_toggle_silver_on_png,  BinaryData::sw_toggle_silver_on_pngSize),
+                                          juce::ImageCache::getFromMemory (BinaryData::sw_toggle_silver_off_png, BinaryData::sw_toggle_silver_off_pngSize) };
+        }
+    };
+
+    for (const auto& sw : hSpec.switches)
+    {
+        auto [onImg, offImg] = switchImgs (sw.kind);
+        auto s = std::make_unique<miamp_rig::RigHeadSwitch> (audioProcessor.apvts, sw, onImg, offImg, [this] (const juce::String& t) { showHud (t); });
+        addChildComponent (*s);
+        rigSwitches.push_back (std::move (s));
+    }
+
+    const auto hqFaderCap = juce::ImageCache::getFromMemory (BinaryData::fader_cap_hq_png, BinaryData::fader_cap_hq_pngSize);
+    for (const auto& sl : hSpec.sliders)
+    {
+        auto f = std::make_unique<miamp_rig::RigHeadSlider> (audioProcessor.apvts, sl, hqFaderCap, [this] (const juce::String& t) { showHud (t); });
+        addChildComponent (*f);
+        rigSliders.push_back (std::move (f));
+    }
+}
+
 void MiAmpAudioProcessorEditor::syncHeadControls()
 {
     const bool bass = audioProcessor.isBassMode();
-    const bool showHeadUi = ! isFloorMode && (! introRunning || introElapsed >= 2.50f);
-    const bool showAmpFace = ! isFloorMode && (! introRunning || (introElapsed / 2.9f) > 0.46f);
-    const float uiAlpha = introRunning ? juce::jlimit (0.0f, 1.0f, (introElapsed - 2.50f) / 0.35f) : 1.0f;
+    rebuildRigHeadControls();
+
+    const bool showHeadUi  = ! isFloorMode && (! introRunning || introElapsed >= 2.42f);
+    const bool showAmpFace = ! isFloorMode && (! introRunning || headSceneYOffsetStage < 680.0f);
+    const float uiAlpha    = introRunning ? juce::jlimit (0.0f, 1.0f, (introElapsed - 2.42f) / 0.40f) : 1.0f;
 
     btnInstGuitar.setToggleState (! bass, juce::dontSendNotification);
     btnInstBass.setToggleState   (bass,   juce::dontSendNotification);
 
     for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
-                     &btnDockConfig })
+                     &btnMainCabs, &btnMainStudioFx, &btnDockConfig })
     {
         b->setVisible (showHeadUi);
         b->setAlpha (showHeadUi ? uiAlpha : 1.0f);
     }
+    btnMainHeads.setVisible   (false);
+    btnMainConsole.setVisible (false);
+    btnViewCloseUp.setVisible (false);
+    btnViewRigMics.setVisible (false);
+    btnMainCabs.setToggleState (cabDrawerOpen, juce::dontSendNotification);
     btnDockDrop.setVisible (false);
 
-    // Keep amp knobs and switches attached to the amp chassis throughout the camera drop!
-    for (auto& k : bassHeadKnobs)      k->setVisible (showAmpFace && bass);
-    for (auto& s : bassHeadSwitches)   s->setVisible (showAmpFace && bass);
-    for (auto& k : guitarHeadKnobs)    k->setVisible (showAmpFace && ! bass);
-    for (auto& s : guitarHeadSwitches) s->setVisible (showAmpFace && ! bass);
+    // Bottom Analog Console Strip visibility & state (hidden unless consoleOpen is toggled on)
+    const bool showConsole = showHeadUi && consoleOpen;
+    for (auto* b : { &btnAmpPrev, &btnAmpNext, &btnAmpBrowse, &btnCabPrev, &btnCabNext, &btnCabBrowse, &btnCabLoadWav,
+                     &btnMic1On, &btnMic1Dist, &btnMic1Phase, &btnMic2On, &btnMic2Dist, &btnMic2Phase,
+                     &btnConsoleStudioFx, &btnConsolePower })
+    {
+        b->setVisible (showConsole);
+        b->setAlpha (showConsole ? uiAlpha : 1.0f);
+    }
+    for (int i = 0; i < 5; ++i)
+        if (conKnobs[i]) { conKnobs[i]->setVisible (showConsole); conKnobs[i]->setAlpha (showConsole ? uiAlpha : 1.0f); }
+    if (conMicMixKnob) { conMicMixKnob->setVisible (showConsole); conMicMixKnob->setAlpha (showConsole ? uiAlpha : 1.0f); }
+    if (conRoomKnob)   { conRoomKnob->setVisible (showConsole);   conRoomKnob->setAlpha (showConsole ? uiAlpha : 1.0f); }
+
+    const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
+    const int headIdx = juce::jlimit (0, static_cast<int> (headList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel)->load())));
+    const auto& hSpec = headList[static_cast<size_t> (headIdx)];
+    const bool useClassic = hSpec.useClassicOverlay;
+
+    if (btnHeadSidePrev && btnHeadSideNext)
+    {
+        const int nHeads = static_cast<int> (headList.size());
+        const auto& prevSpec = headList[static_cast<size_t> ((headIdx - 1 + nHeads) % nHeads)];
+        const auto& nextSpec = headList[static_cast<size_t> ((headIdx + 1) % nHeads)];
+        btnHeadSidePrev->setTipText (juce::String ("< ") + prevSpec.displayName);
+        btnHeadSideNext->setTipText (juce::String (nextSpec.displayName) + " >");
+        btnHeadSidePrev->setVisible (showHeadUi && showAmpFace);
+        btnHeadSideNext->setVisible (showHeadUi && showAmpFace);
+        btnHeadSidePrev->setAlpha (uiAlpha);
+        btnHeadSideNext->setAlpha (uiAlpha);
+    }
+
+    const bool showCabDrawer = showHeadUi && cabDrawerOpen;
+    if (cabPickerPanel)
+    {
+        cabPickerPanel->setVisible (showCabDrawer);
+        if (showCabDrawer)
+        {
+            cabPickerPanel->setMicZoom (cabMicZoom);
+            cabPickerPanel->refresh();
+        }
+    }
+    if (cabMicsPanel)
+    {
+        cabMicsPanel->setVisible (showCabDrawer);
+        if (showCabDrawer)
+        {
+            cabMicsPanel->setMicZoomActive (cabMicZoom);
+            cabMicsPanel->refresh();
+        }
+    }
+
+    const auto& cabList = bass ? miamp_rig::getBassCabSpecs() : miamp_rig::getGuitarCabSpecs();
+    const int cabIdx = juce::jlimit (0, static_cast<int> (cabList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
+    const bool cabIsOff = cabList[static_cast<size_t> (cabIdx)].isOff;
+
+    // Show interactive controls directly on the active amp head
+    for (auto& k : rigKnobs)    k->setVisible (showAmpFace && ! useClassic);
+    for (auto& s : rigSwitches) s->setVisible (showAmpFace && ! useClassic);
+    for (auto& f : rigSliders)  f->setVisible (showAmpFace && ! useClassic);
+
+    for (auto& k : bassHeadKnobs)      k->setVisible (showAmpFace && useClassic && bass);
+    for (auto& s : bassHeadSwitches)   s->setVisible (showAmpFace && useClassic && bass);
+    for (auto& k : guitarHeadKnobs)    k->setVisible (showAmpFace && useClassic && ! bass);
+    for (auto& s : guitarHeadSwitches) s->setVisible (showAmpFace && useClassic && ! bass);
+
+    // Layer 3 bare mics visible when cabinet is not OFF and in Rig & Mics view
+    const bool showMics = showAmpFace && ! cabIsOff && ! closeUpView;
+    if (mic1Body) mic1Body->setVisible (showMics);
+    if (mic2Body) mic2Body->setVisible (showMics);
+
+    // Update Console Quick-Access Tone Knobs to track active instrument & channel
+    if (bass)
+    {
+        const char* bIds[5] = { MiAmpParams::ampGain, MiAmpParams::ampBass, MiAmpParams::ampMid, MiAmpParams::ampTreble,
+                                (headIdx == 8 ? MiAmpParams::ampFreq : MiAmpParams::bassMaster) };
+        const char* bLbl[5] = { "GAIN", "BASS", "MID", "TREBLE", (headIdx == 8 ? "FREQ" : "MASTER") };
+        for (int i = 0; i < 5; ++i)
+            if (conKnobs[i]) conKnobs[i]->setParam (bIds[i], bLbl[i]);
+    }
+    else
+    {
+        const int ch = juce::jlimit (0, 2, static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::gtrChannel)->load())));
+        const char* gIds[5] = { MiAmpParams::gtrChGain[ch], MiAmpParams::gtrChBass[ch], MiAmpParams::gtrChMid[ch],
+                                MiAmpParams::gtrChTreble[ch], MiAmpParams::gtrChMaster[ch] };
+        const char* gLbl[5] = { "GAIN", "BASS", "MID", "TREBLE", "MASTER" };
+        for (int i = 0; i < 5; ++i)
+            if (conKnobs[i]) conKnobs[i]->setParam (gIds[i], gLbl[i]);
+    }
+
+    // Update mic & power console button labels/toggles
+    static constexpr const char* kDistTags[3] = { "CLS", "MID", "FAR" };
+    const bool m1On = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic1On)->load() >= 0.5f;
+    const bool m2On = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic2On)->load() >= 0.5f;
+    const bool m1Ph = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic1Phase)->load() >= 0.5f;
+    const bool m2Ph = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic2Phase)->load() >= 0.5f;
+    const int  m1D  = juce::jlimit (0, 2, static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic1Dist)->load())));
+    const int  m2D  = juce::jlimit (0, 2, static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic2Dist)->load())));
+    const bool pwr  = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampPower : MiAmpParams::gtrPower)->load() >= 0.5f;
+
+    btnMic1On.setToggleState    (m1On, juce::dontSendNotification);
+    btnMic1Phase.setToggleState (m1Ph, juce::dontSendNotification);
+    btnMic1Dist.setButtonText   (kDistTags[m1D]);
+    btnMic2On.setToggleState    (m2On, juce::dontSendNotification);
+    btnMic2Phase.setToggleState (m2Ph, juce::dontSendNotification);
+    btnMic2Dist.setButtonText   (kDistTags[m2D]);
+    btnConsolePower.setToggleState (pwr, juce::dontSendNotification);
+    btnConsolePower.setButtonText  (pwr ? "POWER ON" : "POWER OFF");
+
+    const bool sfxActive = (audioProcessor.apvts.getRawParameterValue (MiAmpParams::sfxCompOn)->load() >= 0.5f)
+                        || (audioProcessor.apvts.getRawParameterValue (MiAmpParams::sfxEqOn)->load()   >= 0.5f)
+                        || (audioProcessor.apvts.getRawParameterValue (MiAmpParams::sfxDlyOn)->load()  >= 0.5f)
+                        || (audioProcessor.apvts.getRawParameterValue (MiAmpParams::sfxRevOn)->load()  >= 0.5f);
+    btnMainStudioFx.setToggleState    (sfxActive || (studioFxModal && studioFxModal->isVisible()), juce::dontSendNotification);
+    btnConsoleStudioFx.setToggleState (sfxActive || (studioFxModal && studioFxModal->isVisible()), juce::dontSendNotification);
 
     const bool headByp = audioProcessor.isHeadBypassed (bass);
     btnHeadModeAmp.setVisible    (isFloorMode);
@@ -3337,10 +3980,10 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     btnFloorPresets.setVisible    (isFloorMode);
     btnFloorTuner.setVisible      (isFloorMode);
     btnFloorToneFinder.setVisible (isFloorMode);
-    btnFloorDrop.setVisible       (false); // Drop ya vive integrado dentro de AFINADOR
+    btnFloorDrop.setVisible       (false);
     btnFloorConfig.setVisible     (isFloorMode);
     btnBackToAmp.setVisible       (isFloorMode);
-    btnSkipIntro.setVisible       (introRunning && ! isFloorMode && introElapsed < 2.42f);
+    btnSkipIntro.setVisible       (introRunning && ! isFloorMode && introElapsed < 2.38f);
 }
 
 void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
@@ -3352,6 +3995,11 @@ void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
     }
     else
     {
+        if (! isFloorMode)
+        {
+            closeFloatingOverlays ("popover");
+            syncHeadControls();
+        }
         // In floor mode, opening Presets/Drop/Config/ToneFinder closes the left editor & slides board left
         if (isFloorMode && (kind == PopoverKind::Presets || kind == PopoverKind::Drop
                          || kind == PopoverKind::Config || kind == PopoverKind::ToneFinder))
@@ -3549,18 +4197,28 @@ void MiAmpAudioProcessorEditor::timerCallback()
         else
         {
             const float prevY = headSceneYOffsetStage;
-            if (tn <= 0.46f)
-                headSceneYOffsetStage = kStageH;
+            if (tn <= 0.34f)
+                headSceneYOffsetStage = 1156.0f;
             else
-                headSceneYOffsetStage = kStageH * (1.0f - cubicBezierIntro ((tn - 0.46f) / 0.54f));
+                headSceneYOffsetStage = 1156.0f * (1.0f - cubicBezierIntro ((tn - 0.34f) / 0.66f));
 
-            if (tn > 0.46f)
-                syncHeadControls();
-
+            syncHeadControls();
             if (std::fabs (headSceneYOffsetStage - prevY) > 0.1f)
                 layoutAll();
-            else if (introElapsed >= 2.50f)
+            else
                 repaint();
+        }
+    }
+
+    if (! isFloorMode)
+    {
+        const float targetDrawer = cabDrawerOpen ? 1.0f : 0.0f;
+        if (std::fabs (targetDrawer - cabDrawerAnim) > 0.002f)
+        {
+            cabDrawerAnim += 0.22f * (targetDrawer - cabDrawerAnim);
+            if (std::fabs (targetDrawer - cabDrawerAnim) <= 0.002f)
+                cabDrawerAnim = targetDrawer;
+            layoutAll();
         }
     }
 
@@ -3661,6 +4319,9 @@ void MiAmpAudioProcessorEditor::timerCallback()
     if (hudTicks > 0 && --hudTicks == 0)
         hudText.clear();
 
+    if (studioFxModal != nullptr && studioFxModal->isVisible())
+        studioFxModal->repaint();
+
     const bool dropOn = audioProcessor.apvts.getRawParameterValue (MiAmpParams::pitchOn)->load() > 0.5f;
     const int semi = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::pitchSemi)->load()));
     const juce::String dropTxt = dropOn ? ("DROP " + juce::String (semi > 0 ? "+" : "") + juce::String (semi)) : "DROP";
@@ -3674,6 +4335,7 @@ void MiAmpAudioProcessorEditor::timerCallback()
     btnMainPresets.setToggleState     (activePopover == PopoverKind::Presets,    juce::dontSendNotification);
     btnMainTuner.setToggleState       (activePopover == PopoverKind::Tuner,      juce::dontSendNotification);
     btnMainToneFinder.setToggleState  (activePopover == PopoverKind::ToneFinder, juce::dontSendNotification);
+    btnMainCabs.setToggleState        (cabDrawerOpen,                            juce::dontSendNotification);
     btnFloorPresets.setToggleState    (activePopover == PopoverKind::Presets,    juce::dontSendNotification);
     btnFloorToneFinder.setToggleState (activePopover == PopoverKind::ToneFinder, juce::dontSendNotification);
     btnFloorTuner.setToggleState      (floorTunerOpen, juce::dontSendNotification);
@@ -3843,70 +4505,195 @@ void MiAmpAudioProcessorEditor::layoutAll()
         }
     }
 
+    if (rigBrowser != nullptr)
+        rigBrowser->setBounds (getLocalBounds());
+    if (studioFxModal != nullptr)
+        studioFxModal->setBounds (getLocalBounds());
+
     if (! isFloorMode)
     {
         const float ampYOff = introRunning ? headSceneYOffsetStage : 0.0f;
 
-        // Unified right glass panel (.menu 1290, 25, 225, 304) — clean head with 5 items + meters
-        btnInstGuitar.setBounds      (toScreenInt (1308, 43,  93, 32));
-        btnInstBass.setBounds        (toScreenInt (1404, 43,  93, 32));
-        btnMainPresets.setBounds     (toScreenInt (1305, 84,  195, 34));
-        btnMainTuner.setBounds       (toScreenInt (1305, 122, 195, 34));
-        btnMainToneFinder.setBounds  (toScreenInt (1305, 160, 195, 34));
-        btnMainPedals.setBounds      (toScreenInt (1305, 198, 195, 34));
-        btnDockConfig.setBounds      (toScreenInt (1305, 236, 195, 34));
+        // Unified right glass panel (.menu 1290, 25, 225, 406) matching approved preview
+        btnInstGuitar.setBounds      (toScreenInt (1306, 40,  94, 36));
+        btnInstBass.setBounds        (toScreenInt (1404, 40,  94, 36));
+        btnMainPresets.setBounds     (toScreenInt (1303, 84,  199, 36));
+        btnMainTuner.setBounds       (toScreenInt (1303, 126, 199, 36));
+        btnMainToneFinder.setBounds  (toScreenInt (1303, 168, 199, 36));
+        btnMainPedals.setBounds      (toScreenInt (1303, 210, 199, 36));
+        btnMainCabs.setBounds        (toScreenInt (1303, 252, 199, 36));
+        btnMainStudioFx.setBounds    (toScreenInt (1303, 294, 199, 36));
+        btnDockConfig.setBounds      (toScreenInt (1303, 336, 199, 36));
 
-        if (bass)
+        if (cabPickerPanel)
+            cabPickerPanel->setBounds (toScreenInt (28, 25, 420, consoleOpen ? 595 : 554));
+        if (cabMicsPanel)
+            cabMicsPanel->setBounds (toScreenInt (28, 591, 420, 150));
+
+        // Mirrored side head-selector arrows flanking the active amp head
+        const float axLeft  = juce::jmap (cabDrawerAnim, 211.0f, 472.0f);
+        const float axRight = juce::jmap (cabDrawerAnim, 1115.0f, 1228.0f);
+        const float ay      = juce::jmap (cabDrawerAnim, 345.0f, 335.0f) + ampYOff;
+        const float aw      = juce::jmap (cabDrawerAnim, 44.0f, 40.0f);
+        const float ah      = juce::jmap (cabDrawerAnim, 82.0f, 74.0f);
+        if (btnHeadSidePrev) btnHeadSidePrev->setBounds (toScreenInt (axLeft,  ay, aw, ah));
+        if (btnHeadSideNext) btnHeadSideNext->setBounds (toScreenInt (axRight, ay, aw, ah));
+
+        // Bottom Analog Console Strip (y = 636..752)
+        btnAmpPrev.setBounds   (toScreenInt (46,  688, 28, 28));
+        btnAmpBrowse.setBounds (toScreenInt (78,  688, 184, 28));
+        btnAmpNext.setBounds   (toScreenInt (266, 688, 28, 28));
+
+        for (int i = 0; i < 5; ++i)
+            if (conKnobs[i])
+                conKnobs[i]->setBounds (toScreenInt (314.0f + i * 74.0f, 650.0f, 70.0f, 88.0f));
+
+        btnCabPrev.setBounds    (toScreenInt (706, 688, 28, 28));
+        btnCabBrowse.setBounds  (toScreenInt (738, 688, 152, 28));
+        btnCabNext.setBounds    (toScreenInt (894, 688, 28, 28));
+        btnCabLoadWav.setBounds (toScreenInt (926, 688, 52, 28));
+
+        btnMic1On.setBounds    (toScreenInt (996,  652, 62, 24));
+        btnMic1Dist.setBounds  (toScreenInt (1062, 652, 42, 24));
+        btnMic1Phase.setBounds (toScreenInt (1108, 652, 28, 24));
+
+        btnMic2On.setBounds    (toScreenInt (996,  682, 62, 24));
+        btnMic2Dist.setBounds  (toScreenInt (1062, 682, 42, 24));
+        btnMic2Phase.setBounds (toScreenInt (1108, 682, 28, 24));
+
+        if (conMicMixKnob) conMicMixKnob->setBounds (toScreenInt (1152, 650, 74, 88));
+        if (conRoomKnob)   conRoomKnob->setBounds   (toScreenInt (1232, 650, 74, 88));
+
+        btnConsoleStudioFx.setBounds (toScreenInt (1324, 652, 174, 38));
+        btnConsolePower.setBounds    (toScreenInt (1324, 696, 174, 38));
+
+        // Modular Rig Layers 1, 2, 3
+        juce::Rectangle<float> cabR, headR, grilleR;
+        computeRigStageLayout (cabR, headR, grilleR);
+        headR = headR.translated (0.0f, ampYOff);
+        grilleR = grilleR.translated (0.0f, ampYOff);
+
+        const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
+        const int headIdx = juce::jlimit (0, static_cast<int> (headList.size()) - 1,
+            static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel)->load())));
+        const auto& hSpec = headList[static_cast<size_t> (headIdx)];
+
+        if (! hSpec.useClassicOverlay)
         {
-            const float knobDiam = 58.0f * kAmpZoom;
+            for (size_t i = 0; i < rigKnobs.size() && i < hSpec.knobs.size(); ++i)
+            {
+                const auto& ks = hSpec.knobs[i];
+                const float d = headR.getWidth() * ks.diamW;
+                const float cx = headR.getX() + ks.cx * headR.getWidth();
+                const float cy = headR.getY() + ks.cy * headR.getHeight();
+                rigKnobs[i]->setBounds (toScreenInt (cx - d * 0.5f, cy - d * 0.5f, d, d));
+            }
+            for (size_t i = 0; i < rigSwitches.size() && i < hSpec.switches.size(); ++i)
+            {
+                const auto& sw = hSpec.switches[i];
+                const float swW = headR.getWidth() * sw.w * 1.15f;
+                const float swH = swW;
+                const float cx = headR.getX() + sw.cx * headR.getWidth();
+                const float cy = headR.getY() + sw.cy * headR.getHeight();
+                rigSwitches[i]->setBounds (toScreenInt (cx - swW * 0.5f, cy - swH * 0.5f, swW, swH));
+            }
+            for (size_t i = 0; i < rigSliders.size() && i < hSpec.sliders.size(); ++i)
+            {
+                const auto& sl = hSpec.sliders[i];
+                const float slW = headR.getWidth() * 0.024f;
+                const float y0 = headR.getY() + sl.yTop * headR.getHeight();
+                const float y1 = headR.getY() + sl.yBot * headR.getHeight();
+                const float cx = headR.getX() + sl.cx * headR.getWidth();
+                rigSliders[i]->setBounds (toScreenInt (cx - slW * 0.5f, y0, slW, y1 - y0));
+            }
+        }
+        else if (bass)
+        {
+            // Classic Mint Bass Head (bass_head_mint.png: 5 knobs, 3 switches)
+            const float knobDiam = headR.getWidth() * 0.072f;
+            static constexpr float kClassicBx[5] = { 0.2918f, 0.4052f, 0.5183f, 0.6312f, 0.7448f };
             for (int i = 0; i < 5; ++i)
             {
-                const float xStage = kBassHeadKnobX[i] * (kStageW / 1376.0f);
-                const auto pt = ampZoomPt (xStage, kBassHeadKnobY);
-                bassHeadKnobs[i]->setBounds (toScreenInt (pt.x - knobDiam * 0.5f, pt.y + ampYOff - knobDiam * 0.5f, knobDiam, knobDiam));
+                const float cx = headR.getX() + kClassicBx[i] * headR.getWidth();
+                const float cy = headR.getY() + 0.7944f * headR.getHeight();
+                bassHeadKnobs[i]->setBounds (toScreenInt (cx - knobDiam * 0.5f, cy - knobDiam * 0.5f, knobDiam, knobDiam));
             }
-
+            static constexpr float kClassicSwX[3] = { 0.098f, 0.174f, 0.864f };
             for (int i = 0; i < 3; ++i)
             {
-                const float xStage = kBassSwitchX[i] * (kStageW / 1376.0f);
-                const auto pt = ampZoomPt (xStage, kBassSwitchY);
-                const float swW = 38.0f * kAmpZoom;
+                const float swW = headR.getWidth() * 0.038f;
                 const float swH = swW * (194.0f / 160.0f);
-                bassHeadSwitches[i]->setBounds (toScreenInt (pt.x - swW * 0.50f, pt.y + ampYOff - swH * 0.5147f, swW, swH));
+                const float cx = headR.getX() + kClassicSwX[i] * headR.getWidth();
+                const float cy = headR.getY() + 0.790f * headR.getHeight();
+                bassHeadSwitches[i]->setBounds (toScreenInt (cx - swW * 0.5f, cy - swH * 0.5147f, swW, swH));
             }
         }
         else
         {
-            const float wStage = 1.18f * (19.0f * 2.0f * kGtrScX * (kStageW / 1376.0f)) * kAmpZoom;
+            // Classic Zenbox Mint Guitar Head (head_zenbox_mint.png: 19 knobs, 3 switches)
+            const float wStage = headR.getWidth() * 0.043f;
+            static constexpr float kZenCols[9] = { 0.228f, 0.292f, 0.355f, 0.456f, 0.519f, 0.581f, 0.662f, 0.725f, 0.788f };
             for (int i = 0; i < 9; ++i)
             {
-                const float cxTop = (183.0f + (kGtrXs[i] - 180.0f) * kGtrScX) * (kStageW / 1376.0f);
-                const float cyTop = 99.0f + (380.0f - 50.0f) * kGtrScY;
-                const auto ptTop = ampZoomPt (cxTop, cyTop);
-                guitarHeadKnobs[i]->setBounds (toScreenInt (ptTop.x - wStage * 0.5f, ptTop.y + ampYOff - wStage * 0.5f, wStage, wStage));
-
-                const float cyBot = 99.0f + (445.0f - 50.0f) * kGtrScY;
-                const auto ptBot = ampZoomPt (cxTop, cyBot);
-                guitarHeadKnobs[9 + i]->setBounds (toScreenInt (ptBot.x - wStage * 0.5f, ptBot.y + ampYOff - wStage * 0.5f, wStage, wStage));
+                const float cx = headR.getX() + kZenCols[i] * headR.getWidth();
+                const float cyTop = headR.getY() + 0.688f * headR.getHeight();
+                const float cyBot = headR.getY() + 0.830f * headR.getHeight();
+                guitarHeadKnobs[i]->setBounds     (toScreenInt (cx - wStage * 0.5f, cyTop - wStage * 0.5f, wStage, wStage));
+                guitarHeadKnobs[9 + i]->setBounds (toScreenInt (cx - wStage * 0.5f, cyBot - wStage * 0.5f, wStage, wStage));
             }
-            const float cxOut = (183.0f + (960.0f - 180.0f) * kGtrScX) * (kStageW / 1376.0f);
-            const float cyOut = 99.0f + (380.0f - 50.0f) * kGtrScY;
-            const auto ptOut = ampZoomPt (cxOut, cyOut);
-            guitarHeadKnobs[18]->setBounds (toScreenInt (ptOut.x - wStage * 0.5f, ptOut.y + ampYOff - wStage * 0.5f, wStage, wStage));
+            const float cxOut = headR.getX() + 0.881f * headR.getWidth();
+            const float cyOut = headR.getY() + 0.712f * headR.getHeight();
+            guitarHeadKnobs[18]->setBounds (toScreenInt (cxOut - wStage * 0.5f, cyOut - wStage * 0.5f, wStage, wStage));
 
+            static constexpr float kZenSwX[3] = { 0.072f, 0.132f, 0.398f };
+            static constexpr float kZenSwY[3] = { 0.750f, 0.750f, 0.768f };
+            static constexpr float kZenSwS[3] = { 0.036f, 0.036f, 0.022f };
             for (int i = 0; i < 3; ++i)
             {
-                const float xStage = kGtrSwitchX[i] * (kStageW / 1376.0f);
-                const auto pt = ampZoomPt (xStage, kGtrSwitchY[i]);
-                const float swW = kGtrSwitchSize[i] * kAmpZoom;
+                const float swW = headR.getWidth() * kZenSwS[i];
                 const float swH = swW * (194.0f / 160.0f);
-                guitarHeadSwitches[i]->setBounds (toScreenInt (pt.x - swW * 0.50f, pt.y + ampYOff - swH * 0.5147f, swW, swH));
+                const float cx = headR.getX() + kZenSwX[i] * headR.getWidth();
+                const float cy = headR.getY() + kZenSwY[i] * headR.getHeight();
+                guitarHeadSwitches[i]->setBounds (toScreenInt (cx - swW * 0.5f, cy - swH * 0.5147f, swW, swH));
             }
         }
 
-        // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 304)
+        // Layer 3 Bare Draggable Microphones (MI-57 + MI-87) in front of cabinet grille
+        if (! grilleR.isEmpty())
+        {
+            const auto grilleScreen = toScreen (grilleR.getX(), grilleR.getY(), grilleR.getWidth(), grilleR.getHeight());
+            static constexpr float kDistScale[3] = { 1.0f, 0.86f, 0.72f };
+
+            const float m1X = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f;
+            const float m1Y = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f;
+            const int   m1D = juce::jlimit (0, 2, static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic1Dist)->load())));
+            const float m1W = 122.0f * kDistScale[m1D];
+            const float m1H = m1W * (147.0f / 340.0f);
+            const float m1Cx = grilleR.getX() + m1X * grilleR.getWidth();
+            const float m1Cy = grilleR.getY() + m1Y * grilleR.getHeight();
+            if (mic1Body)
+            {
+                mic1Body->setCabGrilleScreenRect (grilleScreen);
+                mic1Body->setBounds (toScreenInt (m1Cx - m1W * 0.5f, m1Cy - m1H * 0.5f, m1W, m1H));
+            }
+
+            const float m2X = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f;
+            const float m2Y = audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load() * 0.01f;
+            const int   m2D = juce::jlimit (0, 2, static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::mic2Dist)->load())));
+            const float m2H = 128.0f * kDistScale[m2D];
+            const float m2W = m2H * (120.0f / 340.0f);
+            const float m2Cx = grilleR.getX() + m2X * grilleR.getWidth();
+            const float m2Cy = grilleR.getY() + m2Y * grilleR.getHeight();
+            if (mic2Body)
+            {
+                mic2Body->setCabGrilleScreenRect (grilleScreen);
+                mic2Body->setBounds (toScreenInt (m2Cx - m2W * 0.5f, m2Cy - m2H * 0.5f, m2W, m2H));
+            }
+        }
+
+        // .popover sits cleanly BELOW unified right menu (1290, 25, 225, 406) -> y=442..698
         if (popover->isVisible())
-            popover->setBounds (toScreenInt (1206, 336, 309, 424));
+            popover->setBounds (toScreenInt (1206, 442, 309, 256));
     }
     else
     {
@@ -4166,50 +4953,146 @@ void MiAmpAudioProcessorEditor::paintPedalStateOverlays (juce::Graphics& g, bool
 void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
 {
     const bool bass = audioProcessor.isBassMode();
-    const auto bgStage = juce::Rectangle<float> (
-        kAmpOriginX - kAmpOriginX * kAmpZoom,
-        kAmpOriginY - kAmpOriginY * kAmpZoom + yOff,
-        kStageW * kAmpZoom,
-        kStageH * kAmpZoom);
-
-    const auto& bgImg = bass ? imgs.bassBg : imgs.guitarBg;
-    if (bgImg.isValid())
-        g.drawImage (bgImg, toScreen (bgStage.getX(), bgStage.getY(), bgStage.getWidth(), bgStage.getHeight()),
-                     juce::RectanglePlacement::stretchToFit);
-
-    const bool pwr = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampPower : MiAmpParams::gtrPower)->load() > 0.5f;
-    const bool standby = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampStandby : MiAmpParams::gtrStandby)->load() > 0.5f;
-
-    // Exact .amp-power-led (left:967, top:354, 19x19 metallic dark) when Power is OFF in Bass
-    if (bass && ! pwr)
-    {
-        const auto pt = ampZoomPt (967.0f, 354.0f);
-        const float d = 19.0f * kAmpZoom;
-        const auto lr = toScreen (pt.x, pt.y + yOff, d, d);
-        juce::ColourGradient lg (juce::Colour::fromRGB (164, 154, 144), lr.getX() + lr.getWidth() * 0.38f, lr.getY() + lr.getHeight() * 0.30f,
-                                 juce::Colour::fromRGB (52, 51, 47),    lr.getRight(), lr.getBottom(), true);
-        lg.addColour (0.45, juce::Colour::fromRGB (97, 93, 88));
-        g.setGradientFill (lg);
-        g.fillEllipse (lr);
-    }
-
-    if (introRunning && introElapsed < 2.50f)
-        return;
-
-    const float uiAlpha = introRunning ? juce::jlimit (0.0f, 1.0f, (introElapsed - 2.50f) / 0.35f) : 1.0f;
     const float s = stageScale();
 
-    // Unified right glass panel (.menu 1290, 25, 225, 304) — clean head with 5 actions + meters
-    paintGlassPanel (g, toScreen (1290, 25, 225, 304), 22.0f, uiAlpha);
+    // Layer 0: Single tall continuous Venice Beach Skatepark background (1550x1924)
+    if (imgs.skateparkTall.isValid())
+    {
+        const float camY = juce::jlimit (0.0f, 1156.0f, 1156.0f - yOff);
+        const int fullW = imgs.skateparkTall.getWidth();
+        const int fullH = juce::jmin (768, imgs.skateparkTall.getHeight() - juce::roundToInt (camY));
+        const int panOffsetPx = juce::roundToInt (-52.0f * cabDrawerAnim);
+        if (closeUpView && (! introRunning || introElapsed >= 1.5f))
+        {
+            const float zoom = 1.22f;
+            const int srcW = juce::roundToInt (fullW / zoom);
+            const int srcH = juce::roundToInt (fullH / zoom);
+            const int srcX = juce::jlimit (0, fullW - srcW, (fullW - srcW) / 2 + panOffsetPx);
+            const int srcY = juce::roundToInt (camY) + (fullH - srcH) / 3;
+            g.drawImage (imgs.skateparkTall, 0, 0, getWidth(), getHeight(),
+                         srcX, srcY, srcW, srcH);
+        }
+        else
+        {
+            const int srcY = juce::roundToInt (camY);
+            g.drawImage (imgs.skateparkTall, 0, 0, getWidth(), getHeight(),
+                         0, srcY, fullW, fullH);
+        }
+    }
 
-    auto swBox = toScreen (1305, 40, 195, 38);
+    // Layer 1 (Cabinet) & Layer 2 (Amp Head) seated flush with realistic contact shadows
+    juce::Rectangle<float> cabR, headR, grilleR;
+    computeRigStageLayout (cabR, headR, grilleR);
+    cabR  = cabR.translated  (0.0f, yOff);
+    headR = headR.translated (0.0f, yOff);
+
+    const auto& cabList  = bass ? miamp_rig::getBassCabSpecs()  : miamp_rig::getGuitarCabSpecs();
+    const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
+    const int cabIdx = juce::jlimit (0, static_cast<int> (cabList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
+    const int headIdx = juce::jlimit (0, static_cast<int> (headList.size()) - 1,
+        static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel)->load())));
+    const auto& cSpec = cabList[static_cast<size_t> (cabIdx)];
+    const auto& hSpec = headList[static_cast<size_t> (headIdx)];
+
+    const int visualCabIdx = cSpec.isOff ? (bass ? 4 : 1) : cabIdx;
+    const auto& visualCab = cabList[static_cast<size_t> (juce::jlimit (0, static_cast<int> (cabList.size()) - 1, visualCabIdx))];
+
+    // Ground contact shadow beneath cabinet base
+    {
+        const auto shR = toScreen (cabR.getX() - 18.0f, cabR.getBottom() - 10.0f, cabR.getWidth() + 36.0f, 24.0f);
+        juce::ColourGradient sg (juce::Colour::fromRGBA (12, 10, 8, 165), shR.getCentreX(), shR.getCentreY(),
+                                 juce::Colour::fromRGBA (12, 10, 8, 0),   shR.getRight(),   shR.getCentreY(), true);
+        g.setGradientFill (sg);
+        g.fillEllipse (shR);
+    }
+
+    // Draw Layer 1 Cabinet (dimmed fallback cabinet when CABINET OFF / DIRECT AMP / DI)
+    if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
+    {
+        auto cImg = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
+        if (cImg.isValid())
+        {
+            if (cSpec.isOff)
+            {
+                auto dimmed = cImg.createCopy();
+                dimmed.desaturate();
+                g.setColour (juce::Colours::white.withBrightness (0.44f).withAlpha (0.94f));
+                g.drawImage (dimmed, toScreen (cabR.getX(), cabR.getY(), cabR.getWidth(), cabR.getHeight()),
+                             juce::RectanglePlacement::stretchToFit, true);
+                g.setColour (juce::Colours::white);
+            }
+            else
+            {
+                g.drawImage (cImg, toScreen (cabR.getX(), cabR.getY(), cabR.getWidth(), cabR.getHeight()),
+                             juce::RectanglePlacement::stretchToFit);
+            }
+        }
+
+        // Clean subtle cast shadow under head + front foot contact AO
+        {
+            const auto hSh = toScreen (headR.getX() + headR.getWidth() * 0.04f, headR.getBottom() - 28.0f, headR.getWidth() * 0.92f, 24.0f);
+            juce::ColourGradient bellyGrad (juce::Colour::fromRGBA (4, 4, 4, 130), hSh.getCentreX(), hSh.getCentreY(),
+                                            juce::Colour::fromRGBA (4, 4, 4, 0),   hSh.getRight(),   hSh.getCentreY(), true);
+            g.setGradientFill (bellyGrad);
+            g.fillEllipse (hSh);
+
+            const float fw = headR.getWidth() * 0.085f;
+            for (const float fx : { 0.102f, 0.898f })
+            {
+                const auto fSh = toScreen (headR.getX() + headR.getWidth() * fx - fw * 0.5f, headR.getBottom() - 5.5f, fw, 11.0f);
+                juce::ColourGradient footGrad (juce::Colour::fromRGBA (0, 0, 0, 210), fSh.getCentreX(), fSh.getCentreY(),
+                                               juce::Colour::fromRGBA (0, 0, 0, 0),   fSh.getRight(),   fSh.getCentreY(), true);
+                g.setGradientFill (footGrad);
+                g.fillEllipse (fSh);
+            }
+        }
+    }
+
+    if (cSpec.isOff)
+    {
+        const float badgeW = 310.0f;
+        const float badgeH = 34.0f;
+        const float desiredTop = juce::jmap (cabDrawerAnim, 148.0f, 132.0f);
+        const float maxTop = consoleOpen ? juce::jmax (84.0f, 596.0f - cabR.getY()) : juce::jmax (120.0f, 716.0f - cabR.getY());
+        const float badgeY = closeUpView ? (cabR.getY() + juce::jmin (desiredTop, maxTop)) : (cabR.getY() + cabR.getHeight() * 0.54f - badgeH * 0.5f);
+        const auto diBadge = toScreen (cabR.getCentreX() - badgeW * 0.5f, badgeY, badgeW, badgeH);
+        g.setColour (juce::Colour::fromRGBA (14, 16, 15, 214));
+        g.fillRoundedRectangle (diBadge, 10.0f * s);
+        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 145));
+        g.drawRoundedRectangle (diBadge, 10.0f * s, 1.2f);
+        g.setColour (inkColour().withAlpha (0.92f));
+        g.setFont (sansFont (juce::jmax (10.0f, 12.0f * s), juce::Font::bold));
+        g.drawText ("CABINET OFF  (DIRECT AMP / DI)", diBadge, juce::Justification::centred);
+    }
+
+    // Draw Layer 2 Amp Head
+    {
+        const auto hImg = juce::ImageCache::getFromMemory (hSpec.chassisData, hSpec.chassisSize);
+        if (hImg.isValid())
+            g.drawImage (hImg, toScreen (headR.getX(), headR.getY(), headR.getWidth(), headR.getHeight()),
+                         juce::RectanglePlacement::stretchToFit);
+    }
+
+    const bool pwr = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampPower : MiAmpParams::gtrPower)->load() >= 0.5f;
+    const bool standby = audioProcessor.apvts.getRawParameterValue (bass ? MiAmpParams::ampStandby : MiAmpParams::gtrStandby)->load() >= 0.5f;
+
+    if (introRunning && introElapsed < 2.42f)
+        return;
+
+    const float uiAlpha = introRunning ? juce::jlimit (0.0f, 1.0f, (introElapsed - 2.42f) / 0.40f) : 1.0f;
+
+    // Layer 4a: Unified right glass panel (.menu 1290, 25, 225, 406)
+    paintGlassPanel (g, toScreen (1290, 25, 225, 406), 22.0f, uiAlpha);
+
+    auto swBox = toScreen (1305, 39, 195, 38);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, static_cast<uint8_t> (24.0f * uiAlpha)));
     g.fillRoundedRectangle (swBox, 8.0f * s);
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, static_cast<uint8_t> (102.0f * uiAlpha)));
     g.drawRoundedRectangle (swBox, 8.0f * s, 1.0f);
 
-    // Integrated status LED + IN / OUT meters inside right panel (1305, 276, 195, 37)
-    auto meterBox = toScreen (1305, 276, 195, 37);
+    // Integrated status LED + IN / OUT meters inside right panel (1304, 378, 197, 40)
+    auto meterBox = toScreen (1304, 378, 197, 40);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, static_cast<uint8_t> (16.0f * uiAlpha)));
     g.fillRoundedRectangle (meterBox, 8.0f * s);
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, static_cast<uint8_t> (74.0f * uiAlpha)));
@@ -4220,18 +5103,18 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
                                      : (! pwr || standby ? juce::Colour::fromRGB (247, 197, 107)
                                                          : juce::Colour::fromRGB (126, 255, 189));
     g.setColour (ledCol.withAlpha (uiAlpha));
-    g.fillEllipse (toScreen (1316, 290, 9, 9));
+    g.fillEllipse (toScreen (1315, 393, 9, 9));
 
     const float inFrac  = juce::jlimit (0.0f, 1.0f, audioProcessor.inputRms.load() * 3.5f);
     const float outFrac = juce::jlimit (0.0f, 1.0f, audioProcessor.outputRms.load() * 3.5f);
     g.setColour (inkColour().withAlpha (0.80f * uiAlpha));
     g.setFont (sansFont (juce::jmax (7.5f, 9.0f * s), juce::Font::bold));
-    g.drawText ("IN",  toScreen (1332, 282, 22, 11), juce::Justification::centredLeft);
-    g.drawText ("OUT", toScreen (1332, 296, 24, 11), juce::Justification::centredLeft);
+    g.drawText ("IN",  toScreen (1331, 384, 22, 11), juce::Justification::centredLeft);
+    g.drawText ("OUT", toScreen (1331, 398, 24, 11), juce::Justification::centredLeft);
 
     auto drawMeter = [&] (float y, float frac)
     {
-        auto tr = toScreen (1360, y, 128, 5.5f);
+        auto tr = toScreen (1359, y, 130, 5.5f);
         g.setColour (juce::Colour::fromRGBA (15, 22, 20, static_cast<uint8_t> (165.0f * uiAlpha)));
         g.fillRoundedRectangle (tr, 3.0f * s);
         g.setColour (juce::Colour::fromRGBA (255, 244, 212, static_cast<uint8_t> (56.0f * uiAlpha)));
@@ -4243,12 +5126,52 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
             g.fillRoundedRectangle (tr.withWidth (tr.getWidth() * frac), 3.0f * s);
         }
     };
-    drawMeter (285.0f, inFrac);
-    drawMeter (299.0f, outFrac);
+    drawMeter (387.0f, inFrac);
+    drawMeter (401.0f, outFrac);
+
+    // Layer 4b: Bottom Analog Studio Console Strip (34, 636, 1482, 114) - only when consoleOpen
+    if (consoleOpen)
+    {
+        const auto consoleR = toScreen (34, 636, 1482, 114);
+        juce::ColourGradient cg (juce::Colour::fromRGBA (54, 52, 46, static_cast<uint8_t> (232.0f * uiAlpha)), consoleR.getX(), consoleR.getY(),
+                                 juce::Colour::fromRGBA (24, 26, 24, static_cast<uint8_t> (244.0f * uiAlpha)), consoleR.getX(), consoleR.getBottom(), false);
+        g.setGradientFill (cg);
+        g.fillRoundedRectangle (consoleR, 18.0f * s);
+        g.setColour (juce::Colour::fromRGBA (255, 243, 210, static_cast<uint8_t> (150.0f * uiAlpha)));
+        g.drawRoundedRectangle (consoleR, 18.0f * s, 1.5f);
+
+        // Dividers between console modules
+        g.setColour (juce::Colour::fromRGBA (255, 243, 210, static_cast<uint8_t> (46.0f * uiAlpha)));
+        for (float dx : { 304.0f, 694.0f, 986.0f, 1312.0f })
+            g.drawVerticalLine (juce::roundToInt (dx * s), consoleR.getY() + 10.0f * s, consoleR.getBottom() - 10.0f * s);
+
+        // Section labels & active model names
+        g.setColour (juce::Colour::fromRGBA (191, 252, 225, static_cast<uint8_t> (210.0f * uiAlpha)));
+        g.setFont (sansFont (juce::jmax (8.5f, 10.0f * s), juce::Font::bold));
+        g.drawText ("AMP HEAD",   toScreen (46,  644, 248, 15), juce::Justification::centredLeft);
+        g.drawText ("CABINET / IR", toScreen (706, 644, 272, 15), juce::Justification::centredLeft);
+        g.drawText ("DUAL MICS",  toScreen (996, 640, 140, 12), juce::Justification::centredLeft);
+
+        g.setColour (inkColour().withAlpha (uiAlpha));
+        g.setFont (sansFont (juce::jmax (11.0f, 14.5f * s), juce::Font::bold));
+        g.drawText (hSpec.displayName, toScreen (46, 661, 248, 22), juce::Justification::centredLeft, true);
+
+        const juce::String cabLabel = (cSpec.isCustomIr && audioProcessor.getCustomCabIRName (bass).isNotEmpty())
+            ? ("IR: " + audioProcessor.getCustomCabIRName (bass))
+            : juce::String (cSpec.displayName);
+        g.drawText (cabLabel, toScreen (706, 661, 272, 22), juce::Justification::centredLeft, true);
+
+        g.setColour (inkColour().withAlpha (0.68f * uiAlpha));
+        g.setFont (sansFont (juce::jmax (8.5f, 10.5f * s), juce::Font::plain));
+        g.drawText (hSpec.subtitle, toScreen (46,  722, 248, 16), juce::Justification::centredLeft, true);
+        g.drawText (cSpec.subtitle, toScreen (706, 722, 272, 16), juce::Justification::centredLeft, true);
+        g.drawText ("Drag mics on cab", toScreen (996, 718, 145, 16), juce::Justification::centredLeft, true);
+    }
 
     if (hudText.isNotEmpty())
     {
-        auto hudR = toScreen (35, 25, 245, 36);
+        const float hudCx = 685.0f + cabDrawerAnim * 185.0f;
+        auto hudR = toScreen (hudCx - 135.0f, 18.0f, 270.0f, 34.0f);
         paintGlassPanel (g, hudR, 11.0f);
         g.setColour (inkColour());
         g.setFont (sansFont (juce::jmax (10.0f, 12.5f * s), juce::Font::bold));
@@ -4566,50 +5489,63 @@ void MiAmpAudioProcessorEditor::paintOverChildren (juce::Graphics& g)
 {
     const float s = stageScale();
 
-    // 1. Intro Sky + MI AMP Logo overlay (2.9s matching index.html!)
+    // 1. Intro Logo over single continuous upper sky of skatepark_tall_capa0.jpg (no separate sky stitching!)
     if (introRunning && ! isFloorMode)
     {
         const float tn = juce::jlimit (0.0f, 1.0f, introElapsed / 2.9f);
-        float skyAlpha = 1.0f;
-        if (tn > 0.88f)
-            skyAlpha = 1.0f - (tn - 0.88f) / 0.12f;
-
-        const float skyTopStage = headSceneYOffsetStage - kStageH;
-        const auto skyR = toScreen (0.0f, skyTopStage, kStageW, kStageH + 80.0f);
-
-        g.setOpacity (skyAlpha);
-        if (imgs.introSky.isValid())
-            g.drawImage (imgs.introSky, skyR, juce::RectanglePlacement::stretchToFit);
-
-        // Logo fade in 6%..22%, hold 22%..55%, fade out 55%..80%
         float logoAlpha = 0.0f;
         float logoDy = 0.0f;
-        if (tn >= 0.06f && tn < 0.22f)
+        if (tn >= 0.04f && tn < 0.20f)
         {
-            const float u = (tn - 0.06f) / 0.16f;
+            const float u = (tn - 0.04f) / 0.16f;
             logoAlpha = u;
             logoDy = 10.0f * (1.0f - u);
         }
-        else if (tn >= 0.22f && tn < 0.55f)
+        else if (tn >= 0.20f && tn < 0.52f)
         {
             logoAlpha = 1.0f;
         }
-        else if (tn >= 0.55f && tn < 0.80f)
+        else if (tn >= 0.52f && tn < 0.74f)
         {
-            const float u = (tn - 0.55f) / 0.25f;
+            const float u = (tn - 0.52f) / 0.22f;
             logoAlpha = 1.0f - u;
-            logoDy = -14.0f * u;
+            logoDy = -24.0f * u;
         }
 
         if (logoAlpha > 0.01f && imgs.introLogo.isValid())
         {
-            const float lw = kStageW * 0.64f;
+            const float camY = juce::jlimit (0.0f, 1156.0f, 1156.0f - headSceneYOffsetStage);
+            const float lw = kStageW * 0.58f;
             const float lh = lw * (static_cast<float> (imgs.introLogo.getHeight()) / juce::jmax (1, imgs.introLogo.getWidth()));
-            const auto lr = toScreen (kStageW * 0.18f, skyTopStage + kStageH * 0.28f + logoDy, lw, lh);
-            g.setOpacity (logoAlpha * skyAlpha);
+            const auto lr = toScreen (kStageW * 0.21f, (220.0f - camY * 0.45f) + logoDy, lw, lh);
+            g.setOpacity (logoAlpha);
             g.drawImage (imgs.introLogo, lr, juce::RectanglePlacement::stretchToFit);
+            g.setOpacity (1.0f);
         }
-        g.setOpacity (1.0f);
+    }
+
+    // Hover tooltip pills beside mirrored head-selector arrows
+    if (! isFloorMode && ! introRunning && ! creditOpen)
+    {
+        for (auto* arrow : { btnHeadSidePrev.get(), btnHeadSideNext.get() })
+        {
+            if (arrow != nullptr && arrow->isVisible() && arrow->isMouseOver() && arrow->getTipText().isNotEmpty())
+            {
+                const auto ab = arrow->getBounds().toFloat();
+                const float tw = juce::jmax (110.0f * s, arrow->getTipText().length() * 6.8f * s + 22.0f * s);
+                const float th = 26.0f * s;
+                const float tx = arrow->isRightSide() ? (ab.getX() - tw - 8.0f * s) : (ab.getRight() + 8.0f * s);
+                const float ty = ab.getCentreY() - th * 0.5f;
+                const auto tipR = juce::Rectangle<float> (tx, ty, tw, th);
+                g.setColour (juce::Colour::fromRGBA (14, 17, 16, 232));
+                g.fillRoundedRectangle (tipR, 8.0f * s);
+                g.setColour (juce::Colour::fromRGBA (255, 243, 210, 110));
+                g.drawRoundedRectangle (tipR, 8.0f * s, 1.0f);
+                g.setColour (juce::Colour::fromRGB (250, 243, 227));
+                g.setFont (sansFont (juce::jmax (9.5f, 10.5f * s), juce::Font::bold));
+                g.drawText (arrow->getTipText(), tipR, juce::Justification::centred);
+            }
+        }
     }
 
     // 2. Credit Easter Egg Overlay (.credit-overlay)
@@ -4645,22 +5581,49 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
         if (introRunning) return;
 
         // Clear CLIP on meter click inside unified right panel
-        if (juce::Rectangle<float> (1305, 276, 195, 37).contains (stagePt))
+        if (juce::Rectangle<float> (1304, 378, 197, 40).contains (stagePt))
         {
             audioProcessor.isClipping.store (false, std::memory_order_relaxed);
             return;
         }
-        // Close open popover if clicking outside it
-        if (activePopover != PopoverKind::None)
-            togglePopover (PopoverKind::None);
-        // Easter Egg: .brand-trigger (420, 185, 450, 95)
-        if (juce::Rectangle<float> (420, 185, 450, 95).contains (stagePt))
+        // Clicking the AMP or CABINET info header on the console opens the visual browser
+        if (consoleOpen && juce::Rectangle<float> (42, 642, 256, 42).contains (stagePt))
         {
-            creditOpen = true;
-            btnCreditClose.setVisible (true);
-            btnCreditClose.toFront (true);
-            repaint();
+            closeFloatingOverlays ("rigBrowser");
+            if (rigBrowser) rigBrowser->openMode (miamp_rig::RigBrowserOverlay::Mode::Heads);
+            syncHeadControls();
             return;
+        }
+        if (consoleOpen && juce::Rectangle<float> (702, 642, 278, 42).contains (stagePt))
+        {
+            closeFloatingOverlays ("rigBrowser");
+            if (rigBrowser) rigBrowser->openMode (miamp_rig::RigBrowserOverlay::Mode::Cabs);
+            syncHeadControls();
+            return;
+        }
+
+        // Click outside panels/head/cab returns smoothly to clean Primer Plano view
+        const bool inRightMenu = juce::Rectangle<float> (1290, 25, 225, 406).contains (stagePt);
+        const bool inCabDrawer = cabDrawerOpen && (juce::Rectangle<float> (28, 25, 420, consoleOpen ? 595.0f : 554.0f).contains (stagePt)
+                                                || juce::Rectangle<float> (28, 591, 420, 150.0f).contains (stagePt));
+        const bool inConsole   = consoleOpen && juce::Rectangle<float> (34, 636, 1482, 114).contains (stagePt);
+        const bool inPopover   = (activePopover != PopoverKind::None) && juce::Rectangle<float> (1206, 442, 309, 256).contains (stagePt);
+
+        juce::Rectangle<float> cabR, headR, grilleR;
+        computeRigStageLayout (cabR, headR, grilleR);
+        const bool inRig = headR.contains (stagePt) || cabR.contains (stagePt);
+
+        if (! inRightMenu && ! inCabDrawer && ! inConsole && ! inPopover && ! inRig)
+        {
+            if (activePopover != PopoverKind::None || cabDrawerOpen || consoleOpen || ! closeUpView)
+            {
+                closeFloatingOverlays();
+                consoleOpen = false;
+                closeUpView = true;
+                syncHeadControls();
+                layoutAll();
+                repaint();
+            }
         }
         return;
     }

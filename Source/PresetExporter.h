@@ -207,6 +207,7 @@ public:
         if (bass)
         {
             auto snap = bassIn;
+            snap.useExternalCabEngine = false;
             snap.tunerMuted   = false;
             snap.ampPower     = true;
             snap.ampStandby   = false;
@@ -220,6 +221,7 @@ public:
         else
         {
             auto snap = gtrIn;
+            snap.useExternalCabEngine = false;
             snap.tunerMuted   = false;
             snap.ampPower     = true;
             snap.ampStandby   = false;
@@ -1221,7 +1223,8 @@ public:
 
             zenbox::ZenboxCabConvolver cab;
             cab.prepare (kSr);
-            const int cabIdx = std::clamp (gsnap.cabIndex, 0, 4);
+            const bool cabEnabled = (gsnap.cabIndex >= 0 && gsnap.cabIndex < 8);
+            const int cabIdx = std::clamp (gsnap.cabIndex, 0, 6) % 4;
             const int ch = std::clamp (gsnap.activeChannel, 0, 2);
 
             xvdsp::Biquad toneBass, toneMid, toneTreble, tonePres;
@@ -1238,10 +1241,10 @@ public:
                 if (! gsnap.headBypass)
                 {
                     s = tonePres.processSample (toneTreble.processSample (toneMid.processSample (toneBass.processSample (s))));
-                    if (cabIdx < 4)
+                    if (cabEnabled)
                         s = cab.processSample (s, cabIdx);
                 }
-                else if (cabIdx < 4)
+                else if (cabEnabled)
                 {
                     s = cab.processSample (s, cabIdx);
                 }
@@ -1320,7 +1323,7 @@ public:
             ss << "   - AMP (" << (gs.headBypass ? "BYPASS / SOLO PEDALES" : ("CH" + std::to_string (ch + 1))) << "): Gain " << (int)gs.chGain[static_cast<size_t> (ch)]
                << " | Bass " << (int)gs.chBass[static_cast<size_t> (ch)] << " | Mid " << (int)gs.chMid[static_cast<size_t> (ch)]
                << " | Treble " << (int)gs.chTreble[static_cast<size_t> (ch)] << " | Pres " << (int)gs.chPresence[static_cast<size_t> (ch)] << "\n";
-            ss << "   - CAB IR: " << (gs.cabIndex < 4 ? ("Cab #" + std::to_string (gs.cabIndex + 1)) : "OFF") << "\n";
+            ss << "   - CAB IR: " << (gs.cabIndex < 8 ? ("Cab #" + std::to_string (gs.cabIndex + 1)) : "OFF") << "\n";
             ss << "   - DLY: " << (gs.delayOn ? "ON" : "OFF") << " (" << (int)gs.delayTime << "% Time, " << (int)gs.delayMix << "% Mix)\n";
             ss << "   - REV: " << (gs.reverbOn ? "ON" : "OFF") << " (" << (int)gs.reverbDecay << "% Dec, " << (int)gs.reverbMix << "% Mix)\n";
         }
@@ -1348,7 +1351,7 @@ public:
         ss << "    \"block1\": {\"@model\": \"HD2_CompressorDeluxeComp\", \"@enabled\": " << ((bass ? s.compOn : gs.compOn) ? "true" : "false") << ", \"@path\": 0, \"@position\": 1, \"@type\": 0, \"Threshold\": -24.0, \"Ratio\": 0.45, \"Level\": " << n01 (bass ? s.compLevel : gs.compLevel) << "},\n";
         ss << "    \"block2\": {\"@model\": \"" << (bass ? "HD2_DistObsidian7000" : "HD2_DistScream808") << "\", \"@enabled\": " << ((bass ? (s.xvOn || s.bddiOn || s.goldOn) : (gs.driveOn || gs.distOn)) ? "true" : "false") << ", \"@path\": 0, \"@position\": 2, \"@type\": 0, \"Gain\": " << n01 (bass ? s.xvDrive : gs.driveGain) << ", \"Tone\": " << n01 (bass ? s.xvMid : gs.driveTone) << ", \"Level\": " << n01 (bass ? s.xvLevel : gs.driveLevel) << "},\n";
         ss << "    \"block3\": {\"@model\": \"" << (bass ? "HD2_AmpSVBeastNrm" : (ch == 0 ? "HD2_AmpUSDoubleNrm" : "HD2_AmpBritPlexiJump")) << "\", \"@enabled\": " << ((bass ? !s.headBypass : !gs.headBypass) ? "true" : "false") << ", \"@path\": 0, \"@position\": 3, \"@type\": 1, \"Drive\": " << n01 (bass ? s.ampGain : gs.chGain[static_cast<size_t> (ch)]) << ", \"Bass\": " << n01 (bass ? s.ampBass : gs.chBass[static_cast<size_t> (ch)]) << ", \"Mid\": " << n01 (bass ? s.ampMid : gs.chMid[static_cast<size_t> (ch)]) << ", \"Treble\": " << n01 (bass ? s.ampTreble : gs.chTreble[static_cast<size_t> (ch)]) << ", \"Master\": " << n01 (bass ? 65.0f : gs.chMaster[static_cast<size_t> (ch)]) << "},\n";
-        ss << "    \"block4\": {\"@model\": \"" << (bass ? "HD2_Cab8x10SVBeast" : "HD2_Cab4x12Greenback25") << "\", \"@enabled\": " << ((bass ? s.ampCabOn : (gs.cabIndex < 4)) ? "true" : "false") << ", \"@path\": 0, \"@position\": 4, \"@type\": 2},\n";
+        ss << "    \"block4\": {\"@model\": \"" << (bass ? "HD2_Cab8x10SVBeast" : "HD2_Cab4x12Greenback25") << "\", \"@enabled\": " << ((bass ? s.ampCabOn : (gs.cabIndex < 8)) ? "true" : "false") << ", \"@path\": 0, \"@position\": 4, \"@type\": 2},\n";
         ss << "    \"block5\": {\"@model\": \"HD2_DelaySimpleDelay\", \"@enabled\": " << ((bass ? s.delayOn : gs.delayOn) ? "true" : "false") << ", \"@path\": 0, \"@position\": 5, \"@type\": 7, \"Time\": " << n01 (bass ? s.delayTime : gs.delayTime) << ", \"Feedback\": " << n01 (bass ? s.delayFb : gs.delayFeedback) << ", \"Mix\": " << n01 (bass ? s.delayMix : gs.delayMix) << "},\n";
         ss << "    \"block6\": {\"@model\": \"HD2_ReverbPlate\", \"@enabled\": " << ((bass ? s.reverbOn : gs.reverbOn) ? "true" : "false") << ", \"@path\": 0, \"@position\": 6, \"@type\": 7, \"Decay\": " << n01 (bass ? s.reverbDecay : gs.reverbDecay) << ", \"Mix\": " << n01 (bass ? s.reverbMix : gs.reverbMix) << "}\n";
         ss << "  }, \"global\": {\"@model\": \"@global_params\"}}}\n}\n";
@@ -1375,7 +1378,7 @@ public:
         ss << "    {\"slot\": \"COMP\", \"model\": \"Gray Comp\", \"enabled\": " << ((bass ? s.compOn : gs.compOn) ? "true" : "false") << ", \"sustain\": " << n01 (bass ? s.compSustain : gs.compSustain) << "},\n";
         ss << "    {\"slot\": \"DIST\", \"model\": \"" << (bass ? "Dark Drive" : "Green JRC-OD") << "\", \"enabled\": " << ((bass ? (s.xvOn || s.bddiOn) : (gs.driveOn || gs.distOn)) ? "true" : "false") << ", \"drive\": " << n01 (bass ? s.xvDrive : gs.driveGain) << "},\n";
         ss << "    {\"slot\": \"AMP\", \"model\": \"" << (bass ? "78 Ampeg SVT" : "68 Plexi 100W") << "\", \"enabled\": " << ((bass ? !s.headBypass : !gs.headBypass) ? "true" : "false") << ", \"gain\": " << n01 (bass ? s.ampGain : gs.chGain[static_cast<size_t> (ch)]) << ", \"bass\": " << n01 (bass ? s.ampBass : gs.chBass[static_cast<size_t> (ch)]) << ", \"mid\": " << n01 (bass ? s.ampMid : gs.chMid[static_cast<size_t> (ch)]) << ", \"treble\": " << n01 (bass ? s.ampTreble : gs.chTreble[static_cast<size_t> (ch)]) << "},\n";
-        ss << "    {\"slot\": \"CAB\", \"model\": \"" << (bass ? "8x10 Bass Cab" : "4x12 Greenback") << "\", \"enabled\": " << ((bass ? s.ampCabOn : (gs.cabIndex < 4)) ? "true" : "false") << "},\n";
+        ss << "    {\"slot\": \"CAB\", \"model\": \"" << (bass ? "8x10 Bass Cab" : "4x12 Greenback") << "\", \"enabled\": " << ((bass ? s.ampCabOn : (gs.cabIndex < 8)) ? "true" : "false") << "},\n";
         ss << "    {\"slot\": \"DELAY\", \"model\": \"Tape Echo\", \"enabled\": " << ((bass ? s.delayOn : gs.delayOn) ? "true" : "false") << ", \"mix\": " << n01 (bass ? s.delayMix : gs.delayMix) << "},\n";
         ss << "    {\"slot\": \"REVERB\", \"model\": \"Eleven Reverb\", \"enabled\": " << ((bass ? s.reverbOn : gs.reverbOn) ? "true" : "false") << ", \"mix\": " << n01 (bass ? s.reverbMix : gs.reverbMix) << "}\n";
         ss << "  ]\n}\n";

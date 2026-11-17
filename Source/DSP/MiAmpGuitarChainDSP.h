@@ -38,7 +38,9 @@ struct GuitarControlSnapshot
     bool  os4x       = true;  // 4x Oversampling
     int   cabIndex   = 1;     // 0..3 = 4 Zenbox Cabs, 4 = CAB OFF
 
-    // Amp switches
+    // Amp switches & Model Selection
+    int   headModel  = 0;     // 0=800, 1=Plexi, 2=Recto, 3=6505, 4=AC30, 5=Rocker, 6=BE100, 7=Twin, 8=Zenbox
+    bool  useExternalCabEngine = true;
     bool  ampPower   = true;
     bool  ampStandby = false;
     bool  ampModeBright = true; // MODE switch = 70s Bright Cap
@@ -52,6 +54,20 @@ struct GuitarControlSnapshot
     std::array<float, 3> chPresence { 50.0f, 56.0f, 62.0f };
     std::array<float, 3> chMaster   { 62.0f, 58.0f, 56.0f };
     float outputKnob = 58.0f;
+
+    // Extended controls for modeled amp heads (v25)
+    float resonance  = 50.0f;
+    float vol2       = 45.0f;
+    float cleanBass  = 52.0f;
+    float cleanTreb  = 56.0f;
+    float ampReverb  = 0.0f;
+    float tremSpeed  = 45.0f;
+    float tremDepth  = 0.0f;
+    float attenuator = 85.0f;
+    bool  bright2    = false;
+    bool  crunchSw   = false;
+    bool  halfPower  = false;
+    int   voiceSw    = 1; // 0..2 (e.g. Clean / Vintage / Modern or Voice)
 
     // Pre-FX Pitch Shifter, Tuner Mute & Direct Pedalboard Mode (Head Bypass)
     bool  pitchEnabled   = false;
@@ -589,7 +605,7 @@ private:
 };
 
 //==============================================================================
-// Zenbox Guitar Amp Head Processor (3 Voicings + Bright Cap + 4x OS + British Tone Stack + 4 Cabs)
+// Multi-Model Guitar Amp Head Processor (8 Classic Modeled Amps + Zenbox Mint)
 class ZenboxHeadProcessor
 {
 public:
@@ -604,6 +620,8 @@ public:
         preMudCut.setPeaking   (sr, 275.0, -2.4, 1.1);
         jcmBarkFilter.setPeaking (sr, 1750.0, 3.6, 0.9);
         rectoThump.setPeaking  (sr, 110.0,  2.2, 1.1);
+        resonanceFilter.setPeaking (sr, 90.0, 0.0, 1.1);
+        toneCutLpf.setLowPass  (sr, 18000.0, 0.7071);
 
         millerLpfOs.setLowPass (osSr, 6400.0, 0.7071);
         aaLpfOs1.setLowPass    (osSr, std::min (19000.0, sr * 0.42), 0.7071);
@@ -615,22 +633,28 @@ public:
         eqTreble.setHighShelf  (sr, 2500.0, 0.0);
         eqPresence.setHighShelf (sr, 3800.0, 0.0);
 
+        springRev.prepare (sr);
         cab.prepare (sr);
         reset();
         lastCh = -1;
+        lastModel = -1;
         lastBright = false;
-        lastGain = lastBass = lastMid = lastTreble = lastPresence = -1.0f;
+        lastGain = lastBass = lastMid = lastTreble = lastPresence = lastRes = -1.0f;
     }
 
     void reset() noexcept
     {
         inPreHpf.reset(); brightShelf.reset(); preMidFocus.reset();
         preMudCut.reset(); jcmBarkFilter.reset(); rectoThump.reset();
+        resonanceFilter.reset(); toneCutLpf.reset();
         millerLpfOs.reset(); aaLpfOs1.reset(); aaLpfOs2.reset(); aaLpf1x.reset();
         eqBass.reset(); eqMid.reset(); eqTreble.reset(); eqPresence.reset();
+        springRev.reset();
         cab.reset();
         prevIn = 0.0f;
+        prevJcmIn = 0.0f;
         sagEnv = 0.0f;
+        tremPhase = 0.0f;
     }
 
     inline float process (float x, const GuitarControlSnapshot& snap) noexcept
@@ -638,79 +662,192 @@ public:
         const bool activeOut = snap.ampPower && ! snap.ampStandby && ! snap.tunerMuted;
         muteSmooth += 0.006f * ((activeOut ? 1.0f : 0.0f) - muteSmooth);
 
+        const int model = std::clamp (snap.headModel, 0, 8);
         const int ch = std::clamp (snap.activeChannel, 0, 2);
-        const float gVal = snap.chGain[static_cast<size_t> (ch)];
-        const float bVal = snap.chBass[static_cast<size_t> (ch)];
-        const float mVal = snap.chMid[static_cast<size_t> (ch)];
-        const float tVal = snap.chTreble[static_cast<size_t> (ch)];
-        const float pVal = snap.chPresence[static_cast<size_t> (ch)];
-        const float mast = snap.chMaster[static_cast<size_t> (ch)];
 
-        if (ch != lastCh || snap.ampModeBright != lastBright
+        // Read unified controls mapped cleanly per model
+        const float gVal = snap.chGain[static_cast<size_t> (ch)];
+        const float bVal = (model == 5 && ch == 0) ? snap.cleanBass : snap.chBass[static_cast<size_t> (ch)];
+        const float mVal = snap.chMid[static_cast<size_t> (ch)];
+        const float tVal = (model == 5 && ch == 0) ? snap.cleanTreb : snap.chTreble[static_cast<size_t> (ch)];
+        const float pVal = snap.chPresence[static_cast<size_t> (ch)];
+        const float mast = (model == 5 && ch == 0) ? snap.vol2
+                         : (model == 6 && ch == 0) ? snap.vol2
+                         : snap.chMaster[static_cast<size_t> (ch)];
+
+        if (model != lastModel || ch != lastCh || snap.ampModeBright != lastBright
             || std::fabs (gVal - lastGain) > 0.25f
             || std::fabs (bVal - lastBass) > 0.25f
             || std::fabs (mVal - lastMid)  > 0.25f
             || std::fabs (tVal - lastTreble) > 0.25f
-            || std::fabs (pVal - lastPresence) > 0.25f)
+            || std::fabs (pVal - lastPresence) > 0.25f
+            || std::fabs (snap.resonance - lastRes) > 0.25f)
         {
+            lastModel = model;
             lastCh = ch;
             lastBright = snap.ampModeBright;
-            lastGain = gVal; lastBass = bVal; lastMid = mVal; lastTreble = tVal; lastPresence = pVal;
+            lastGain = gVal; lastBass = bVal; lastMid = mVal; lastTreble = tVal; lastPresence = pVal; lastRes = snap.resonance;
 
-            const double hpfHz = (ch == 0) ? 78.0 : (ch == 1 ? 105.0 : 118.0);
-            inPreHpf.setHighPass (sr, hpfHz, 0.7071);
-
-            const double midPushDb = (ch == 0) ? 1.0 : (ch == 1 ? 2.8 : 3.4);
-            preMidFocus.setPeaking (sr, (ch == 2 ? 1550.0 : 1200.0), midPushDb, 0.85);
-            preMudCut.setPeaking   (sr, 275.0, (ch == 2 ? -2.8 : (ch == 1 ? -1.4 : -0.6)), 1.1);
-
-            // 70s Bright Cap across Gain pot: stronger at lower/mid gain, tapers at max gain
             const double gn = std::clamp (gVal * 0.01, 0.0, 1.0);
-            const double brightDb = snap.ampModeBright ? ((ch == 0 ? 5.6 : 4.4) * (1.0 - gn * 0.65)) : 0.0;
+            double hpfHz = 95.0, midFocusHz = 1350.0, midFocusDb = 2.0, mudCutDb = -1.6;
+            double bassHz = 95.0, midHz = 650.0, trebHz = 2450.0, presHz = 3850.0;
+            double brightDb = snap.ampModeBright ? (4.4 * (1.0 - gn * 0.65)) : 0.0;
+            double resDb = 0.0;
+            double toneCutHz = 18000.0;
+
+            switch (model)
+            {
+                case 0: // MI AMP 800 (JCM800 2203: tight british bite)
+                    hpfHz = 112.0; midFocusHz = 1650.0; midFocusDb = 3.2; mudCutDb = -2.0;
+                    bassHz = 100.0; midHz = 720.0; trebHz = 2500.0; presHz = 4100.0;
+                    break;
+                case 1: // MI AMP PLEXI (1959SLP: open warm vintage mid-punch)
+                    hpfHz = 72.0; midFocusHz = 1150.0; midFocusDb = 1.8; mudCutDb = -0.8;
+                    bassHz = 90.0; midHz = 620.0; trebHz = 2300.0; presHz = 3600.0;
+                    brightDb = snap.ampModeBright ? (5.2 * (1.0 - gn * 0.60)) : 0.0;
+                    break;
+                case 2: // MI AMP RECTO (Dual Rectifier: massive low-end & modern scoop)
+                    hpfHz = 82.0; midFocusHz = 1550.0; midFocusDb = 2.8; mudCutDb = -2.6;
+                    bassHz = 85.0; midHz = 560.0; trebHz = 2650.0; presHz = 4300.0;
+                    break;
+                case 3: // MI AMP 6505 (HG-120: super-tight high-gain metal + resonance)
+                    hpfHz = (ch == 0 && ! snap.crunchSw) ? 88.0 : 128.0;
+                    midFocusHz = 1720.0; midFocusDb = 3.8; mudCutDb = -3.0;
+                    bassHz = 95.0; midHz = 780.0; trebHz = 2700.0; presHz = 4400.0;
+                    resDb = (snap.resonance * 0.01 - 0.5) * 14.0;
+                    break;
+                case 4: // MI AMP AC-30 (Class A Top Boost chime + Tone Cut)
+                    hpfHz = 98.0; midFocusHz = 1950.0; midFocusDb = 2.6; mudCutDb = -1.2;
+                    bassHz = 110.0; midHz = 900.0; trebHz = 2900.0; presHz = 4600.0;
+                    toneCutHz = 11000.0 - (pVal * 0.01) * 7800.0; // Presence acts as Tone Cut on AC30
+                    break;
+                case 5: // MI AMP ROCKER (Thick British low-mid fuzz-edge crunch)
+                    hpfHz = 78.0; midFocusHz = 980.0; midFocusDb = 2.8; mudCutDb = -0.6;
+                    bassHz = 105.0; midHz = 540.0; trebHz = 2150.0; presHz = 3400.0;
+                    break;
+                case 6: // MI AMP BE-100 (Modded British Boutique clarity)
+                    hpfHz = 108.0; midFocusHz = 1580.0; midFocusDb = 3.0; mudCutDb = -2.2;
+                    bassHz = 92.0; midHz = 680.0; trebHz = 2550.0; presHz = 4000.0;
+                    break;
+                case 7: // MI AMP TWIN (Blackface sparkling clean headroom)
+                    hpfHz = 62.0; midFocusHz = 1100.0; midFocusDb = 0.0; mudCutDb = -1.4;
+                    bassHz = 82.0; midHz = 480.0; trebHz = 3100.0; presHz = 4800.0;
+                    brightDb = (snap.ampModeBright || snap.bright2) ? 4.8 : 0.0;
+                    break;
+                default: // 8: MI AMP ZENBOX (Original v24 signature voicing)
+                    hpfHz = (ch == 0) ? 78.0 : (ch == 1 ? 105.0 : 118.0);
+                    midFocusHz = (ch == 2 ? 1550.0 : 1200.0);
+                    midFocusDb = (ch == 0) ? 1.0 : (ch == 1 ? 2.8 : 3.4);
+                    mudCutDb = (ch == 2 ? -2.8 : (ch == 1 ? -1.4 : -0.6));
+                    midHz = (ch == 2 ? 720.0 : 640.0);
+                    brightDb = snap.ampModeBright ? ((ch == 0 ? 5.6 : 4.4) * (1.0 - gn * 0.65)) : 0.0;
+                    break;
+            }
+
+            inPreHpf.setHighPass (sr, hpfHz, 0.7071);
+            preMidFocus.setPeaking (sr, midFocusHz, midFocusDb, 0.85);
+            preMudCut.setPeaking (sr, 275.0, mudCutDb, 1.1);
             brightShelf.setHighShelf (sr, 2750.0, brightDb);
 
-            // British + Recto hybrid tone stack EQ
-            eqBass.setLowShelf     (sr, 95.0,   (bVal * 0.01 - 0.5) * 16.0);
-            eqMid.setPeaking       (sr, (ch == 2 ? 720.0 : 640.0), (mVal * 0.01 - 0.5) * 15.0, 0.95);
-            eqTreble.setHighShelf  (sr, 2450.0, (tVal * 0.01 - 0.5) * 16.0);
-            eqPresence.setHighShelf (sr, 3850.0, (pVal * 0.01 - 0.5) * 14.0);
+            eqBass.setLowShelf     (sr, bassHz, (bVal * 0.01 - 0.5) * 16.0);
+            eqMid.setPeaking       (sr, midHz,  (mVal * 0.01 - 0.5) * 15.0, 0.95);
+            eqTreble.setHighShelf  (sr, trebHz, (tVal * 0.01 - 0.5) * 16.0);
+            eqPresence.setHighShelf (sr, presHz, (model == 4) ? 0.0 : (pVal * 0.01 - 0.5) * 14.0);
+            resonanceFilter.setPeaking (sr, 90.0, resDb, 1.1);
+            toneCutLpf.setLowPass  (sr, toneCutHz, 0.7071);
         }
 
-        // Preamp conditioning + tight low-mid mud cut
         float s = preMudCut.processSample (preMidFocus.processSample (brightShelf.processSample (inPreHpf.processSample (x))));
-        const float jcmDriveIn = (ch == 2) ? jcmBarkFilter.processSample (s) : 0.0f;
+        const float jcmDriveIn = ((model == 8 && ch == 2) || model == 0 || model == 6) ? jcmBarkFilter.processSample (s) : 0.0f;
 
-        // Subtle dynamic tube power-supply sag
+        // Tube power-supply sag (stronger on Recto spongy / Plexi / AC30, tighter on 6505 / Twin)
         sagEnv += 0.0025f * (std::fabs (s) - sagEnv);
-        const float sagScale = 1.0f / (1.0f + sagEnv * ((ch == 2) ? 0.55f : 0.35f));
+        const float sagAmt = (model == 7) ? 0.12f : (model == 3 ? 0.25f : (model == 1 || model == 4 ? 0.48f : 0.38f));
+        const float sagScale = 1.0f / (1.0f + sagEnv * sagAmt);
 
         const float gn = std::clamp (gVal * 0.01f, 0.0f, 1.0f);
-        const float drive1 = (ch == 0) ? (1.15f + gn * 4.5f)
-                           : (ch == 1) ? (2.4f  + gn * 11.5f)
-                                       : (4.4f  + gn * 22.0f);
-        const float drive2 = (ch == 0) ? (1.0f  + gn * 1.4f)
-                           : (ch == 1) ? (1.65f + gn * 4.8f)
-                                       : (2.7f  + gn * 8.2f);
+        float drive1 = 2.0f, drive2 = 2.0f;
+        float symBias = -0.14f;
 
-        auto shapeNonLinear = [this, drive1, drive2, ch, sagScale] (float in, float jcmIn) noexcept -> float
+        switch (model)
         {
-            // Branch A: Zenbox / Triple Rectifier cascaded triode stages
+            case 0: // 800
+                drive1 = 1.8f + gn * 11.0f; drive2 = 1.5f + gn * 4.4f; symBias = -0.15f; break;
+            case 1: // PLEXI (Vol I + Vol II parallel jumpered feel!)
+            {
+                const float v2 = std::clamp (snap.vol2 * 0.01f, 0.0f, 1.0f);
+                drive1 = 1.3f + (gn * 0.72f + v2 * 0.45f) * 8.5f;
+                drive2 = 1.2f + (gn * 0.70f + v2 * 0.30f) * 3.2f;
+                symBias = 0.06f;
+                break;
+            }
+            case 2: // RECTO (ch0=Clean, ch1=Vintage, ch2=Modern)
+                drive1 = (ch == 0) ? (1.1f + gn * 4.0f) : (ch == 1 ? (2.8f + gn * 14.0f) : (4.8f + gn * 24.0f));
+                drive2 = (ch == 0) ? (1.0f + gn * 1.2f) : (ch == 1 ? (1.8f + gn * 5.6f)  : (2.9f + gn * 8.8f));
+                symBias = (ch == 0) ? 0.04f : -0.22f;
+                break;
+            case 3: // 6505 (Rhythm + Crunch, or Lead)
+            {
+                const bool highChannel = (ch >= 1) || snap.crunchSw;
+                drive1 = highChannel ? (4.6f + gn * 25.0f) : (1.25f + gn * 5.2f);
+                drive2 = highChannel ? (2.6f + gn * 8.6f)  : (1.1f  + gn * 1.8f);
+                symBias = highChannel ? -0.18f : 0.05f;
+                break;
+            }
+            case 4: // AC-30 (Normal + Top Boost blend, Class A harmonic)
+            {
+                const float normV = std::clamp (snap.vol2 * 0.01f, 0.0f, 1.0f);
+                drive1 = 1.25f + (gn * 0.75f + normV * 0.40f) * 7.8f;
+                drive2 = 1.15f + (gn * 0.65f + normV * 0.25f) * 2.8f;
+                symBias = 0.16f; // even-order Class A chime!
+                break;
+            }
+            case 5: // ROCKER (Clean vs Dirty)
+                drive1 = (ch == 0) ? (1.1f + gn * 3.2f) : (3.0f + gn * 16.0f);
+                drive2 = (ch == 0) ? (1.0f + gn * 1.0f) : (1.9f + gn * 5.8f);
+                symBias = (ch == 0) ? 0.04f : -0.16f;
+                break;
+            case 6: // BE-100 (Clean vs BE/HBE)
+            {
+                const float hbeBoost = (snap.voiceSw >= 2) ? 1.45f : (snap.voiceSw == 0 ? 0.72f : 1.0f);
+                drive1 = (ch == 0) ? (1.15f + gn * 3.8f) : (2.8f + gn * 15.5f * hbeBoost);
+                drive2 = (ch == 0) ? (1.0f  + gn * 1.2f) : (1.8f + gn * 5.5f * hbeBoost);
+                symBias = (ch == 0) ? 0.05f : -0.14f;
+                break;
+            }
+            case 7: // TWIN (Clean headroom; breaks up gently only above 75%)
+                drive1 = 0.85f + gn * 2.6f;
+                drive2 = 0.92f + gn * 0.95f;
+                symBias = 0.03f;
+                break;
+            default: // 8: ZENBOX
+                drive1 = (ch == 0) ? (1.15f + gn * 4.5f) : (ch == 1 ? (2.4f + gn * 11.5f) : (4.4f + gn * 22.0f));
+                drive2 = (ch == 0) ? (1.0f  + gn * 1.4f) : (ch == 1 ? (1.65f + gn * 4.8f) : (2.7f + gn * 8.2f));
+                symBias = (ch == 0) ? 0.06f : -0.18f;
+                break;
+        }
+
+        auto shapeNonLinear = [this, drive1, drive2, symBias, model, ch, sagScale] (float in, float jcmIn) noexcept -> float
+        {
             const float x1 = in * drive1 * sagScale;
             float s1 = std::tanh (x1 + 0.14f) - std::tanh (0.14f);
             s1 = millerLpfOs.processSample (s1);
 
             const float x2 = s1 * drive2;
-            const float bias2 = (ch == 0) ? 0.06f : -0.18f;
-            float s2 = std::tanh (x2 + bias2) - std::tanh (bias2);
+            float s2 = std::tanh (x2 + symBias) - std::tanh (symBias);
 
-            if (ch == 2)
+            if ((model == 8 && ch == 2) || (model == 2 && ch == 2) || model == 3 || model == 6)
             {
-                // Stage 3 Recto Vintage crunch + parallel Marshall JCM900 Cranked-Clean EL34 bite!
-                const float recto = std::tanh (s2 * 1.85f + 0.10f) - std::tanh (0.10f);
-                const float jcm   = std::tanh (jcmIn * (2.6f + drive1 * 0.22f) + 0.08f) - std::tanh (0.08f);
-                return recto * 0.44f + jcm * 0.24f;
+                const float st3 = std::tanh (s2 * 1.80f + 0.10f) - std::tanh (0.10f);
+                const float jcm = std::tanh (jcmIn * (2.4f + drive1 * 0.20f) + 0.08f) - std::tanh (0.08f);
+                return st3 * 0.45f + jcm * 0.22f;
             }
-            return s2 * ((ch == 0) ? 0.64f : 0.52f);
+            if (model == 0)
+            {
+                const float jcm = std::tanh (jcmIn * (2.2f + drive1 * 0.18f) + 0.06f) - std::tanh (0.06f);
+                return s2 * 0.42f + jcm * 0.22f;
+            }
+            return s2 * ((model == 7 || ch == 0) ? 0.68f : 0.54f);
         };
 
         float preOut = 0.0f;
@@ -735,36 +872,67 @@ public:
             prevJcmIn = jcmDriveIn;
         }
 
-        // Tone Stack + Recto 110Hz Chest Thump + Power Amp Master + Presence
+        // Tone Stack + Power Amp Saturation + Resonance/Presence/ToneCut
         float ampSig = eqTreble.processSample (eqMid.processSample (eqBass.processSample (preOut)));
-        if (ch == 2)
+        if (model == 2 || (model == 8 && ch == 2))
             ampSig = rectoThump.processSample (ampSig);
-        const float mastGain = 0.45f + std::clamp (mast * 0.01f, 0.0f, 1.0f) * 1.55f;
-        ampSig = std::tanh (ampSig * mastGain * 1.15f) * 0.88f;
-        ampSig = eqPresence.processSample (ampSig);
+        if (model == 3)
+            ampSig = resonanceFilter.processSample (ampSig);
 
-        // 4 Zenbox Cabs (or Cab Bypass when cabIndex == 4)
+        const float halfScale = snap.halfPower ? 0.82f : 1.0f;
+        const float mastGain = (0.45f + std::clamp (mast * 0.01f, 0.0f, 1.0f) * 1.55f) * halfScale;
+        ampSig = std::tanh (ampSig * mastGain * 1.12f) * 0.88f;
+        ampSig = eqPresence.processSample (ampSig);
+        if (model == 4)
+            ampSig = toneCutLpf.processSample (ampSig);
+
+        // Built-in Optical Tremolo (AC-30 & Twin)
+        if ((model == 4 || model == 7) && snap.tremDepth > 1.0f)
+        {
+            const float hz = 1.2f + (snap.tremSpeed * 0.01f) * 9.5f;
+            tremPhase += hz / static_cast<float> (sr);
+            if (tremPhase >= 1.0f) tremPhase -= 1.0f;
+            const float lfo = 0.5f + 0.5f * std::sin (tremPhase * 6.2831853f);
+            const float mod = 1.0f - (snap.tremDepth * 0.01f) * 0.72f * lfo;
+            ampSig *= mod;
+        }
+
+        // Built-in Amp Spring Reverb (AC-30, Rocker, Twin)
+        if ((model == 4 || model == 5 || model == 7) && snap.ampReverb > 1.0f)
+        {
+            ampSig = springRev.process (ampSig, true, 48.0f, 54.0f, snap.ampReverb * 0.65f, 30.0f);
+        }
+
+        // Attenuator trim (Rocker) or Output Knob
+        const float attenTrim = (model == 5) ? (0.35f + (snap.attenuator * 0.01f) * 0.75f) : 1.0f;
+        const float outTrim = std::pow (10.0f, ((snap.outputKnob * 0.01f - 0.5f) * 18.0f) / 20.0f) * attenTrim;
+
+        if (snap.useExternalCabEngine)
+        {
+            return std::tanh (ampSig * outTrim * 0.90f) * 0.94f * muteSmooth;
+        }
+
+        // Legacy internal 4-cab convolver (if ever invoked standalone)
         const bool cabActive = (snap.cabIndex >= 0 && snap.cabIndex <= 3);
         cabSmooth += 0.008f * ((cabActive ? 1.0f : 0.0f) - cabSmooth);
         const float cabSig = cab.processSample (ampSig, cabActive ? snap.cabIndex : 1);
         const float mixed  = cabSig * cabSmooth + ampSig * 0.55f * (1.0f - cabSmooth);
-
-        const float outTrim = std::pow (10.0f, ((snap.outputKnob * 0.01f - 0.5f) * 18.0f) / 20.0f);
         return std::tanh (mixed * outTrim * 0.95f) * 0.94f * muteSmooth;
     }
 
 private:
     double sr = 48000.0;
-    xvdsp::Biquad inPreHpf, brightShelf, preMidFocus, preMudCut, jcmBarkFilter, rectoThump;
+    xvdsp::Biquad inPreHpf, brightShelf, preMidFocus, preMudCut, jcmBarkFilter, rectoThump, resonanceFilter, toneCutLpf;
     xvdsp::Biquad millerLpfOs, aaLpfOs1, aaLpfOs2, aaLpf1x;
     xvdsp::Biquad eqBass, eqMid, eqTreble, eqPresence;
+    GuitarReverbFX springRev;
     ZenboxCabConvolver cab;
 
-    float prevIn = 0.0f, prevJcmIn = 0.0f, sagEnv = 0.0f;
+    float prevIn = 0.0f, prevJcmIn = 0.0f, sagEnv = 0.0f, tremPhase = 0.0f;
     float muteSmooth = 1.0f, cabSmooth = 1.0f;
-    int   lastCh = -1;
+    int   lastCh = -1, lastModel = -1;
     bool  lastBright = false;
-    float lastGain = -1.0f, lastBass = -1.0f, lastMid = -1.0f, lastTreble = -1.0f, lastPresence = -1.0f;
+    float lastGain = -1.0f, lastBass = -1.0f, lastMid = -1.0f, lastTreble = -1.0f, lastPresence = -1.0f, lastRes = -1.0f;
 };
 
 //==============================================================================

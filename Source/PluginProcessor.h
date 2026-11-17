@@ -2,6 +2,8 @@
 #include <JuceHeader.h>
 #include "DSP/MiAmpBassChainDSP.h"
 #include "DSP/MiAmpGuitarChainDSP.h"
+#include "DSP/MiAmpCabMicDSP.h"
+#include "DSP/MiAmpStudioFxDSP.h"
 #include "DSP/XVBassTuner.h"
 
 namespace MiAmpParams
@@ -120,6 +122,95 @@ namespace MiAmpParams
     inline constexpr const char* gtrOctOn      = "gtr_oct_on",      *gtrOctDirect  = "gtr_oct_direct",  *gtrOctUp = "gtr_oct_up",       *gtrOctSub1 = "gtr_oct_sub1", *gtrOctSub2 = "gtr_oct_sub2";
     inline constexpr const char* gtrEqOn       = "gtr_eq_on";
     inline constexpr const char* gtrEqBand[7]  = { "gtr_eq_0", "gtr_eq_1", "gtr_eq_2", "gtr_eq_3", "gtr_eq_4", "gtr_eq_5", "gtr_eq_6" };
+
+    // Expanded Head & Cab Selection + Extended Amp Controls (v25)
+    inline constexpr const char* gtrHeadModel  = "gtr_head_model"; // 0..7 new + 8=Zenbox
+    inline constexpr const char* gtrResonance  = "gtr_resonance";
+    inline constexpr const char* gtrVol2       = "gtr_vol2";
+    inline constexpr const char* gtrCleanBass  = "gtr_clean_bass";
+    inline constexpr const char* gtrCleanTreb  = "gtr_clean_treb";
+    inline constexpr const char* gtrAmpRev     = "gtr_amp_rev";
+    inline constexpr const char* gtrTremSpd    = "gtr_trem_spd";
+    inline constexpr const char* gtrTremDep    = "gtr_trem_dep";
+    inline constexpr const char* gtrAtten      = "gtr_atten";
+    inline constexpr const char* gtrBright2    = "gtr_bright2";
+    inline constexpr const char* gtrCrunchSw   = "gtr_crunch_sw";
+    inline constexpr const char* gtrHalfPwr    = "gtr_half_pwr";
+    inline constexpr const char* gtrVoiceSw    = "gtr_voice_sw"; // 0..2
+
+    inline constexpr const char* bassHeadModel = "bass_head_model"; // 0..7 new + 8=Classic Mint
+    inline constexpr const char* bassCabModel  = "bass_cab_model";  // 0..5 new + 6=Custom + 7=OFF
+    inline constexpr const char* bassMaster    = "bass_master";
+    inline constexpr const char* bassTubeGain  = "bass_tube_gain";
+    inline constexpr const char* bassCompCtrl  = "bass_comp_ctrl";
+    inline constexpr const char* bassDriveCtrl = "bass_drive_ctrl";
+    inline constexpr const char* bassToneCtrl  = "bass_tone_ctrl";
+    inline constexpr const char* bassBlendCtrl = "bass_blend_ctrl";
+    inline constexpr const char* bassLoMid     = "bass_lo_mid";
+    inline constexpr const char* bassBiAmpLo   = "bass_biamp_lo";
+    inline constexpr const char* bassPad       = "bass_pad";
+    inline constexpr const char* bassMuteSw    = "bass_mute_sw";
+    inline constexpr const char* bassUltraLo   = "bass_ultra_lo";
+    inline constexpr const char* bassBrightSw  = "bass_bright_sw";
+    inline constexpr const char* bassDeepSw    = "bass_deep_sw";
+    inline constexpr const char* bassHeadEqOn  = "bass_head_eq_on";
+    inline constexpr const char* bassHeadEq[10]= { "bh_eq_0","bh_eq_1","bh_eq_2","bh_eq_3","bh_eq_4","bh_eq_5","bh_eq_6","bh_eq_7","bh_eq_8","bh_eq_9" };
+
+    // Dual Microphones (MI-57 + MI-87) & Room
+    inline constexpr const char* mic1On        = "mic1_on";
+    inline constexpr const char* mic1Level     = "mic1_level";
+    inline constexpr const char* mic1PosX      = "mic1_pos_x";
+    inline constexpr const char* mic1PosY      = "mic1_pos_y";
+    inline constexpr const char* mic1Dist      = "mic1_dist";   // 0=Close, 1=Mid, 2=Far
+    inline constexpr const char* mic1Phase     = "mic1_phase";
+    inline constexpr const char* mic2On        = "mic2_on";
+    inline constexpr const char* mic2Level     = "mic2_level";
+    inline constexpr const char* mic2PosX      = "mic2_pos_x";
+    inline constexpr const char* mic2PosY      = "mic2_pos_y";
+    inline constexpr const char* mic2Dist      = "mic2_dist";   // 0=Close, 1=Mid, 2=Far
+    inline constexpr const char* mic2Phase     = "mic2_phase";
+    inline constexpr const char* cabMicMix     = "cab_mic_mix"; // 0..100
+    inline constexpr const char* cabRoom       = "cab_room";    // 0..100
+
+    // Post-Amp Stereo STUDIO FX
+    inline constexpr const char* sfxCompOn     = "sfx_comp_on";
+    inline constexpr const char* sfxCompPar    = "sfx_comp_par";
+    inline constexpr const char* sfxCompXLow   = "sfx_comp_xlow";
+    inline constexpr const char* sfxCompXHigh  = "sfx_comp_xhigh";
+    inline constexpr const char* sfxCompBOn[3] = { "sfx_c0_on", "sfx_c1_on", "sfx_c2_on" };
+    inline constexpr const char* sfxCompBSol[3]= { "sfx_c0_so", "sfx_c1_so", "sfx_c2_so" };
+    inline constexpr const char* sfxCompBThr[3]= { "sfx_c0_th", "sfx_c1_th", "sfx_c2_th" };
+    inline constexpr const char* sfxCompBRat[3]= { "sfx_c0_ra", "sfx_c1_ra", "sfx_c2_ra" };
+    inline constexpr const char* sfxCompBAtt[3]= { "sfx_c0_at", "sfx_c1_at", "sfx_c2_at" };
+    inline constexpr const char* sfxCompBRel[3]= { "sfx_c0_re", "sfx_c1_re", "sfx_c2_re" };
+    inline constexpr const char* sfxCompBGn[3] = { "sfx_c0_gn", "sfx_c1_gn", "sfx_c2_gn" };
+
+    inline constexpr const char* sfxEqOn       = "sfx_eq_on";
+    inline constexpr const char* sfxEqAnal     = "sfx_eq_anal";
+    inline constexpr const char* sfxEqHpf      = "sfx_eq_hpf";
+    inline constexpr const char* sfxEqLpf      = "sfx_eq_lpf";
+    inline constexpr const char* sfxEqOut      = "sfx_eq_out";
+    inline constexpr const char* sfxEqFreq[5]  = { "sfx_e0_f", "sfx_e1_f", "sfx_e2_f", "sfx_e3_f", "sfx_e4_f" };
+    inline constexpr const char* sfxEqGain[5]  = { "sfx_e0_g", "sfx_e1_g", "sfx_e2_g", "sfx_e3_g", "sfx_e4_g" };
+    inline constexpr const char* sfxEqQ[5]     = { "sfx_e0_q", "sfx_e1_q", "sfx_e2_q", "sfx_e3_q", "sfx_e4_q" };
+
+    inline constexpr const char* sfxDlyOn      = "sfx_dly_on";
+    inline constexpr const char* sfxDlyPP      = "sfx_dly_pp";
+    inline constexpr const char* sfxDlySync    = "sfx_dly_sync";
+    inline constexpr const char* sfxDlyTime    = "sfx_dly_time";
+    inline constexpr const char* sfxDlySub     = "sfx_dly_sub";
+    inline constexpr const char* sfxDlyFb      = "sfx_dly_fb";
+    inline constexpr const char* sfxDlyLoCut   = "sfx_dly_locut";
+    inline constexpr const char* sfxDlyHiCut   = "sfx_dly_hicut";
+    inline constexpr const char* sfxDlyMix     = "sfx_dly_mix";
+
+    inline constexpr const char* sfxRevOn      = "sfx_rev_on";
+    inline constexpr const char* sfxRevMode    = "sfx_rev_mode";
+    inline constexpr const char* sfxRevPreDly  = "sfx_rev_predly";
+    inline constexpr const char* sfxRevDecay   = "sfx_rev_decay";
+    inline constexpr const char* sfxRevDamp    = "sfx_rev_damp";
+    inline constexpr const char* sfxRevWidth   = "sfx_rev_width";
+    inline constexpr const char* sfxRevMix     = "sfx_rev_mix";
 }
 
 struct MiAmpBassPreset
@@ -235,6 +326,12 @@ public:
 
     miamp::BassControlSnapshot getBassSnapshot() const noexcept { return readBassSnapshot(); }
     zenbox::GuitarControlSnapshot getGuitarSnapshot() const noexcept { return readGuitarSnapshot(); }
+    miamp::CabMicSnapshot getCabMicSnapshot() const noexcept { return readCabMicSnapshot(); }
+    miamp::StudioFxSnapshot getStudioFxSnapshot() const noexcept { return readStudioFxSnapshot(); }
+    bool loadCustomCabIR (bool forBass, const juce::File& file);
+    juce::String getCustomCabIRName (bool forBass) const { return forBass ? customBassIrName : customGtrIrName; }
+    float getStudioCompGrDb (int band) const noexcept { return studioFxDsp.getBandGrDb (band); }
+    float getStudioEqSpectrumBin (int bin) const noexcept { return studioFxDsp.getSpectrumBin (bin); }
     juce::String exportStateAsXmlString (const juce::String& presetName);
     bool importStateFromXmlString (const juce::String& xmlText);
 
@@ -250,6 +347,8 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     miamp::BassControlSnapshot readBassSnapshot() const noexcept;
     zenbox::GuitarControlSnapshot readGuitarSnapshot() const noexcept;
+    miamp::CabMicSnapshot readCabMicSnapshot() const noexcept;
+    miamp::StudioFxSnapshot readStudioFxSnapshot() const noexcept;
     static float dbToXvKnob (float db) noexcept { return std::clamp (((db + 12.0f) / 24.0f) * 100.0f, 0.0f, 100.0f); }
     static juce::File getUserPresetsFile();
     static juce::File getSettingsFile();
@@ -258,6 +357,10 @@ private:
 
     miamp::MiAmpBassChainDSP bassDsp;
     zenbox::MiAmpGuitarChainDSP guitarDsp;
+    miamp::MiAmpCabMicDSP cabMicDsp;
+    miamp::MiAmpStudioFxDSP studioFxDsp;
+    juce::String customGtrIrPath, customGtrIrName;
+    juce::String customBassIrPath, customBassIrName;
     std::vector<float> monoScratch;
     std::vector<MiAmpBassPreset> factoryPresets;
     std::vector<MiAmpGuitarPreset> guitarFactoryPresets;
