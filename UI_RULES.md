@@ -47,5 +47,6 @@ Estas reglas son obligatorias para cualquier cambio de interfaz, código C++ (`S
 
 ## 6. Assets RGBA y Autenticidad Visual
 - **Bordes limpios (`Resources/rig/`):** todos los PNG de cabezales, cajas, micrófonos, perillas y switches deben mantener alfa descontaminado, sin halos ni artefactos en los bordes del lienzo.
+- **Formato PNG obligatorio (`RGBA 32-bit` / `color_type = 6`):** **NUNCA** guardar assets críticos nuevos o regenerados como PNG8 indexado con paleta + `tRNS` (`color_type = 3`, por ej. cuantización `FASTOCTREE`) ni superar `1536 px` en el lado más largo en imágenes con alfa: en Windows con JUCE 8 (`libpng` + Direct2D), los PNG8 indexados con ciertos bloques `PLTE`/`tRNS` o alturas elevadas pueden decodificarse/renderizarse como una **silueta negra sólida (`#000000`)** manteniendo intacta la máscara alfa. Guardar siempre como **PNG 32-bit RGBA puro (`color_type = 6`, sin `PLTE` ni `tRNS`)**, con RGB puesto a `0` en píxeles donde `alpha == 0`.
 - **Controles completos:** cada cabezal debe mostrar todas sus perillas, switches y faders reales alineados según `Source/AmpCatalogSpecs.h`.
 - **Previews 100% reales:** cualquier captura o preview visual debe reflejar exactamente las posiciones y proporciones reales del plugin (no reubicar paneles en lugares donde no existen).

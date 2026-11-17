@@ -52,7 +52,7 @@ Documento de referencia técnica integral para retomar el desarrollo de **MI AMP
 - `4`: `2x12 CLASS-A` (`cab_2x12_classa.png`)
 - `5`: `4x12 TANGERINE` (`cab_4x12_tangerine.png`)
 - `6`: `2x12 BLACKFACE` (`cab_2x12_twin.png`)
-- `7`: **`4x12 MI ZENBOX`** (`cab_4x12_zenbox.png`, **1020×1029 px**, Mint Tolex original, default)
+- `7`: **`4x12 MI ZENBOX`** (`cab_4x12_zenbox.png`, **880×888 px**, 32-bit RGBA, Mint Tolex original, default)
 - `8`: `CUSTOM WAV IR` (usa `cab_4x12_zenbox.png`, carga `.wav` externo)
 - `9`: `CAB OFF` (`isOff = true`, muestra imagen atenuada de la caja original sin grill/mics)
 
@@ -66,7 +66,7 @@ Documento de referencia técnica integral para retomar el desarrollo de **MI AMP
 - `3`: `6x10 HEAVY` (`bass_cab_6x10_heavy.png`)
 - `4`: `8x10 CLASSIC` (`bass_cab_8x10_classic.png`)
 - `5`: `8x10 TANGERINE` (`bass_cab_8x10_tangerine.png`)
-- `6`: **`8x10 MI CLASSIC`** (`bass_cab_8x10_mint.png`, **805×1909 px**, Mint Tolex original, default)
+- `6`: **`8x10 MI CLASSIC`** (`bass_cab_8x10_mint.png`, **600×1423 px**, 32-bit RGBA, Mint Tolex original, default)
 - `7`: `CUSTOM WAV IR` (usa `bass_cab_8x10_mint.png`, carga `.wav` externo)
 - `8`: `CAB OFF` (`isOff = true`, salida DI directa)
 
@@ -81,7 +81,7 @@ Revisar siempre estos archivos antes de modificar gráficos o layouts:
 - **Resolución y formato de assets en `Resources/rig/`**:
   - Todos los cabezales son `1200 px` de ancho RGBA sin fondo ni patas sobrantes.
   - Si un cabezal tipo rack (`PRO-450`, `RB-800`, `DB-750`) tiene esquineros cromados, dejar `≥ 5 px` de aire transparente en los bordes laterales y asegurar que el riel horizontal inferior sea continuo por encima de las patas de goma.
-  - Las cajas originales (`4x12 MI ZENBOX` y `8x10 MI CLASSIC`) deben mantenerse a **≥ `800 px` de ancho real** (`1020×1029` y `805×1909`) para que `closeUpView` (`~900 px` de ancho en pantalla) se vea 100% nítido sin pixelación.
+  - Las cajas originales (`4x12 MI ZENBOX` `880×888` y `8x10 MI CLASSIC` `600×1423`) deben guardarse siempre en **PNG 32-bit RGBA puro (`color_type = 6`, sin paleta `PLTE`/`tRNS`)** y mantenerse bajo `1536 px` de altura (evitando el bug de silueta negra en Windows JUCE 8 `libpng` + Direct2D) y por encima de `580 px` de ancho para que `closeUpView` se vea 100% nítido y en color real de 24-bit sin cuantización.
   - Todo nuevo recurso agregado en `Resources/` debe declararse en `CMakeLists.txt` (`juce_add_binary_data`) para compilar en `BinaryData`.
 
 ---
@@ -93,7 +93,7 @@ Revisar siempre estos archivos antes de modificar gráficos o layouts:
 
 ---
 
-## 6. Estado Alcanzado en esta Entrega (`v26`)
+## 6. Estado Alcanzado en esta Entrega (`v26b`)
 - Fixes #1–7 de UI completos (`UI_RULES.md`), limpieza de artefactos en pies de los 18 cabezales, reparación fotorealista completa de los esquineros y riel inferior en `bass_head_svt3pro.png` (`PRO-450`) y `bass_head_gk800.png` (`RB-800`).
-- Cajas originales fotorealistas HD (`cab_4x12_zenbox.png` `1020×1029` y `bass_cab_8x10_mint.png` `805×1909`) sincronizadas en las 10 cajas de guitarra y 9 de bajo junto a `CUSTOM WAV IR` y `CAB OFF`.
+- Cajas originales fotorealistas HD en **32-bit RGBA puro (`ct=6`)** (`cab_4x12_zenbox.png` `880×888` y `bass_cab_8x10_mint.png` `600×1423`) — corrigiendo el fallo de silueta negra en Windows JUCE 8 — sincronizadas en las 10 cajas de guitarra y 9 de bajo junto a `CUSTOM WAV IR` y `CAB OFF`.
 - Documentación completa de creación de fondos (`FONDO_GUIA.md` + `scripts/crear_fondos_mi_amp.py`) y guía técnica (`PROJECT_HANDOFF.md`).
