@@ -402,7 +402,7 @@ namespace
         auto& dm = holder.deviceManager;
 
         if (dm.getCurrentAudioDeviceType() != cand.typeName)
-            dm.setCurrentAudioType (cand.typeName);
+            dm.setCurrentAudioDeviceType (cand.typeName, true);
 
         auto* activeType = dm.getCurrentDeviceTypeObject();
         if (activeType == nullptr)
