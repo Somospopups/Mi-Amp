@@ -229,7 +229,7 @@ target_compile_definitions(MiAmp
         MIAMP_APP_VERSION="1.1.${MIAMP_BUILD_NUMBER}"
 )
 
-# Pure-C++ Offline AI Stem Separation (Eigen 3.4.0 + sevagh/demucs.cpp htdemucs_6s)
+# Pure-C++ Offline AI Stem Separation (Eigen dd8c71e6 + sevagh/demucs.cpp htdemucs_6s)
 option(MIAMP_ENABLE_DEMUCS "Build embedded pure-C++ Demucs 6-stem AI engine" ON)
 if(MIAMP_ENABLE_DEMUCS)
     include(FetchContent)
@@ -242,7 +242,7 @@ if(MIAMP_ENABLE_DEMUCS)
     endif()
     FetchContent_Declare(
         eigen
-        URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+        URL https://gitlab.com/libeigen/eigen/-/archive/dd8c71e62852b2fe429edb6682ac91fd1c578a26/eigen-dd8c71e62852b2fe429edb6682ac91fd1c578a26.tar.gz
     )
     FetchContent_GetProperties(eigen)
     if(NOT eigen_POPULATED)
@@ -254,6 +254,7 @@ if(MIAMP_ENABLE_DEMUCS)
         GIT_REPOSITORY https://github.com/sevagh/demucs.cpp.git
         GIT_TAG        main
         GIT_SHALLOW    TRUE
+        GIT_SUBMODULES ""
     )
     FetchContent_GetProperties(demucs_cpp)
     if(NOT demucs_cpp_POPULATED)
@@ -267,12 +268,15 @@ if(MIAMP_ENABLE_DEMUCS)
         CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE ON
     )
-    target_include_directories(demucs_core PUBLIC
+    target_include_directories(demucs_core SYSTEM PUBLIC
         "${demucs_cpp_SOURCE_DIR}/src"
         "${eigen_SOURCE_DIR}"
     )
+    target_compile_definitions(demucs_core PUBLIC
+        $<$<PLATFORM_ID:Windows>:NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS>
+    )
     target_compile_options(demucs_core PRIVATE
-        $<$<CXX_COMPILER_ID:MSVC>:/utf-8 /O2 /bigobj>
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8 /O2 /bigobj /Zc:__cplusplus>
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-O2 -Wno-sign-conversion -Wno-unused-parameter>
     )
     target_link_libraries(MiAmp PRIVATE demucs_core)
@@ -283,7 +287,7 @@ endif()
 
 target_compile_options(MiAmp
     PUBLIC
-        $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8 /Zc:__cplusplus>
 )
 
 target_link_libraries(MiAmp
