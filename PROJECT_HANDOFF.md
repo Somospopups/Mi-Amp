@@ -97,7 +97,13 @@ Revisar siempre estos archivos antes de modificar gráficos o layouts:
 ## 6. Estado Alcanzado en esta Entrega (`v28`)
 - **Encuadre por Instrumento y Flechas Fijas (`Source/PluginEditor.cpp` + `Source/CabPanels.h`):**
   - En Primer Plano (`closeUpView`), **Guitarra** usa `centerX=675, actualW=860, cabTopY=555` (zoom fondo `1.18×`) y **Bajo** usa `centerX=665, actualW=960, cabTopY=555` (zoom fondo `1.24×`), acomodando ambos a `870 / 680 / 505` al abrir el panel de `CAJAS`.
-  - **`HeadSideArrowButton` (`Cápsula Fina`)**: pastilla vertical redondeada (`30 × 66 px`, 1 único chevron fino) en **coordenadas fijas por instrumento** para no saltar al cambiar de cabezal.
+  - **`HeadSideArrowButton` (`Cápsula Fina`)**: pastilla vertical redondeada (`30 × 66 px`, 1 único chevron fino) en **coordenadas fijas (`133`/`1167`, `y=344` en pantalla principal)** inmóviles entre Guitarra, Bajo y todos los cabezales.
+- **Transición Guitarra ↔ Bajo (`#4 Elevación de Estudio Suave`, `0.62s`) y Pantalla Principal Centrada (v29)**:
+  - Crossfade sedoso de `0.62s` con desplazamiento sutil (`-5px` salida / `+8px` entrada), **sin parpadeo** y **con zoom de fondo fijo en `1.18f`** en Primer Plano.
+  - En la pantalla principal (`!isFloorMode`), el menú derecho (`1291, 173, 224, 422`) y los popovers derechos (`1206, (768-h)/2`) van centrados verticalmente y **todos los popups** (`GlassPopover`, `CabPickerPanel`, `StudioFxModal`, `RigBrowserOverlay`) animan suavemente apertura y cierre sin superponerse (`closeFloatingOverlays`).
+- **Blindaje de Audio Standalone sin DAW (`StandaloneAudioImpl.cpp` + `PluginProcessor.cpp`)**:
+  - Arranque con entrada estrictamente silenciada (`0.0f`) hasta verificar interfaz USB/ASIO/Line-In real; bloqueo estricto de micrófonos integrados/Realtek/Intel Smart Sound/High Definition Audio/loopback en español e inglés; sin persistir bypass manual de micrófono entre reinicios.
+  - Sanitización `NaN`/`Inf`, limitador suave de seguridad (`±0.94f`) y corte automático anti-acople sostenido en `processBlock()`.
 - **Selector Unificado `CAJAS ↔ MICRÓFONOS` (`Source/CabPanels.h`)**:
   - Un solo panel izquierdo (`28, 25, 420, 716`) con pill toggle **`[ CAJAS | MICRÓFONOS ]`** en la cabecera, Hero sin flechas `< >` laterales, grilla **`5×2`** completa e íconos propios para **`.WAV IR`** y **`DIRECT DI`**.
 - **Vidrio Equilibrado Único (`Source/MiAmpGlassTheme.h` + `UI_RULES.md` §7 y §9)**:

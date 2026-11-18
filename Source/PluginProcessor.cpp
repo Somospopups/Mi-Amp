@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "StandaloneAudioBridge.h"
 #include <algorithm>
 #include <cmath>
 
@@ -378,6 +379,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
 
 void MiAmpAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    currentSampleRate = sampleRate > 1000.0 ? sampleRate : 44100.0;
+    feedbackHoldSamples = 0;
     bassDsp.prepare (sampleRate, samplesPerBlock, std::max (2, getTotalNumOutputChannels()));
     guitarDsp.prepare (sampleRate, samplesPerBlock, std::max (2, getTotalNumOutputChannels()));
     cabMicDsp.prepare (sampleRate, samplesPerBlock);
@@ -388,6 +391,7 @@ void MiAmpAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
 void MiAmpAudioProcessor::releaseResources()
 {
+    feedbackHoldSamples = 0;
     bassDsp.reset();
     guitarDsp.reset();
     cabMicDsp.reset();
@@ -790,6 +794,29 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     if (numSamples <= 0 || buffer.getNumChannels() == 0)
         return;
 
+    // Standalone zero-noise startup & built-in mic guard:
+    // Keep input strictly silent until StandaloneAudioImpl verifies an external interface or manual selection.
+    if (wrapperType == wrapperType_Standalone
+        && (! miamp_standalone::isStandaloneInputAllowed() || miamp_standalone::isAudioInputMuted()))
+    {
+        buffer.clear();
+        feedbackHoldSamples = 0;
+        inputRms.store (0.0f, std::memory_order_relaxed);
+        outputRms.store (0.0f, std::memory_order_relaxed);
+        isClipping.store (false, std::memory_order_relaxed);
+        bassCompGrDb.store (0.0f, std::memory_order_relaxed);
+        return;
+    }
+
+    // Sanitize incoming samples against NaN/Inf from faulty drivers
+    for (int c = 0; c < totalIn && c < buffer.getNumChannels(); ++c)
+    {
+        float* p = buffer.getWritePointer (c);
+        for (int i = 0; i < numSamples; ++i)
+            if (! std::isfinite (p[i]))
+                p[i] = 0.0f;
+    }
+
     // Duplicate mono input to right channel if stereo output
     if (totalIn == 1 && totalOut >= 2)
         buffer.copyFrom (1, 0, buffer, 0, 0, numSamples);
@@ -860,20 +887,59 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
 
     studioFxDsp.processStereo (buffer, readStudioFxSnapshot(), dawBpm);
 
+    // Final output safety: sanitize NaN/Inf + smooth protective ceiling (±0.94) so speakers never take harsh digital blasts
     double outSq = 0.0;
     float peak = 0.0f;
     for (int c = 0; c < buffer.getNumChannels(); ++c)
     {
-        const float* p = buffer.getReadPointer (c);
+        float* p = buffer.getWritePointer (c);
         for (int i = 0; i < numSamples; ++i)
         {
-            const float v = p[i];
+            float v = p[i];
+            if (! std::isfinite (v))
+            {
+                v = 0.0f;
+            }
+            else if (std::fabs (v) > 0.88f)
+            {
+                const float sign = (v >= 0.0f) ? 1.0f : -1.0f;
+                const float excess = (std::fabs (v) - 0.88f) / 0.06f;
+                v = sign * (0.88f + 0.06f * std::tanh (excess));
+            }
+            p[i] = v;
             outSq += static_cast<double> (v) * static_cast<double> (v);
             peak = std::max (peak, std::fabs (v));
         }
     }
-    outputRms.store (static_cast<float> (std::sqrt (outSq / static_cast<double> (numSamples * buffer.getNumChannels()))));
-    isClipping.store (peak >= 0.985f);
+
+    const float outRmsVal = static_cast<float> (std::sqrt (outSq / static_cast<double> (numSamples * buffer.getNumChannels())));
+    const float inRmsVal  = inputRms.load (std::memory_order_relaxed);
+
+    // Standalone sustained acoustic feedback auto-mute guard (~0.42s of continuous near-full-scale loop)
+    if (wrapperType == wrapperType_Standalone)
+    {
+        if (outRmsVal > 0.68f && inRmsVal > 0.16f)
+        {
+            feedbackHoldSamples += numSamples;
+            if (feedbackHoldSamples >= static_cast<int> (currentSampleRate * 0.42))
+            {
+                feedbackHoldSamples = 0;
+                buffer.clear();
+                miamp_standalone::muteInputForSafety (true);
+                standaloneFeedbackTripped.store (true, std::memory_order_relaxed);
+                outputRms.store (0.0f, std::memory_order_relaxed);
+                isClipping.store (false, std::memory_order_relaxed);
+                return;
+            }
+        }
+        else
+        {
+            feedbackHoldSamples = std::max (0, feedbackHoldSamples - numSamples * 2);
+        }
+    }
+
+    outputRms.store (outRmsVal, std::memory_order_relaxed);
+    isClipping.store (peak >= 0.935f, std::memory_order_relaxed);
 }
 
 bool MiAmpAudioProcessor::isHeadBypassed (bool forBass) const noexcept

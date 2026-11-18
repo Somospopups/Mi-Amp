@@ -404,19 +404,65 @@ public:
     void openMode (Mode m)
     {
         mode = m;
-        setVisible (true);
+        targetOpen = true;
+        if (! isVisible())
+        {
+            animProgress = 0.0f;
+            setAlpha (0.0f);
+            setVisible (true);
+        }
         toFront (true);
         resized();
         repaint();
     }
 
+    void closeAnimated()
+    {
+        targetOpen = false;
+    }
+
+    void forceCloseImmediate()
+    {
+        targetOpen = false;
+        animProgress = 0.0f;
+        setAlpha (0.0f);
+        setVisible (false);
+    }
+
+    bool isOpenTarget() const noexcept { return targetOpen; }
+
+    void tickAnimation (float dt)
+    {
+        const float target = targetOpen ? 1.0f : 0.0f;
+        if (std::fabs (target - animProgress) <= 0.004f && ! targetOpen && isVisible())
+        {
+            animProgress = 0.0f;
+            setAlpha (0.0f);
+            setVisible (false);
+            return;
+        }
+        if (std::fabs (target - animProgress) > 0.002f)
+        {
+            const float step = dt / 0.28f;
+            animProgress = targetOpen ? juce::jmin (1.0f, animProgress + step)
+                                      : juce::jmax (0.0f, animProgress - step);
+            const float inv = 1.0f - animProgress;
+            const float ease = 1.0f - inv * inv * inv;
+            setAlpha (ease);
+            repaint();
+        }
+    }
+
     void paint (juce::Graphics& g) override
     {
         const auto b = getLocalBounds().toFloat();
-        g.setColour (juce::Colour::fromRGBA (12, 14, 13, 152));
+        const float inv = 1.0f - animProgress;
+        const float ease = 1.0f - inv * inv * inv;
+        g.setColour (juce::Colour::fromRGBA (12, 14, 13, static_cast<uint8_t> (152.0f * ease)));
         g.fillRect (b);
 
-        const auto card = b.reduced (b.getWidth() * 0.09f, b.getHeight() * 0.08f);
+        const auto card = b.reduced (b.getWidth() * 0.09f, b.getHeight() * 0.08f)
+                           .translated (0.0f, (1.0f - ease) * 12.0f);
         miamp_theme::paintFrostedGlassPanel (g, card, 22.0f);
 
         const bool bass = processor.isBassMode();
@@ -600,5 +646,7 @@ private:
     juce::TextButton btnClose { juce::String::fromUTF8 (u8"\u00d7") };
     juce::TextButton btnLoadWav { "LOAD .WAV IR..." };
     std::unique_ptr<juce::FileChooser> fileChooser;
+    bool targetOpen = false;
+    float animProgress = 0.0f;
 };
 } // namespace miamp_rig

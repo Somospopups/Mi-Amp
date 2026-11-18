@@ -340,6 +340,7 @@ public:
     std::atomic<float> outputRms { 0.0f };
     std::atomic<bool>  isClipping { false };
     std::atomic<float> bassCompGrDb { 0.0f };
+    std::atomic<bool>  standaloneFeedbackTripped { false };
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -369,6 +370,8 @@ private:
     juce::String activeBassPresetName   { "Inicial (XV Pop-Punk)" };
     juce::String activeGuitarPresetName { juce::String::fromUTF8 (u8"MI \u2022 90s Cali Punk") };
     int currentProgramIndex = 0;
+    double currentSampleRate = 44100.0;
+    int feedbackHoldSamples = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MiAmpAudioProcessor)
 };

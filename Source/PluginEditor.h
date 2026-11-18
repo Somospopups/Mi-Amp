@@ -231,6 +231,7 @@ private:
     juce::Rectangle<float> applyBoardTransform (juce::Rectangle<float> stageRect) const noexcept;
 
     void paintHeadScene (juce::Graphics& g, float yOffsetStage = 0.0f);
+    void paintRigOnly (juce::Graphics& g, float yOffsetStage = 0.0f, float opacity = 1.0f);
     void paintFloorScene (juce::Graphics& g);
     void paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> r, float radius = 22.0f, float alpha = 1.0f) const;
     void paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const;
@@ -264,8 +265,18 @@ private:
     bool floorTunerOpen = false;
     bool useSolfege = false; // false = C D E F G A B, true = Do Re Mi Fa Sol La Si
     PopoverKind activePopover = PopoverKind::None;
+    float popoverAnim = 0.0f;
+    bool popoverClosing = false;
+    float rightMenuAnim = 1.0f;
     int selectedBassPedal = 1;
     int selectedGuitarPedal = 1;
+
+    // #4 Elevación de Estudio Suave (0.62s Guitar <-> Bass transition, zero background zoom/flicker)
+    bool instSwitching = false;
+    float instSwitchAnim = 1.0f;
+    juce::Image instOutSnapshot;
+    bool standaloneStartupNoticeShown = false;
+    bool standaloneFeedbackNoticeShown = false;
 
     // Intro animation (2.9s matching index.html)
     bool  introRunning = true;

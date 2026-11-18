@@ -544,13 +544,66 @@ public:
             btnRevMode[m].setToggleState (m == rMode, juce::dontSendNotification);
     }
 
+    void openAnimated()
+    {
+        syncControls();
+        targetOpen = true;
+        if (! isVisible())
+        {
+            animProgress = 0.0f;
+            setAlpha (0.0f);
+            setVisible (true);
+        }
+        toFront (true);
+    }
+
+    void closeAnimated()
+    {
+        targetOpen = false;
+    }
+
+    void forceCloseImmediate()
+    {
+        targetOpen = false;
+        animProgress = 0.0f;
+        setAlpha (0.0f);
+        setVisible (false);
+    }
+
+    bool isOpenTarget() const noexcept { return targetOpen; }
+
+    void tickAnimation (float dt)
+    {
+        const float target = targetOpen ? 1.0f : 0.0f;
+        if (std::fabs (target - animProgress) <= 0.004f && ! targetOpen && isVisible())
+        {
+            animProgress = 0.0f;
+            setAlpha (0.0f);
+            setVisible (false);
+            return;
+        }
+        if (std::fabs (target - animProgress) > 0.002f)
+        {
+            const float step = dt / 0.28f;
+            animProgress = targetOpen ? juce::jmin (1.0f, animProgress + step)
+                                      : juce::jmax (0.0f, animProgress - step);
+            const float inv = 1.0f - animProgress;
+            const float ease = 1.0f - inv * inv * inv;
+            setAlpha (ease);
+            repaint();
+        }
+    }
+
     void paint (juce::Graphics& g) override
     {
         const auto b = getLocalBounds().toFloat();
-        g.setColour (juce::Colour::fromRGBA (10, 12, 11, 165));
+        const float inv = 1.0f - animProgress;
+        const float ease = 1.0f - inv * inv * inv;
+        g.setColour (juce::Colour::fromRGBA (10, 12, 11, static_cast<uint8_t> (165.0f * ease)));
         g.fillRect (b);
 
-        const auto card = b.reduced (b.getWidth() * 0.045f, b.getHeight() * 0.072f);
+        const auto card = b.reduced (b.getWidth() * 0.045f, b.getHeight() * 0.072f)
+                           .translated (0.0f, (1.0f - ease) * 12.0f);
         miamp_theme::paintFrostedGlassPanel (g, card, 22.0f);
 
         g.setColour (juce::Colour::fromRGB (250, 243, 227));
@@ -746,5 +799,8 @@ private:
     juce::TextButton btnRevOn { "ON" };
     juce::TextButton btnRevMode[4];
     std::unique_ptr<StudioMiniKnob> revPreKnob, revDecayKnob, revDampKnob, revWidthKnob, revMixKnob;
+
+    bool targetOpen = false;
+    float animProgress = 0.0f;
 };
 } // namespace miamp_rig
