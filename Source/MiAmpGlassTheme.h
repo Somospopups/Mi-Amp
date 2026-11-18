@@ -63,7 +63,7 @@ namespace miamp_theme
     inline void paintGlassCard (juce::Graphics& g,
                                 juce::Rectangle<float> r,
                                 float cornerRadius,
-                                bool selected,
+                                bool selected = false,
                                 bool hovered = false,
                                 float alpha = 1.0f)
     {
