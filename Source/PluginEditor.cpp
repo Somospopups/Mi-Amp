@@ -189,25 +189,25 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
 
     if (active)
     {
-        g.setColour (juce::Colour::fromRGBA (164, 217, 196, down ? 120 : (highlighted ? 110 : 84)));
+        g.setColour (juce::Colour::fromRGBA (154, 216, 192, down ? 128 : (highlighted ? 116 : 92)));
         g.fillRoundedRectangle (r, 8.0f);
         g.setColour (mintBorder());
         g.drawRoundedRectangle (r, 8.0f, 1.2f);
     }
     else if (highlighted || down)
     {
-        g.setColour (juce::Colour::fromRGBA (232, 214, 169, down ? 115 : 91));
+        g.setColour (juce::Colour::fromRGBA (232, 214, 169, down ? 120 : 96));
         g.fillRoundedRectangle (r, 8.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.9f));
+        g.setColour (juce::Colours::white.withAlpha (0.92f));
         g.drawRoundedRectangle (r, 8.0f, 1.1f);
     }
     else
     {
-        juce::ColourGradient grad (juce::Colour::fromRGBA (255, 255, 255, 34), r.getX(), r.getY(),
-                                   juce::Colour::fromRGBA (255, 255, 255, 11), r.getX(), r.getBottom(), false);
+        juce::ColourGradient grad (juce::Colour::fromRGBA (255, 252, 242, 41), r.getX(), r.getY(),
+                                   juce::Colour::fromRGBA (255, 252, 242, 15), r.getX(), r.getBottom(), false);
         g.setGradientFill (grad);
         g.fillRoundedRectangle (r, 8.0f);
-        g.setColour (juce::Colour::fromRGBA (241, 224, 190, 102));
+        g.setColour (juce::Colour::fromRGBA (248, 232, 198, 115));
         g.drawRoundedRectangle (r, 8.0f, 1.0f);
     }
 }
@@ -296,8 +296,6 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
         const float sc = bh / 36.0f;
         const float hFont = juce::jlimit (9.5f, 12.5f, bh * 0.33f);
         g.setFont (sansFont (hFont, juce::Font::bold));
-        g.setColour (b.isEnabled() ? juce::Colour::fromRGB (250, 243, 227)
-                                   : juce::Colour::fromRGBA (250, 243, 227, 105));
 
         // Left-aligned text & right-aligned thin icons (matching preview #right-menu .menu-btn)
         const float leftPad = 14.0f * sc;
@@ -306,6 +304,16 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
                                             static_cast<float> (bounds.getY()),
                                             static_cast<float> (bounds.getWidth()) - leftPad - rightPad - 20.0f * sc,
                                             bh);
+        if (b.isEnabled())
+        {
+            g.setColour (juce::Colour::fromRGBA (0, 0, 0, 165));
+            g.drawFittedText (b.getButtonText(), txtR.translated (0.0f, 1.0f).toNearestInt(), juce::Justification::centredLeft, 1);
+            g.setColour (juce::Colour::fromRGB (255, 250, 240));
+        }
+        else
+        {
+            g.setColour (juce::Colour::fromRGBA (255, 250, 240, 115));
+        }
         g.drawFittedText (b.getButtonText(), txtR.toNearestInt(), juce::Justification::centredLeft, 1);
 
         const float sz = 14.0f * sc;
@@ -413,14 +421,14 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
     }
 
     const float h = juce::jlimit (9.5f, 13.0f, static_cast<float> (b.getHeight()) * 0.34f);
-    g.setFont (sansFont (h, (id == "presetSave" || id == "presetFactory") && b.getToggleState()
+    g.setFont (sansFont (h, (id == "presetSave" || id == "presetFactory" || id == "cabTabCabs" || id == "cabTabMics") && b.getToggleState()
                             ? juce::Font::bold : juce::Font::plain));
-    g.setColour (b.isEnabled() ? juce::Colour::fromRGB (250, 243, 227)
-                               : juce::Colour::fromRGBA (250, 243, 227, 105));
 
     auto textArea = bounds.reduced (6, 2);
     if (id == "presetFactory" && b.getToggleState())
     {
+        g.setColour (b.isEnabled() ? juce::Colour::fromRGB (255, 250, 240)
+                                   : juce::Colour::fromRGBA (255, 250, 240, 115));
         const float cx = static_cast<float> (textArea.getX()) + 7.0f;
         const float cy = textArea.toFloat().getCentreY();
         juce::Path chk;
@@ -433,6 +441,16 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
         return;
     }
 
+    if (b.isEnabled())
+    {
+        g.setColour (juce::Colour::fromRGBA (0, 0, 0, 165));
+        g.drawFittedText (b.getButtonText(), textArea.translated (0, 1), juce::Justification::centred, 1);
+        g.setColour (juce::Colour::fromRGB (255, 250, 240));
+    }
+    else
+    {
+        g.setColour (juce::Colour::fromRGBA (255, 250, 240, 115));
+    }
     g.drawFittedText (b.getButtonText(), textArea, juce::Justification::centred, 1);
 }
 
@@ -3740,10 +3758,10 @@ void MiAmpAudioProcessorEditor::computeRigStageLayout (
 
     if (closeUpView)
     {
-        const float centerX = juce::jmap (cabDrawerAnim, 685.0f, 870.0f);
-        const float actualW = juce::jmap (cabDrawerAnim, 820.0f, 680.0f);
+        const float centerX = juce::jmap (cabDrawerAnim, bass ? 665.0f : 675.0f, 870.0f);
+        const float actualW = juce::jmap (cabDrawerAnim, bass ? 960.0f : 860.0f, 680.0f);
         const float hh = actualW / juce::jmax (0.5f, hAspect);
-        const float cabTopY = juce::jmap (cabDrawerAnim, 530.0f, 505.0f);
+        const float cabTopY = juce::jmap (cabDrawerAnim, 555.0f, 505.0f);
         float seatDepth = 0.0f;
 
         if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
@@ -4571,12 +4589,16 @@ void MiAmpAudioProcessorEditor::layoutAll()
         if (cabPickerPanel)
             cabPickerPanel->setBounds (toScreenInt (28, 25, 420, consoleOpen ? 595 : 716));
 
-        // Mirrored side head-selector arrows flanking the active amp head
-        const float axLeft  = juce::jmap (cabDrawerAnim, 211.0f, 472.0f);
-        const float axRight = juce::jmap (cabDrawerAnim, 1115.0f, 1228.0f);
-        const float ay      = juce::jmap (cabDrawerAnim, 345.0f, 335.0f) + ampYOff;
-        const float aw      = juce::jmap (cabDrawerAnim, 44.0f, 40.0f);
-        const float ah      = juce::jmap (cabDrawerAnim, 82.0f, 74.0f);
+        // Fixed Slim-Pill (Cápsula Fina) head-selector arrows per instrument (never jump between models)
+        const float refCenterX = juce::jmap (cabDrawerAnim, bass ? 665.0f : 675.0f, 870.0f);
+        const float refHeadW   = juce::jmap (cabDrawerAnim, bass ? 960.0f : 860.0f, 680.0f);
+        const float aw         = juce::jmap (cabDrawerAnim, 30.0f, 28.0f);
+        const float ah         = juce::jmap (cabDrawerAnim, 66.0f, 60.0f);
+        const float gap        = juce::jmap (cabDrawerAnim, 22.0f, 16.0f);
+        const float axLeft     = refCenterX - refHeadW * 0.5f - gap - aw;
+        const float axRight    = refCenterX + refHeadW * 0.5f + gap;
+        const float ayMid      = juce::jmap (cabDrawerAnim, bass ? 340.0f : 348.0f, 335.0f) + ampYOff;
+        const float ay         = ayMid - ah * 0.5f;
         if (btnHeadSidePrev) btnHeadSidePrev->setBounds (toScreenInt (axLeft,  ay, aw, ah));
         if (btnHeadSideNext) btnHeadSideNext->setBounds (toScreenInt (axRight, ay, aw, ah));
 
@@ -4999,7 +5021,7 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
         const float maxCamY = juce::jmax (1.0f, static_cast<float> (imgs.skateparkTall.getHeight()) - fullH);
         const float camY = juce::jlimit (0.0f, maxCamY, maxCamY - yOff);
         const float introDown = 1.0f - juce::jlimit (0.0f, 1.0f, yOff / maxCamY);
-        const float zoom = closeUpView ? (1.0f + 0.22f * introDown) : 1.0f;
+        const float zoom = closeUpView ? (1.0f + (bass ? 0.24f : 0.18f) * introDown) : 1.0f;
         const float srcW = fullW / zoom;
         const float srcH = fullH / zoom;
         const float panOffsetPx = -52.0f * cabDrawerAnim;

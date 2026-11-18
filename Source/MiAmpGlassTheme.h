@@ -4,25 +4,25 @@
 namespace miamp_theme
 {
     //==============================================================================
-    // REFERENCIA OFICIAL UNICA DE VIDRIO CLARO ("Vidrio Claro") — MI AMP
+    // REFERENCIA OFICIAL UNICA DE VIDRIO EQUILIBRADO ("Vidrio: Equilibrado (Legible)") — MI AMP
     // Todos los paneles, popovers, modales, tarjetas y sub-paneles de vidrio
     // del plugin DEBEN usar exclusivamente estas funciones/constantes para mantener
-    // exactamente el mismo tono, gradiente y luminosidad en toda la interfaz.
+    // exactamente el mismo tono, contraste legible sobre cielo claro y luminosidad.
     //==============================================================================
 
     inline juce::Colour glassPanelGradTopLeft (float alpha = 1.0f) noexcept
     {
-        return juce::Colour::fromRGBA (239, 222, 183, static_cast<juce::uint8> (juce::jlimit (0.0f, 255.0f, 74.0f * alpha)));
+        return juce::Colour::fromRGBA (84, 82, 72, static_cast<juce::uint8> (juce::jlimit (0.0f, 255.0f, 143.0f * alpha)));
     }
 
     inline juce::Colour glassPanelGradBottomRight (float alpha = 1.0f) noexcept
     {
-        return juce::Colour::fromRGBA (53, 54, 45, static_cast<juce::uint8> (juce::jlimit (0.0f, 255.0f, 178.0f * alpha)));
+        return juce::Colour::fromRGBA (34, 37, 34, static_cast<juce::uint8> (juce::jlimit (0.0f, 255.0f, 204.0f * alpha)));
     }
 
     inline juce::Colour glassPanelBorder (float alpha = 1.0f) noexcept
     {
-        return juce::Colour::fromRGBA (255, 243, 210, static_cast<juce::uint8> (juce::jlimit (0.0f, 255.0f, 158.0f * alpha)));
+        return juce::Colour::fromRGBA (255, 243, 210, static_cast<juce::uint8> (juce::jlimit (0.0f, 255.0f, 168.0f * alpha)));
     }
 
     inline void paintFrostedGlassPanel (juce::Graphics& g,

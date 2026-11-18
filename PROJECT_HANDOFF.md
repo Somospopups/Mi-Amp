@@ -94,11 +94,13 @@ Revisar siempre estos archivos antes de modificar gráficos o layouts:
 
 ---
 
-## 6. Estado Alcanzado en esta Entrega (`v27`)
+## 6. Estado Alcanzado en esta Entrega (`v28`)
+- **Encuadre por Instrumento y Flechas Fijas (`Source/PluginEditor.cpp` + `Source/CabPanels.h`):**
+  - En Primer Plano (`closeUpView`), **Guitarra** usa `centerX=675, actualW=860, cabTopY=555` (zoom fondo `1.18×`) y **Bajo** usa `centerX=665, actualW=960, cabTopY=555` (zoom fondo `1.24×`), acomodando ambos a `870 / 680 / 505` al abrir el panel de `CAJAS`.
+  - **`HeadSideArrowButton` (`Cápsula Fina`)**: pastilla vertical redondeada (`30 × 66 px`, 1 único chevron fino) en **coordenadas fijas por instrumento** para no saltar al cambiar de cabezal.
 - **Selector Unificado `CAJAS ↔ MICRÓFONOS` (`Source/CabPanels.h`)**:
-  - Un solo panel izquierdo de vidrio claro (`28, 25, 420, 716`) con pill toggle **`[ CAJAS | MICRÓFONOS ]`** en la cabecera.
-  - En **`CAJAS`**: Hero grande superior sin flechas `< >` laterales + grilla **`5×2`** completa (los 10 modelos de guitarra / 9 de bajo visibles sin recortes) + íconos propios para **`.WAV IR`** y **`DIRECT DI`** (sin repetir la caja Mint).
-  - En **`MICRÓFONOS`**: el mismo Hero grande muestra la grilla y pines arrastrables `57` / `87`, y debajo aparecen los controles `MI-57 DYN`, `MI-87 COND`, distancia (`CLOSE/MED/FAR`), fase `Ø`, `MIC MIX`, `ROOM` y botón `← VOLVER A CAJAS`.
-- **Vidrio Claro Unificado (`Source/MiAmpGlassTheme.h` + `UI_RULES.md` §7)**: todos los paneles, popovers, modales (`StudioFxModal`, `RigSelectorModal`, `UpdateOverlayComponent`) y tarjetas comparten exactamente el mismo tono `Vidrio Claro` (`(239,222,183,74) → (53,54,45,178)`, borde `(255,243,210,158)`).
+  - Un solo panel izquierdo (`28, 25, 420, 716`) con pill toggle **`[ CAJAS | MICRÓFONOS ]`** en la cabecera, Hero sin flechas `< >` laterales, grilla **`5×2`** completa e íconos propios para **`.WAV IR`** y **`DIRECT DI`**.
+- **Vidrio Equilibrado Único (`Source/MiAmpGlassTheme.h` + `UI_RULES.md` §7 y §9)**:
+  - Todos los paneles, popovers, modales, cápsulas y botones usan el mismo **Vidrio Equilibrado (Legible)** (`(84,82,72,143) → (34,37,34,204)`, borde `(255,243,210,168)`) con tinta `#FFFAF0` y sombra `1 px` para lectura nítida sobre cielo claro.
 - **Identidad 100% `MI AMP`**: eliminada toda referencia anterior en UI, código C++, recursos y nombres de archivo (`MiAmpCabIRs.h`, `cab_4x12_mint.png`, `head_miamp_mint.png`, `knob_miamp_mint.png`).
 - **Assets RGBA 32-bit (`ct=6`)**: `cab_4x12_mint.png` (`880×888`) y `bass_cab_8x10_mint.png` (`600×1423`) y guía de fondos (`FONDO_GUIA.md` + `scripts/crear_fondos_mi_amp.py`).

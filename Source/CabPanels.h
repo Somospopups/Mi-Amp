@@ -29,56 +29,42 @@ public:
     void paintButton (juce::Graphics& g, bool highlighted, bool down) override
     {
         const auto b = getLocalBounds().toFloat();
-        const float sc = juce::jmin (b.getWidth() / 44.0f, b.getHeight() / 82.0f);
-        const float rad = 14.0f * sc;
+        const float sc = juce::jmin (b.getWidth() / 30.0f, b.getHeight() / 66.0f);
 
         auto drawR = b.reduced (1.0f);
         if (down)
-            drawR = drawR.reduced (1.5f);
+            drawR = drawR.reduced (1.2f);
 
-        juce::ColourGradient grad (
-            juce::Colour::fromRGBA (255, 248, 232, highlighted ? 88 : 62), drawR.getX(), drawR.getY(),
-            juce::Colour::fromRGBA (53, 54, 45, highlighted ? 186 : 168), drawR.getX(), drawR.getBottom(), false);
-        grad.addColour (0.48, juce::Colour::fromRGBA (166, 223, 201, highlighted ? 62 : 26));
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (drawR, rad);
+        const float rad = drawR.getWidth() * 0.5f;
 
-        g.setColour (juce::Colour::fromRGBA (255, 252, 240, highlighted ? 150 : 105));
-        g.drawHorizontalLine (juce::roundToInt (drawR.getY() + 1.0f), drawR.getX() + rad * 0.45f, drawR.getRight() - rad * 0.45f);
-
-        g.setColour (highlighted ? juce::Colour::fromRGB (166, 223, 201)
-                                 : juce::Colour::fromRGBA (255, 243, 210, 158));
-        g.drawRoundedRectangle (drawR, rad, 1.3f);
-
-        const float accentX = isRight ? (drawR.getX() + 3.5f * sc) : (drawR.getRight() - 3.5f * sc);
-        g.setColour (juce::Colour::fromRGBA (255, 248, 232, highlighted ? 120 : 75));
-        g.drawVerticalLine (juce::roundToInt (accentX), drawR.getY() + 7.0f * sc, drawR.getBottom() - 7.0f * sc);
-
-        const float vw = drawR.getWidth() * 0.58f;
-        const float vh = drawR.getHeight() * 0.58f;
-        const float vx = drawR.getCentreX() - vw * 0.5f;
-        const float vy = drawR.getCentreY() - vh * 0.5f;
-
-        auto mapX = [&] (float svgX)
+        if (highlighted)
         {
-            const float nx = isRight ? (28.0f - svgX) / 28.0f : (svgX / 28.0f);
-            return vx + nx * vw;
-        };
-        auto mapY = [&] (float svgY) { return vy + (svgY / 48.0f) * vh; };
+            g.setColour (juce::Colour::fromRGBA (166, 223, 201, down ? 92 : 68));
+            g.fillRoundedRectangle (drawR, rad);
+            g.setColour (juce::Colour::fromRGB (166, 223, 201));
+            g.drawRoundedRectangle (drawR, rad, 1.4f);
+        }
+        else
+        {
+            miamp_theme::paintFrostedGlassPanel (g, drawR, rad, 1.0f, 1.25f);
+        }
 
-        juce::Path mainP;
-        mainP.startNewSubPath (mapX (18.5f), mapY (8.5f));
-        mainP.lineTo        (mapX (7.5f),  mapY (24.0f));
-        mainP.lineTo        (mapX (18.5f), mapY (39.5f));
-        g.setColour (highlighted ? juce::Colour::fromRGB (225, 255, 242) : juce::Colour::fromRGB (250, 243, 227));
-        g.strokePath (mainP, juce::PathStrokeType (juce::jmax (1.8f, 3.1f * sc), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        // Single clean slim chevron
+        const float vw = drawR.getWidth() * 0.42f;
+        const float vh = drawR.getWidth() * 0.72f;
+        const float cx = drawR.getCentreX();
+        const float cy = drawR.getCentreY();
+        const float dx = isRight ? (vw * 0.42f) : (-vw * 0.42f);
 
-        juce::Path echoP;
-        echoP.startNewSubPath (mapX (23.5f), mapY (14.5f));
-        echoP.lineTo        (mapX (16.0f), mapY (24.0f));
-        echoP.lineTo        (mapX (23.5f), mapY (33.5f));
-        g.setColour (highlighted ? juce::Colour::fromRGBA (191, 252, 225, 215) : juce::Colour::fromRGBA (166, 223, 201, 122));
-        g.strokePath (echoP, juce::PathStrokeType (juce::jmax (1.3f, 2.1f * sc), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        juce::Path chev;
+        chev.startNewSubPath (cx - dx, cy - vh * 0.5f);
+        chev.lineTo        (cx + dx, cy);
+        chev.lineTo        (cx - dx, cy + vh * 0.5f);
+
+        g.setColour (highlighted ? juce::Colour::fromRGB (225, 255, 242) : juce::Colour::fromRGB (255, 250, 240));
+        g.strokePath (chev, juce::PathStrokeType (juce::jmax (1.8f, 2.3f * sc),
+                                                  juce::PathStrokeType::curved,
+                                                  juce::PathStrokeType::rounded));
     }
 
 private:

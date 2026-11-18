@@ -53,23 +53,23 @@ Estas reglas son obligatorias para cualquier cambio de interfaz, código C++ (`S
 
 ---
 
-## 7. Estética Oficial de Vidrio Claro (Referencia Única Obligatoria)
-**Todos los paneles de vidrio del plugin** (selector izquierdo de `CAJAS / MICRÓFONOS`, menú derecho, barra inferior de pedalera, `GlassPopover` de Presets/Afinador/Buscar Tono/Config, `StudioFxModal`, `RigSelectorModal`, `UpdateOverlayComponent` y tarjetas internas) **DEBEN ser exactamente iguales**, usando el mismo tono **"Vidrio Claro"** definido en `Source/MiAmpGlassTheme.h`:
+## 7. Estética Oficial de Vidrio Equilibrado (Referencia Única Obligatoria)
+**Todos los paneles de vidrio del plugin** (selector izquierdo de `CAJAS / MICRÓFONOS`, menú derecho, cápsulas laterales del cabezal, barra inferior de pedalera, `GlassPopover` de Presets/Afinador/Buscar Tono/Config, `StudioFxModal`, `RigSelectorModal`, `UpdateOverlayComponent` y tarjetas internas) **DEBEN ser exactamente iguales**, usando el mismo tono **"Vidrio: Equilibrado (Legible)"** definido en `Source/MiAmpGlassTheme.h`:
 
 - **Panel principal de vidrio (`paintFrostedGlassPanel`):**
   - Gradiente diagonal (`top-left (x, y)` → `bottom-right (right, bottom)`):
-    - Inicio: `rgba(239, 222, 183, 74)` (`0.29` alfa)
-    - Fin: `rgba(53, 54, 45, 178)` (`0.70` alfa)
-  - Borde (`1.5 px`): `rgba(255, 243, 210, 158)` (`0.62` alfa)
+    - Inicio: `rgba(84, 82, 72, 143)` (`0.56` alfa)
+    - Fin: `rgba(34, 37, 34, 204)` (`0.80` alfa)
+  - Borde (`1.5 px`): `rgba(255, 243, 210, 168)` (`0.66` alfa)
   - Radio estándar: `22 px` (`20 px` en el panel izquierdo de cajas/mics)
-- **Sub-paneles / Contenedores interiores (`paintGlassSubPanel` — Hero de cajas, tarjeta de controles Dual Mics, sub-paneles de Studio FX, cuadros de nota):**
-  - Gradiente vertical (`top` → `bottom`): `rgba(255, 250, 238, 41)` → `rgba(230, 218, 190, 23)`
-  - Borde (`1.2 px`): `rgba(255, 246, 222, 107)`
-- **Tarjetas / Celdas seleccionables (`paintGlassCard` — grilla `5×2` de cajas, `RigSelectorModal`, filas de presets/export):**
+- **Botones y tipografía sobre vidrio:** usar tinta `#FFFAF0` (`255, 250, 240`) con sombra sutil de `1 px` (`rgba(0, 0, 0, 165)`) para garantizar legibilidad 10/10 sobre el cielo claro del fondo.
+- **Sub-paneles / Contenedores interiores (`paintGlassSubPanel`):**
+  - Gradiente vertical (`top` → `bottom`): `rgba(255, 250, 238, 41)` → `rgba(230, 218, 190, 23)`, borde `1.2 px` `rgba(255, 246, 222, 107)`
+- **Tarjetas / Celdas seleccionables (`paintGlassCard`):**
   - Normal: gradiente vertical `rgba(255, 250, 238, 56)` → `rgba(236, 224, 198, 31)`, borde `1.2 px` `rgba(255, 246, 222, 122)`
   - Hover: gradiente vertical `rgba(255, 252, 244, 87)` → `rgba(242, 232, 208, 56)`, borde `1.4 px` `rgba(255, 246, 222, 198)`
   - Seleccionada: relleno `rgba(166, 223, 201, 71)`, borde `1.8 px` `rgb(166, 223, 201)`
-- **Regla estricta:** prohibido oscurecer popovers, modales o tarjetas con fondos negros/grises opacos (`rgba(12..45, ..., 130..232)`). Cualquier nuevo panel de vidrio debe llamar directamente a `miamp_theme::paintFrostedGlassPanel`, `paintGlassSubPanel` y `paintGlassCard`.
+- **Regla estricta:** cualquier nuevo panel de vidrio debe llamar directamente a `miamp_theme::paintFrostedGlassPanel`, `paintGlassSubPanel` y `paintGlassCard`.
 
 ---
 
@@ -79,3 +79,13 @@ Estas reglas son obligatorias para cualquier cambio de interfaz, código C++ (`S
 - **Íconos propios (sin repetir la caja Mint):** `CUSTOM WAV IR` usa ícono propio de onda `.WAV IR` y `SIN CAJA (DI)` usa ícono propio rojo `DIRECT DI`.
 - **Modo `MICRÓFONOS`:** el mismo Hero grande muestra los micrófonos arrastrables sobre la grilla del gabinete y debajo aparecen los controles completos (`MI-57`, `MI-87`, distancia `CLOSE/MED/FAR`, fase `Ø`, `MIC MIX`, `ROOM` y botón `← VOLVER A CAJAS`).
 - **Identidad MI AMP:** usar exclusivamente la marca `MI AMP` en UI, código C++, recursos y nombres de archivo (prohibido reutilizar nombres externos anteriores).
+
+---
+
+## 9. Encuadre de Cabezal y Flechas Fijas (`Cápsula Fina`)
+- **Tamaño de cabezal en Primer Plano (`closeUpView == true`):**
+  - **Guitarra:** `centerX = 675`, `actualW = 860`, `cabTopY = 555` (cuando se abre `CAJAS`, transiciona a `870 / 680 / 505`).
+  - **Bajo:** `centerX = 665`, `actualW = 960`, `cabTopY = 555` (cuando se abre `CAJAS`, transiciona a `870 / 680 / 505`).
+- **Flechitas laterales (`HeadSideArrowButton` — Cápsula Fina):**
+  - Forma de cápsula vertical redondeada (`30 × 66 px`, `rad = width * 0.5f`) con el vidrio equilibrado oficial y un único chevron fino redondeado.
+  - **Posición 100% fija por instrumento** (`ay = 348` en guitarra, `ay = 340` en bajo; `335` con cajón abierto): **jamás** deben moverse arriba/abajo o a los costados al cambiar entre distintos modelos de cabezal.
