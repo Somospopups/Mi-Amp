@@ -261,6 +261,52 @@ if(MIAMP_ENABLE_DEMUCS)
         FetchContent_Populate(demucs_cpp)
     endif()
 
+    # Patch upstream sevagh/demucs.cpp bugs that crash Windows/macOS plugins on song load:
+    # 1) model_load.cpp: uninitialized n_dims/length before late feof(f) check causes stack smash / bad_alloc at EOF
+    # 2) model_load.cpp: fopen() on Windows fails on UTF-8 paths with accents -> use _wfopen
+    # 3) layers.cpp / crosstransformer.cpp: std::exit(1) terminates entire host DAW/app -> throw std::runtime_error
+    set(_demucs_ml "${demucs_cpp_SOURCE_DIR}/src/model_load.cpp")
+    if(EXISTS "${_demucs_ml}")
+        file(READ "${_demucs_ml}" _ml_src)
+        string(FIND "${_ml_src}" "miamp_open_model_rb" _has_patch)
+        if(_has_patch EQUAL -1)
+            string(REPLACE
+                "#include <vector>"
+                "#include <vector>\n#ifdef _WIN32\n#include <windows.h>\n#endif\nstatic FILE* miamp_open_model_rb(const std::string& p) {\n#ifdef _WIN32\n    int wlen = MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, nullptr, 0);\n    if (wlen > 0) {\n        std::wstring wp(static_cast<size_t>(wlen), L'\\0');\n        MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, &wp[0], wlen);\n        if (FILE* wf = _wfopen(wp.c_str(), L\"rb\")) return wf;\n    }\n#endif\n    return fopen(p.c_str(), \"rb\");\n}"
+                _ml_src "${_ml_src}")
+            string(REPLACE
+                "FILE *f = fopen(model_file.c_str(), \"rb\");"
+                "FILE *f = miamp_open_model_rb(model_file);"
+                _ml_src "${_ml_src}")
+            string(REPLACE
+                "        int32_t n_dims;\n        int32_t length;\n\n        fread(&n_dims, sizeof(int32_t), 1, f);\n        fread(&length, sizeof(int32_t), 1, f);\n\n        int32_t nelements = 1;\n\n        // we are loading up to 4d tensors, so allocate 4 dims\n        int32_t ne[4] = {1, 1, 1, 1};\n        for (int i = 0; i < n_dims; ++i)\n        {\n            fread(&ne[i], sizeof(int32_t), 1, f);\n            nelements *= ne[i];\n        }\n\n        std::string name;\n        std::vector<char> tmp(length);               // create a buffer\n        fread(&tmp[0], sizeof(char), tmp.size(), f); // read to buffer\n        name.assign(&tmp[0], tmp.size());\n\n        // check if we reached eof of the open file f\n        if (feof(f))\n        {\n            break;\n        }"
+                "        int32_t n_dims = 0;\n        int32_t length = 0;\n\n        if (fread(&n_dims, sizeof(int32_t), 1, f) != 1 ||\n            fread(&length, sizeof(int32_t), 1, f) != 1)\n        {\n            break;\n        }\n        if (n_dims <= 0 || n_dims > 4 || length <= 0 || length > 4096)\n        {\n            fclose(f);\n            return false;\n        }\n\n        int32_t nelements = 1;\n\n        // we are loading up to 4d tensors, so allocate 4 dims\n        int32_t ne[4] = {1, 1, 1, 1};\n        for (int i = 0; i < n_dims; ++i)\n        {\n            if (fread(&ne[i], sizeof(int32_t), 1, f) != 1 || ne[i] <= 0)\n            {\n                fclose(f);\n                return false;\n            }\n            nelements *= ne[i];\n        }\n\n        std::string name;\n        std::vector<char> tmp(static_cast<size_t>(length));\n        if (fread(tmp.data(), sizeof(char), tmp.size(), f) != tmp.size())\n        {\n            break;\n        }\n        name.assign(tmp.data(), tmp.size());"
+                _ml_src "${_ml_src}")
+            string(REPLACE
+                "        if (loaded_size == 0)\n        {\n            my_fprintf(stderr, \"%s: failed to load %s\\n\", __func__,\n                       name.c_str());\n            return false;\n        }"
+                "        if (loaded_size == 0)\n        {\n            my_fprintf(stderr, \"%s: failed to load %s\\n\", __func__,\n                       name.c_str());\n            fclose(f);\n            return false;\n        }"
+                _ml_src "${_ml_src}")
+            file(WRITE "${_demucs_ml}" "${_ml_src}")
+        endif()
+    endif()
+
+    foreach(_demucs_guard_file IN ITEMS
+        "${demucs_cpp_SOURCE_DIR}/src/layers.cpp"
+        "${demucs_cpp_SOURCE_DIR}/src/crosstransformer.cpp")
+        if(EXISTS "${_demucs_guard_file}")
+            file(READ "${_demucs_guard_file}" _dg_src)
+            string(FIND "${_dg_src}" "std::exit(1);" _has_exit)
+            if(NOT _has_exit EQUAL -1)
+                string(FIND "${_dg_src}" "<stdexcept>" _has_stdexcept)
+                if(_has_stdexcept EQUAL -1)
+                    string(REPLACE "#include \"model.hpp\"" "#include \"model.hpp\"\n#include <stdexcept>" _dg_src "${_dg_src}")
+                endif()
+                string(REPLACE "std::exit(1);" "throw std::runtime_error(\"demucs invalid tensor dimension\");" _dg_src "${_dg_src}")
+                file(WRITE "${_demucs_guard_file}" "${_dg_src}")
+            endif()
+        endif()
+    endforeach()
+
     file(GLOB DEMUCS_CORE_SOURCES CONFIGURE_DEPENDS "${demucs_cpp_SOURCE_DIR}/src/*.cpp")
     add_library(demucs_core STATIC ${DEMUCS_CORE_SOURCES})
     set_target_properties(demucs_core PROPERTIES

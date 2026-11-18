@@ -251,7 +251,6 @@ class MiAmpPracticeEngine
 public:
     MiAmpPracticeEngine()
     {
-        formatManager.registerBasicFormats();
         for (auto& v : trackVolume) v.store (1.0f);
         for (auto& m : trackMute)   m.store (false);
         for (auto& s : trackSolo)   s.store (false);
@@ -345,12 +344,6 @@ public:
             item.isFreeTake = false;
             item.bpm = 120.0f;
 
-            // Detect duration cheaply via reader
-            if (auto r = std::unique_ptr<juce::AudioFormatReader> (formatManager.createReaderFor (f)))
-            {
-                if (r->sampleRate > 0.0)
-                    item.durationSec = static_cast<double> (r->lengthInSamples) / r->sampleRate;
-            }
             const auto cacheDir = getSongCacheDir (item.id);
             bool allCached = true;
             for (int s = 0; s < kNumStems; ++s)
@@ -361,7 +354,7 @@ public:
             playlist.push_back (item);
         }
         savePlaylistToDisk();
-        if (firstAdded >= 0 && (activeSongIndex < 0 || playlist.size() == static_cast<size_t> (files.size())))
+        if (firstAdded >= 0 && (activeSongIndex < 0 || ! isPlaying()))
             loadSongAtIndex (firstAdded, false);
     }
 
@@ -474,10 +467,16 @@ public:
         const double sr = engineSampleRate;
         auto tok = aliveToken;
         loaderThread = std::make_unique<SongLoaderThread> (
-            item, sr, formatManager, tok,
+            item, sr, tok,
             [this, tok, autoPlayAfterLoad] (std::shared_ptr<LoadedSongStems> loaded, bool shouldStartAi)
             {
-                if (! tok || ! tok->load (std::memory_order_acquire) || loaded == nullptr) return;
+                if (! tok || ! tok->load (std::memory_order_acquire)) return;
+                if (loaded == nullptr)
+                {
+                    aiStatusText = "No se pudo abrir el archivo de audio (usa MP3, WAV, FLAC, AIFF u OGG)";
+                    if (onStateChanged) onStateChanged();
+                    return;
+                }
                 setActiveStems (loaded);
                 if (activeSongIndex >= 0 && activeSongIndex < static_cast<int> (playlist.size())
                     && playlist[static_cast<size_t> (activeSongIndex)].id == loaded->songId)
@@ -509,7 +508,7 @@ public:
         aiStatusText = "Descargando motor AI (htdemucs-6s · ~53 MB)...";
         auto tok = aliveToken;
         aiThread = std::make_unique<AiWorkerThread> (
-            AiWorkerThread::Task::DownloadModel, PracticeSongItem{}, 0.0, formatManager, tok,
+            AiWorkerThread::Task::DownloadModel, PracticeSongItem{}, 0.0, tok,
             [this, tok] (float p, const juce::String& msg)
             {
                 if (! tok || ! tok->load (std::memory_order_acquire)) return;
@@ -549,7 +548,7 @@ public:
 
         auto tok = aliveToken;
         aiThread = std::make_unique<AiWorkerThread> (
-            AiWorkerThread::Task::SeparateSong, item, engineSampleRate, formatManager, tok,
+            AiWorkerThread::Task::SeparateSong, item, engineSampleRate, tok,
             [this, tok] (float p, const juce::String& msg)
             {
                 if (! tok || ! tok->load (std::memory_order_acquire)) return;
@@ -823,8 +822,9 @@ public:
     {
         if (recording.load (std::memory_order_relaxed))
             recomputeTakePeaks();
-        // Clean up retired stem snapshots safely after a short grace period
-        if (retiredStems.size() > 3)
+        // Clean up retired stem snapshots safely after >= 2 seconds so audio thread never sees a freed pointer
+        const uint32_t nowMs = juce::Time::getMillisecondCounter();
+        while (! retiredStems.empty() && (nowMs - retiredStems.front().retiredAtMs) > 2000)
             retiredStems.erase (retiredStems.begin());
     }
 
@@ -890,8 +890,9 @@ public:
         const float spd = playbackSpeed.load (std::memory_order_relaxed);
         const int pitchSt = pitchSemitones.load (std::memory_order_relaxed);
         const bool loopOn = loopEnabled.load (std::memory_order_relaxed);
-        const int64_t loopA = juce::jlimit<int64_t> (0, timelineLen - 1, static_cast<int64_t> (loopStartSec.load (std::memory_order_relaxed) * engineSampleRate));
-        const int64_t loopB = juce::jlimit<int64_t> (loopA + 1024, timelineLen, static_cast<int64_t> (loopEndSec.load (std::memory_order_relaxed) * engineSampleRate));
+        const int64_t safeTimeline = juce::jmax<int64_t> (2048, timelineLen);
+        const int64_t loopA = juce::jlimit<int64_t> (0, safeTimeline - 1024, static_cast<int64_t> (loopStartSec.load (std::memory_order_relaxed) * engineSampleRate));
+        const int64_t loopB = juce::jlimit<int64_t> (loopA + 1024, safeTimeline, static_cast<int64_t> (loopEndSec.load (std::memory_order_relaxed) * engineSampleRate));
 
         // 2. Capture live processed MI AMP tone into User Take Track if armed & recording
         const bool isRec = recording.load (std::memory_order_acquire);
@@ -1314,15 +1315,102 @@ private:
         return true;
     }
 
+    static bool readStereoAudioFileSafe (const juce::File& file, double targetSr, juce::Thread& thread,
+                                         juce::AudioBuffer<float>& outBuf)
+    {
+        if (! file.existsAsFile())
+            return false;
+
+        // Thread-local AudioFormatManager avoids any cross-thread Windows COM/WMAudioFormat contention
+        juce::AudioFormatManager localFormats;
+        localFormats.registerBasicFormats();
+
+        std::unique_ptr<juce::AudioFormatReader> reader (localFormats.createReaderFor (file));
+        if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0 || reader->numChannels <= 0)
+            return false;
+
+        const int srcLen = static_cast<int> (juce::jmin<int64_t> (reader->lengthInSamples, static_cast<int64_t> (reader->sampleRate * 600.0)));
+        if (srcLen <= 0)
+            return false;
+
+        juce::AudioBuffer<float> srcBuf (2, srcLen);
+        srcBuf.clear();
+
+        constexpr int kReadChunk = 65536;
+        int pos = 0;
+        while (pos < srcLen && ! thread.threadShouldExit())
+        {
+            const int nThis = juce::jmin (kReadChunk, srcLen - pos);
+            if (! reader->read (&srcBuf, pos, nThis, static_cast<int64_t> (pos), true, true))
+                break;
+            pos += nThis;
+        }
+        if (thread.threadShouldExit() || pos <= 0)
+            return false;
+
+        sanitizeAudioBuffer (srcBuf, pos);
+        const bool ok = resampleStereoSafe (srcBuf, reader->sampleRate, targetSr, pos, outBuf);
+        srcBuf.setSize (0, 0);
+        return ok;
+    }
+
+   #if defined(MIAMP_HAS_DEMUCS) && MIAMP_HAS_DEMUCS
+    static bool loadDemucsModelInner (const std::string* pathPtr, demucscpp::demucs_model* model)
+    {
+        return demucscpp::load_demucs_model (*pathPtr, model);
+    }
+
+    static bool runDemucsInferenceInner (const demucscpp::demucs_model* model,
+                                         const Eigen::MatrixXf* mixPtr,
+                                         Eigen::Tensor3dXf* outPtr,
+                                         const std::function<void(float, const std::string&)>* cbPtr)
+    {
+        *outPtr = demucscpp::demucs_inference (*model, *mixPtr, *cbPtr);
+        return true;
+    }
+
+   #if defined(_MSC_VER)
+    __declspec(noinline) static bool sehLoadDemucsModel (const std::string* pathPtr, demucscpp::demucs_model* model, bool* outSehFault) noexcept
+    {
+        __try
+        {
+            return loadDemucsModelInner (pathPtr, model);
+        }
+        __except (1)
+        {
+            if (outSehFault) *outSehFault = true;
+            return false;
+        }
+    }
+
+    __declspec(noinline) static bool sehRunDemucsInference (const demucscpp::demucs_model* model,
+                                                            const Eigen::MatrixXf* mixPtr,
+                                                            Eigen::Tensor3dXf* outPtr,
+                                                            const std::function<void(float, const std::string&)>* cbPtr,
+                                                            bool* outSehFault) noexcept
+    {
+        __try
+        {
+            return runDemucsInferenceInner (model, mixPtr, outPtr, cbPtr);
+        }
+        __except (1)
+        {
+            if (outSehFault) *outSehFault = true;
+            return false;
+        }
+    }
+   #endif
+   #endif
+
     class SongLoaderThread final : public juce::Thread
     {
     public:
-        SongLoaderThread (PracticeSongItem songItem, double targetSr, juce::AudioFormatManager& fm,
+        SongLoaderThread (PracticeSongItem songItem, double targetSr,
                           std::shared_ptr<std::atomic<bool>> alive,
                           std::function<void(std::shared_ptr<LoadedSongStems>, bool)> onDone)
             : juce::Thread ("MiAmpSongLoader", 2 * 1024 * 1024),
               item (std::move (songItem)), targetSampleRate (targetSr),
-              formats (fm), aliveFlag (std::move (alive)), doneCb (std::move (onDone)) {}
+              aliveFlag (std::move (alive)), doneCb (std::move (onDone)) {}
 
         void run() override
         {
@@ -1345,7 +1433,7 @@ private:
                     for (int s = 0; s < kNumStems && ! threadShouldExit(); ++s)
                     {
                         juce::AudioBuffer<float> tmp;
-                        if (! readAndResampleFile (cacheDir.getChildFile (stemFileName (s)), targetSampleRate, tmp))
+                        if (! readStereoAudioFileSafe (cacheDir.getChildFile (stemFileName (s)), targetSampleRate, *this, tmp))
                         {
                             allOk = false;
                             break;
@@ -1372,12 +1460,24 @@ private:
                 if (threadShouldExit()) return;
 
                 juce::AudioBuffer<float> fullAudio;
-                if (! readAndResampleFile (juce::File (item.audioFilePath), targetSampleRate, fullAudio) || fullAudio.getNumSamples() <= 0)
+                if (! readStereoAudioFileSafe (juce::File (item.audioFilePath), targetSampleRate, *this, fullAudio) || fullAudio.getNumSamples() <= 0)
+                {
+                    if (! threadShouldExit())
+                    {
+                        auto tok = aliveFlag;
+                        juce::MessageManager::callAsync ([cb = doneCb, tok]
+                        {
+                            if (tok && tok->load (std::memory_order_acquire) && cb)
+                                cb (nullptr, false);
+                        });
+                    }
                     return;
+                }
 
                 res->numSamples = fullAudio.getNumSamples();
                 res->isAiSeparated = false;
                 splitStemsDspInstant (fullAudio, targetSampleRate, res->stems);
+                fullAudio.setSize (0, 0);
                 for (int s = 0; s < kNumStems; ++s)
                     computePeaksForBuffer (res->stems[static_cast<size_t> (s)], res->numSamples, LoadedSongStems::kPeakBins, res->peaks[static_cast<size_t> (s)]);
 
@@ -1390,32 +1490,20 @@ private:
             }
             catch (...)
             {
+                if (! threadShouldExit())
+                {
+                    auto tok = aliveFlag;
+                    juce::MessageManager::callAsync ([cb = doneCb, tok]
+                    {
+                        if (tok && tok->load (std::memory_order_acquire) && cb)
+                            cb (nullptr, false);
+                    });
+                }
             }
-        }
-
-        bool readAndResampleFile (const juce::File& file, double targetSr, juce::AudioBuffer<float>& outBuf)
-        {
-            if (! file.existsAsFile())
-                return false;
-            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
-            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0 || reader->numChannels <= 0)
-                return false;
-
-            const int srcLen = static_cast<int> (juce::jmin<int64_t> (reader->lengthInSamples, static_cast<int64_t> (reader->sampleRate * 900.0)));
-            if (srcLen <= 0)
-                return false;
-            juce::AudioBuffer<float> srcBuf (juce::jmax (1, static_cast<int> (reader->numChannels)), srcLen);
-            srcBuf.clear();
-            if (! reader->read (&srcBuf, 0, srcLen, 0, true, true))
-                return false;
-
-            sanitizeAudioBuffer (srcBuf, srcLen);
-            return resampleStereoSafe (srcBuf, reader->sampleRate, targetSr, srcLen, outBuf);
         }
 
         PracticeSongItem item;
         double targetSampleRate;
-        juce::AudioFormatManager& formats;
         std::shared_ptr<std::atomic<bool>> aliveFlag;
         std::function<void(std::shared_ptr<LoadedSongStems>, bool)> doneCb;
     };
@@ -1424,13 +1512,13 @@ private:
     {
     public:
         enum class Task { DownloadModel, SeparateSong };
-        AiWorkerThread (Task t, PracticeSongItem songItem, double sr, juce::AudioFormatManager& fm,
+        AiWorkerThread (Task t, PracticeSongItem songItem, double sr,
                         std::shared_ptr<std::atomic<bool>> alive,
                         std::function<void(float, const juce::String&)> progressCb,
                         std::function<void(bool, const juce::String&, const juce::String&)> doneCb)
             : juce::Thread ("MiAmpDemucsAI", 8 * 1024 * 1024),
               task (t), item (std::move (songItem)),
-              targetSr (sr), formats (fm), aliveFlag (std::move (alive)),
+              targetSr (sr), aliveFlag (std::move (alive)),
               onProg (std::move (progressCb)), onDone (std::move (doneCb)) {}
 
         void run() override
@@ -1540,37 +1628,13 @@ private:
                 return;
             }
 
-            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (srcFile));
-            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0 || reader->numChannels <= 0)
-            {
-                postDone (false, "No se pudo leer el archivo de audio");
-                return;
-            }
-
-            const int srcLen = static_cast<int> (juce::jmin<int64_t> (reader->lengthInSamples, static_cast<int64_t> (reader->sampleRate * 900.0)));
-            if (srcLen <= 0)
-            {
-                postDone (false, "El archivo de audio esta vacio");
-                return;
-            }
-
-            juce::AudioBuffer<float> srcBuf (juce::jmax (1, static_cast<int> (reader->numChannels)), srcLen);
-            srcBuf.clear();
-            if (! reader->read (&srcBuf, 0, srcLen, 0, true, true))
-            {
-                postDone (false, "Error leyendo muestras de audio");
-                return;
-            }
-            sanitizeAudioBuffer (srcBuf, srcLen);
-
             juce::AudioBuffer<float> audio44;
             const double demucsSr = static_cast<double> (demucscpp::SUPPORTED_SAMPLE_RATE);
-            if (! resampleStereoSafe (srcBuf, reader->sampleRate, demucsSr, srcLen, audio44))
+            if (! readStereoAudioFileSafe (srcFile, demucsSr, *this, audio44))
             {
-                postDone (false, "Error remuestreando audio a 44.1 kHz");
+                postDone (false, "No se pudo leer o remuestrear el archivo de audio");
                 return;
             }
-            srcBuf.setSize (0, 0);
             if (threadShouldExit()) return;
 
             const int n44 = audio44.getNumSamples();
@@ -1582,10 +1646,17 @@ private:
 
             postProg (0.08f, "Cargando modelo HTDemucs-6s...", true);
             auto model = std::make_unique<demucscpp::demucs_model>();
-            if (! demucscpp::load_demucs_model (modelFile.getFullPathName().toStdString(), model.get())
-                || model->is_4sources)
+            const std::string modelPathUtf8 = modelFile.getFullPathName().toStdString();
+            bool loadedOk = false;
+            bool sehFault = false;
+           #if defined(_MSC_VER)
+            loadedOk = sehLoadDemucsModel (&modelPathUtf8, model.get(), &sehFault);
+           #else
+            loadedOk = loadDemucsModelInner (&modelPathUtf8, model.get());
+           #endif
+            if (sehFault || ! loadedOk || model->is_4sources)
             {
-                postDone (false, "Error cargando pesos HTDemucs-6s");
+                postDone (false, sehFault ? "Fallo protegido al cargar HTDemucs-6s" : "Error cargando pesos HTDemucs-6s");
                 return;
             }
             if (threadShouldExit()) return;
@@ -1644,13 +1715,25 @@ private:
                 const float baseProg = 0.10f + (0.84f * static_cast<float> (ci)) / static_cast<float> (chunks.size());
                 const float spanProg = 0.84f / static_cast<float> (chunks.size());
 
-                Eigen::Tensor3dXf stemsOut = demucscpp::demucs_inference (
-                    *model, mix,
-                    [this, baseProg, spanProg] (float prog, const std::string&)
-                    {
-                        const float p = juce::jlimit (0.10f, 0.94f, baseProg + prog * spanProg);
-                        postProg (p, "Separando 6 pistas AI: " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
-                    });
+                std::function<void(float, const std::string&)> progCb = [this, baseProg, spanProg] (float prog, const std::string&)
+                {
+                    const float p = juce::jlimit (0.10f, 0.94f, baseProg + prog * spanProg);
+                    postProg (p, "Separando 6 pistas AI: " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
+                };
+
+                Eigen::Tensor3dXf stemsOut;
+                bool inferOk = false;
+                bool inferSehFault = false;
+               #if defined(_MSC_VER)
+                inferOk = sehRunDemucsInference (model.get(), &mix, &stemsOut, &progCb, &inferSehFault);
+               #else
+                inferOk = runDemucsInferenceInner (model.get(), &mix, &stemsOut, &progCb);
+               #endif
+                if (inferSehFault || ! inferOk)
+                {
+                    postDone (false, inferSehFault ? "Fallo protegido en separacion AI (usando DSP)" : "Error en separacion AI");
+                    return;
+                }
 
                 if (threadShouldExit()) return;
 
@@ -1718,7 +1801,7 @@ private:
 
             postDone (ok, ok ? juce::String() : "Error guardando cache WAV");
            #else
-            juce::ignoreUnused (targetSr, formats);
+            juce::ignoreUnused (targetSr);
             postDone (false, "Motor Demucs AI disponible en build CMake");
            #endif
         }
@@ -1749,7 +1832,6 @@ private:
         Task task;
         PracticeSongItem item;
         double targetSr;
-        juce::AudioFormatManager& formats;
         std::shared_ptr<std::atomic<bool>> aliveFlag;
         uint32_t lastProgPostMs = 0;
         std::function<void(float, const juce::String&)> onProg;
@@ -1765,7 +1847,7 @@ private:
         if (loaderThread != nullptr) { loaderThread->signalThreadShouldExit(); loaderThread->stopThread (2000); }
         auto tok = aliveToken;
         loaderThread = std::make_unique<SongLoaderThread> (
-            item, engineSampleRate, formatManager, tok,
+            item, engineSampleRate, tok,
             [this, tok] (std::shared_ptr<LoadedSongStems> loaded, bool)
             {
                 if (! tok || ! tok->load (std::memory_order_acquire) || loaded == nullptr) return;
@@ -1778,7 +1860,7 @@ private:
     void setActiveStems (std::shared_ptr<LoadedSongStems> next)
     {
         if (activeStemsOwner != nullptr)
-            retiredStems.push_back (activeStemsOwner);
+            retiredStems.push_back ({ activeStemsOwner, juce::Time::getMillisecondCounter() });
         activeStemsOwner = std::move (next);
         activeStemsPtr.store (activeStemsOwner.get(), std::memory_order_release);
     }
@@ -1926,7 +2008,12 @@ private:
         }
     }
 
-    juce::AudioFormatManager formatManager;
+    struct RetiredStemEntry
+    {
+        std::shared_ptr<LoadedSongStems> stems;
+        uint32_t retiredAtMs = 0;
+    };
+
     double engineSampleRate = 44100.0;
 
     std::vector<PracticeSongItem> playlist;
@@ -1934,7 +2021,7 @@ private:
     PlaylistEndMode endMode = PlaylistEndMode::Continuous;
 
     std::shared_ptr<LoadedSongStems> activeStemsOwner;
-    std::vector<std::shared_ptr<LoadedSongStems>> retiredStems;
+    std::vector<RetiredStemEntry> retiredStems;
     std::atomic<const LoadedSongStems*> activeStemsPtr { nullptr };
 
     juce::SpinLock takeLock;

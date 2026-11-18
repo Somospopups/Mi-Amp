@@ -288,18 +288,24 @@ public:
         pedalViewport.setScrollBarsShown (true, false);
         addChildComponent (pedalViewport);
 
-        engine.onStateChanged = [this]
+        juce::Component::SafePointer<PracticeStudioView> safeSelf (this);
+        engine.onStateChanged = [safeSelf]
         {
-            rebuildPlaylistRows();
-            syncTextsAndButtons();
-            repaint();
+            if (safeSelf == nullptr) return;
+            safeSelf->rebuildPlaylistRows();
+            safeSelf->syncTextsAndButtons();
+            const auto& st = safeSelf->engine.getAiStatusText();
+            if (! safeSelf->engine.isAiBusy() && st.isNotEmpty() && safeSelf->callbacks.onHud)
+                safeSelf->callbacks.onHud (st);
+            safeSelf->repaint();
         };
-        engine.onSongAutoAdvanced = [this] (int)
+        engine.onSongAutoAdvanced = [safeSelf] (int)
         {
-            autoLoadLinkedPresetIfAny();
-            rebuildPlaylistRows();
-            syncTextsAndButtons();
-            repaint();
+            if (safeSelf == nullptr) return;
+            safeSelf->autoLoadLinkedPresetIfAny();
+            safeSelf->rebuildPlaylistRows();
+            safeSelf->syncTextsAndButtons();
+            safeSelf->repaint();
         };
 
         // Load initial song if playlist persisted from previous session
@@ -1121,9 +1127,12 @@ private:
     void openAddSongChooser()
     {
         juce::Component::SafePointer<PracticeStudioView> safeThis (this);
+        auto initDir = juce::File::getSpecialLocation (juce::File::userMusicDirectory);
+        if (! initDir.isDirectory())
+            initDir = juce::File::getSpecialLocation (juce::File::userHomeDirectory);
         activeChooser = std::make_unique<juce::FileChooser> (
             "Elegir canciones (MP3, WAV, FLAC, AIFF, OGG)",
-            juce::File::getSpecialLocation (juce::File::userMusicDirectory),
+            initDir,
             "*.mp3;*.wav;*.flac;*.aiff;*.aif;*.ogg;*.m4a");
         activeChooser->launchAsync (
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
