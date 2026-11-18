@@ -458,7 +458,7 @@ inline juce::String tr (Msg id)
 
         // Tone Finder
         { u8"Escrib\u00ed banda, canci\u00f3n o estilo:", u8"Enter band, song or style:", u8"Digite banda, m\u00fasica ou estilo:", u8"Entrez groupe, morceau ou style :", u8"Band, Song oder Stil eingeben:" },
-        { u8"Ej: The Story So Far, Blink, Deftones...", u8"Ex: The Story So Far, Blink, Deftones...", u8"Ex: The Story So Far, Blink, Deftones...", u8"Ex : The Story So Far, Blink, Deftones...", u8"Z.B. The Story So Far, Blink, Deftones..." },
+        { u8"Ej: Cerati, John Mayer, Metallica, Pink Floyd...", u8"Ex: John Mayer, Metallica, Pink Floyd, Hendrix...", u8"Ex: John Mayer, Metallica, Pink Floyd, Hendrix...", u8"Ex : John Mayer, Metallica, Pink Floyd, Hendrix...", u8"Z.B. John Mayer, Metallica, Pink Floyd, Hendrix..." },
         { u8"BUSCAR", u8"SEARCH", u8"BUSCAR", u8"CHERCHER", u8"SUCHEN" },
         { u8"SUGERENCIAS", u8"SUGGESTIONS", u8"SUGEST\u00d5ES", u8"SUGGESTIONS", u8"VORSCHL\u00c4GE" },
         { u8"Buscando rig real...", u8"Searching real rig...", u8"Buscando rig real...", u8"Recherche du rig...", u8"Suche echtes Rig..." },

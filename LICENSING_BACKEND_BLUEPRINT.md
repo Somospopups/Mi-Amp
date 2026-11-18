@@ -173,6 +173,14 @@ Base URL ejemplo: `https://api.miampaudio.com` (siempre HTTPS).
 - `POST /api/admin/licenses/revoke` — Revocar serial o liberar máquinas de un cliente que formateó su PC sin desactivar.
 - `GET /api/admin/licenses/search?q=...` — Buscar por email o serial.
 
+### 6. `POST /api/v1/tone-finder` (Tone Finder Inteligente con Caché + IA sin API Key del usuario)
+- **Request:** `{ "query": "John Mayer Slow Dancing", "instrument": "guitar", "license_id": "...", "machine_id": "..." }`
+- **Flujo:**
+  1. Verificar licencia activa (rate-limit por licencia para evitar abuso, ej. 40 búsquedas/día).
+  2. Buscar en tabla `tone_cache(query_norm, instrument)` (si ya fue buscado o curado manualmente por el equipo, devolver JSON al instante `< 40 ms`, costo `$0`).
+  3. Si no está en caché, llamar a la API de IA del servidor (Gemini Flash / OpenAI con Web Search) usando **la clave del servidor** y el inventario exacto de MI AMP (`gtrHeadModel 0..8`, `gtrCab 0..7`, `bassHeadModel 0..8`, `bassCabModel 0..6`, pedales y perillas `0..100`), guardar en `tone_cache`, y devolver el JSON completo al plugin.
+  4. En el plugin (`ToneFinderEngine.h`), el orden de prioridad será: **Catálogo Local Curado (instantáneo) → Backend `/api/v1/tone-finder` → Fallback Web/Prompt**.
+
 ---
 
 ## 6. Paso 4 — Machine ID Estable en C++ (Windows + macOS)

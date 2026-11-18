@@ -1534,8 +1534,8 @@ public:
 
         if (isTF)
         {
-            static constexpr const char* kGtrChips[6]  = { "The Story So Far", "90s Cali Punk", "Turnstile", "Dual Directo", "Deftones", "Midwest Emo" };
-            static constexpr const char* kBassChips[6] = { "The Story So Far", "90s Cali Punk", "Turnstile", "XV Directo",   "Deftones", "Tool" };
+            static constexpr const char* kGtrChips[6]  = { "Cerati / Soda", "John Mayer", "Metallica", "Pink Floyd", "Slash / GNR", "The Story So Far" };
+            static constexpr const char* kBassChips[6] = { "Flea / RHCP", "Tool", "Muse Hysteria", "Cliff / Metallica", "XV Directo", "The Story So Far" };
             for (int i = 0; i < 6; ++i)
                 tfChips[i].setButtonText (bass ? kBassChips[i] : kGtrChips[i]);
 
@@ -1790,14 +1790,21 @@ public:
                 g.setColour (inkColour());
                 g.drawFittedText (lastToneResult.title, tc.removeFromTop (20.0f * s).toNearestInt(), juce::Justification::centredLeft, 1);
 
-                const juce::String meta = miamp_i18n::tr (lastToneResult.bassMode ? miamp_i18n::Msg::BtnBass : miamp_i18n::Msg::BtnGuitar)
-                                        + " \u00b7 " + miamp_i18n::tr (lastToneResult.headBypass ? miamp_i18n::Msg::BtnPedalsOnly : miamp_i18n::Msg::BtnWithAmp)
-                                        + " \u00b7 Drop " + juce::String (lastToneResult.dropSemi)
+                const juce::String dropStr = (lastToneResult.dropSemi != 0)
+                    ? ("Drop " + juce::String (lastToneResult.dropSemi) + " st")
+                    : (lastToneResult.suggestedDropSemi != 0
+                        ? ("Drop " + juce::String (lastToneResult.suggestedDropSemi) + " opt")
+                        : "Std");
+                const juce::String rigTxt = lastToneResult.rigSummary.isNotEmpty()
+                    ? lastToneResult.rigSummary
+                    : miamp_i18n::tr (lastToneResult.headBypass ? miamp_i18n::Msg::BtnPedalsOnly : miamp_i18n::Msg::BtnWithAmp);
+                const juce::String meta = rigTxt
+                                        + " \u00b7 " + dropStr
                                         + " \u00b7 " + juce::String (static_cast<int> (lastToneResult.chainSlots.size())) + " "
                                         + miamp_i18n::tr (miamp_i18n::Msg::TfPedalsWord);
-                g.setFont (sansFont (10.0f * s, juce::Font::bold));
+                g.setFont (sansFont (9.8f * s, juce::Font::bold));
                 g.setColour (juce::Colour::fromRGBA (255, 226, 175, 225));
-                g.drawText (meta, tc.removeFromTop (15.0f * s), juce::Justification::centredLeft);
+                g.drawFittedText (meta, tc.removeFromTop (16.0f * s).toNearestInt(), juce::Justification::centredLeft, 1);
 
                 tc.removeFromTop (3.0f * s);
                 g.setFont (sansFont (10.8f * s));
@@ -2512,8 +2519,8 @@ private:
         auto localHit = mipedals::ToneFinderEngine::searchLocalCatalog (q, forBass, localScore);
         const juce::String apiKey = MiAmpAudioProcessor::getGeminiApiKey();
 
-        // Fast local exact match when no Gemini API key is set
-        if (localHit.found && localScore >= 36 && apiKey.isEmpty())
+        // Fast local exact match when no Gemini API key is set (or high-confidence curated artist hit)
+        if (localHit.found && ((localScore >= 50 && apiKey.isEmpty()) || localScore >= 180))
         {
             lastToneResult = localHit;
             tfSearching = false;

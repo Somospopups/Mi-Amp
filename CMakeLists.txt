@@ -225,7 +225,7 @@ target_compile_definitions(MiAmp
 )
 
 target_compile_options(MiAmp
-    PRIVATE
+    PUBLIC
         $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
 )
 

@@ -25,7 +25,22 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DMIAMP_BUILD_NUMBER=${{ github.run_number }}
 
       - name: Build Plugin (VST3 + Standalone)
-        run: cmake --build build --config Release --parallel
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --parallel 2>&1 | Tee-Object -FilePath win_build.log
+          if ($LASTEXITCODE -ne 0) {
+            $errs = Select-String -Path win_build.log -Pattern "error C\d+|fatal error|LNK\d+" | Select-Object -Last 10 | ForEach-Object { $_.Line.Trim() }
+            $msg = ($errs -join " | ")
+            if ($msg) { Write-Host "::error::Windows build failed: $msg" }
+            exit 1
+          }
+
+      - name: Upload Windows Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Build-Log
+          path: win_build.log
 
       - name: Build NSIS Windows Installer (.exe)
         shell: pwsh

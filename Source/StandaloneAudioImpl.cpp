@@ -3,7 +3,6 @@
 #include <atomic>
 #include <cmath>
 #include <juce_audio_devices/juce_audio_devices.h>
-#include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_audio_utils/juce_audio_utils.h>
 
 extern juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter();
@@ -174,7 +173,8 @@ void ensureAudioInputActive()
     if (holder->settings != nullptr && holder->settings->containsKey ("v21ManualInputConfirmed"))
     {
         holder->settings->removeValue ("v21ManualInputConfirmed");
-        holder->settings->saveIfNeeded();
+        if (auto* propsFile = dynamic_cast<juce::PropertiesFile*> (holder->settings.get()))
+            propsFile->saveIfNeeded();
     }
 
     auto& dm = holder->deviceManager;
