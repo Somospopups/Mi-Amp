@@ -4531,10 +4531,19 @@ void MiAmpAudioProcessorEditor::timerCallback()
         }
     }
 
-    // Standalone safety notice (no-interface startup mute or acoustic feedback auto-mute)
+    // Standalone safety & hot-plug auto-config notice (Blackbox / USB interface)
     if (miamp_standalone::isRunningStandalone() && ! introRunning)
     {
-        if (miamp_standalone::wasInputMutedForFeedback() && ! standaloneFeedbackNoticeShown)
+        const auto autoNotice = miamp_standalone::popAudioAutoSwitchNotice();
+        if (autoNotice.isNotEmpty())
+        {
+            standaloneStartupNoticeShown = false;
+            standaloneFeedbackNoticeShown = false;
+            showHud (autoNotice);
+            if (popover != nullptr && activePopover == PopoverKind::Config)
+                popover->repaint();
+        }
+        else if (miamp_standalone::wasInputMutedForFeedback() && ! standaloneFeedbackNoticeShown)
         {
             standaloneFeedbackNoticeShown = true;
             showHud (miamp_i18n::tr (miamp_i18n::Msg::StandaloneFeedbackMuted));

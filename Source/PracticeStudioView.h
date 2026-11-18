@@ -1007,41 +1007,58 @@ private:
         for (size_t i = 0; i < pl.size(); ++i)
         {
             const int idx = static_cast<int> (i);
+            juce::Component::SafePointer<PracticeStudioView> safeView (this);
             auto r = std::make_unique<PlaylistRowComponent> (
                 pl[i], idx == activeIdx,
-                [this, idx]
+                [safeView, idx]
                 {
-                    engine.loadSongAtIndex (idx, false);
-                    autoLoadLinkedPresetIfAny();
-                    rebuildPlaylistRows();
-                    syncTextsAndButtons();
-                    repaint();
-                },
-                [this, idx] (int d)
-                {
-                    engine.moveSongInPlaylist (idx, d);
-                    rebuildPlaylistRows();
-                },
-                [this, idx]
-                {
-                    engine.removeSongAtIndex (idx);
-                    rebuildPlaylistRows();
-                    syncTextsAndButtons();
-                    repaint();
-                },
-                [this, idx]
-                {
-                    if (idx != engine.getActiveSongIndex())
-                        engine.loadSongAtIndex (idx, false);
-                    const auto& list = engine.getPlaylist();
-                    if (idx >= 0 && idx < static_cast<int> (list.size()))
+                    juce::MessageManager::callAsync ([safeView, idx]
                     {
-                        if (list[static_cast<size_t> (idx)].linkedPresetName.isNotEmpty())
-                            engine.clearLinkedPresetOnActiveSong();
-                        else
-                            engine.linkPresetToActiveSong (processor.getActivePresetName(), processor.isBassMode());
-                    }
-                    rebuildPlaylistRows();
+                        if (safeView == nullptr) return;
+                        safeView->engine.loadSongAtIndex (idx, false);
+                        safeView->autoLoadLinkedPresetIfAny();
+                        safeView->rebuildPlaylistRows();
+                        safeView->syncTextsAndButtons();
+                        safeView->repaint();
+                    });
+                },
+                [safeView, idx] (int d)
+                {
+                    juce::MessageManager::callAsync ([safeView, idx, d]
+                    {
+                        if (safeView == nullptr) return;
+                        safeView->engine.moveSongInPlaylist (idx, d);
+                        safeView->rebuildPlaylistRows();
+                    });
+                },
+                [safeView, idx]
+                {
+                    juce::MessageManager::callAsync ([safeView, idx]
+                    {
+                        if (safeView == nullptr) return;
+                        safeView->engine.removeSongAtIndex (idx);
+                        safeView->rebuildPlaylistRows();
+                        safeView->syncTextsAndButtons();
+                        safeView->repaint();
+                    });
+                },
+                [safeView, idx]
+                {
+                    juce::MessageManager::callAsync ([safeView, idx]
+                    {
+                        if (safeView == nullptr) return;
+                        if (idx != safeView->engine.getActiveSongIndex())
+                            safeView->engine.loadSongAtIndex (idx, false);
+                        const auto& list = safeView->engine.getPlaylist();
+                        if (idx >= 0 && idx < static_cast<int> (list.size()))
+                        {
+                            if (list[static_cast<size_t> (idx)].linkedPresetName.isNotEmpty())
+                                safeView->engine.clearLinkedPresetOnActiveSong();
+                            else
+                                safeView->engine.linkPresetToActiveSong (safeView->processor.getActivePresetName(), safeView->processor.isBassMode());
+                        }
+                        safeView->rebuildPlaylistRows();
+                    });
                 });
             playlistHolder.addAndMakeVisible (*r);
             playlistRows.push_back (std::move (r));
@@ -1103,59 +1120,65 @@ private:
 
     void openAddSongChooser()
     {
+        juce::Component::SafePointer<PracticeStudioView> safeThis (this);
         activeChooser = std::make_unique<juce::FileChooser> (
             "Elegir canciones (MP3, WAV, FLAC, AIFF, OGG)",
             juce::File::getSpecialLocation (juce::File::userMusicDirectory),
             "*.mp3;*.wav;*.flac;*.aiff;*.aif;*.ogg;*.m4a");
         activeChooser->launchAsync (
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
-            [this] (const juce::FileChooser& fc)
+            [safeThis] (const juce::FileChooser& fc)
             {
+                if (safeThis == nullptr) return;
                 const auto res = fc.getResults();
                 if (! res.isEmpty())
                 {
-                    engine.addAudioFilesToPlaylist (res);
-                    rebuildPlaylistRows();
-                    syncTextsAndButtons();
-                    repaint();
+                    safeThis->engine.addAudioFilesToPlaylist (res);
+                    safeThis->rebuildPlaylistRows();
+                    safeThis->syncTextsAndButtons();
+                    safeThis->repaint();
                 }
             });
     }
 
     void exportMixFlow()
     {
+        juce::Component::SafePointer<PracticeStudioView> safeThis (this);
         activeChooser = std::make_unique<juce::FileChooser> (
             "Guardar Mezcla (.WAV)",
             juce::File::getSpecialLocation (juce::File::userDesktopDirectory).getChildFile ("MiAmp_Ensayo_Mix.wav"),
             "*.wav");
         activeChooser->launchAsync (
             juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
-            [this] (const juce::FileChooser& fc)
+            [safeThis] (const juce::FileChooser& fc)
             {
+                if (safeThis == nullptr) return;
                 auto f = fc.getResult();
                 if (f != juce::File{})
                 {
                     if (! f.hasFileExtension ("wav")) f = f.withFileExtension ("wav");
-                    const bool ok = engine.exportMixWav (f);
-                    if (callbacks.onHud) callbacks.onHud (ok ? ("Exportado: " + f.getFileName()) : "Nada para exportar");
+                    const bool ok = safeThis->engine.exportMixWav (f);
+                    if (safeThis->callbacks.onHud) safeThis->callbacks.onHud (ok ? ("Exportado: " + f.getFileName()) : "Nada para exportar");
                 }
             });
     }
 
     void exportStemsFlow()
     {
+        juce::Component::SafePointer<PracticeStudioView> safeThis (this);
         activeChooser = std::make_unique<juce::FileChooser> (
             "Elegir carpeta para guardar los Stems (.WAV)",
             juce::File::getSpecialLocation (juce::File::userDesktopDirectory));
         activeChooser->launchAsync (
             juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-            [this] (const juce::FileChooser& fc)
+            [safeThis] (const juce::FileChooser& fc)
             {
+                if (safeThis == nullptr) return;
                 const auto dir = fc.getResult();
                 if (dir != juce::File{})
                 {
-                    const int count = engine.exportCheckedStemsToFolder (dir);
-                    if (callbacks.onHud) callbacks.onHud (count > 0 ? (juce::String (count) + " stems .WAV exportados") : "Nada marcado para exportar");
+                    const int count = safeThis->engine.exportCheckedStemsToFolder (dir);
+                    if (safeThis->callbacks.onHud) safeThis->callbacks.onHud (count > 0 ? (juce::String (count) + " stems .WAV exportados") : "Nada marcado para exportar");
                 }
             });
     }
@@ -1167,20 +1190,22 @@ private:
             if (callbacks.onHud) callbacks.onHud ("Primero grabá una toma con REC");
             return;
         }
+        juce::Component::SafePointer<PracticeStudioView> safeThis (this);
         activeChooser = std::make_unique<juce::FileChooser> (
             "Guardar Mi Toma (.WAV)",
             juce::File::getSpecialLocation (juce::File::userDesktopDirectory).getChildFile ("MiAmp_Mi_Toma.wav"),
             "*.wav");
         activeChooser->launchAsync (
             juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
-            [this] (const juce::FileChooser& fc)
+            [safeThis] (const juce::FileChooser& fc)
             {
+                if (safeThis == nullptr) return;
                 auto f = fc.getResult();
                 if (f != juce::File{})
                 {
                     if (! f.hasFileExtension ("wav")) f = f.withFileExtension ("wav");
-                    const bool ok = engine.exportUserTakeWav (f);
-                    if (callbacks.onHud) callbacks.onHud (ok ? ("Toma exportada: " + f.getFileName()) : "Error exportando toma");
+                    const bool ok = safeThis->engine.exportUserTakeWav (f);
+                    if (safeThis->callbacks.onHud) safeThis->callbacks.onHud (ok ? ("Toma exportada: " + f.getFileName()) : "Error exportando toma");
                 }
             });
     }

@@ -11,4 +11,5 @@ namespace miamp_standalone
     void ensureAudioInputActive() {}
     void openAudioSettingsDialog() {}
     juce::String getCurrentAudioStatusSummary() { return {}; }
+    juce::String popAudioAutoSwitchNotice()     { return {}; }
 }

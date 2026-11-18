@@ -85,7 +85,7 @@ inline juce::File getDemucsModelFile()
 inline bool isDemucsModelReady()
 {
     const auto f = getDemucsModelFile();
-    return f.existsAsFile() && f.getSize() >= 52000000;
+    return f.existsAsFile() && f.getSize() >= 54000000;
 }
 
 inline juce::String demucsModelDownloadUrl()
@@ -263,6 +263,8 @@ public:
 
     ~MiAmpPracticeEngine()
     {
+        if (aliveToken != nullptr)
+            aliveToken->store (false, std::memory_order_release);
         stopBackgroundWorkers();
     }
 
@@ -281,12 +283,27 @@ public:
         lastTakePitch    = 999.0f;
         needsStretchReset.store (true, std::memory_order_release);
 
-        // If a song is already selected but stems were loaded at a different sample rate, reload them
+        // If a song is already selected but stems were loaded at a different sample rate, reload safely on message thread
         if (activeSongIndex >= 0 && activeSongIndex < static_cast<int> (playlist.size()))
         {
             const auto* cur = activeStemsPtr.load (std::memory_order_acquire);
             if (cur == nullptr || std::abs (cur->sampleRate - engineSampleRate) > 1.0)
-                loadSongAtIndex (activeSongIndex, false);
+            {
+                if (juce::MessageManager::getInstance()->isThisTheMessageThread())
+                {
+                    loadSongAtIndex (activeSongIndex, false);
+                }
+                else
+                {
+                    auto tok = aliveToken;
+                    juce::MessageManager::callAsync ([this, tok]
+                    {
+                        if (tok && tok->load (std::memory_order_acquire)
+                            && activeSongIndex >= 0 && activeSongIndex < static_cast<int> (playlist.size()))
+                            loadSongAtIndex (activeSongIndex, false);
+                    });
+                }
+            }
         }
     }
 
@@ -455,11 +472,12 @@ public:
         }
 
         const double sr = engineSampleRate;
+        auto tok = aliveToken;
         loaderThread = std::make_unique<SongLoaderThread> (
-            item, sr, formatManager,
-            [this, autoPlayAfterLoad] (std::shared_ptr<LoadedSongStems> loaded, bool shouldStartAi)
+            item, sr, formatManager, tok,
+            [this, tok, autoPlayAfterLoad] (std::shared_ptr<LoadedSongStems> loaded, bool shouldStartAi)
             {
-                if (loaded == nullptr) return;
+                if (! tok || ! tok->load (std::memory_order_acquire) || loaded == nullptr) return;
                 setActiveStems (loaded);
                 if (activeSongIndex >= 0 && activeSongIndex < static_cast<int> (playlist.size())
                     && playlist[static_cast<size_t> (activeSongIndex)].id == loaded->songId)
@@ -489,15 +507,18 @@ public:
         aiBusy.store (true, std::memory_order_release);
         aiProgress.store (0.0f, std::memory_order_relaxed);
         aiStatusText = "Descargando motor AI (htdemucs-6s · ~53 MB)...";
+        auto tok = aliveToken;
         aiThread = std::make_unique<AiWorkerThread> (
-            AiWorkerThread::Task::DownloadModel, PracticeSongItem{}, 0.0, formatManager,
-            [this] (float p, const juce::String& msg)
+            AiWorkerThread::Task::DownloadModel, PracticeSongItem{}, 0.0, formatManager, tok,
+            [this, tok] (float p, const juce::String& msg)
             {
+                if (! tok || ! tok->load (std::memory_order_acquire)) return;
                 aiProgress.store (p, std::memory_order_relaxed);
                 aiStatusText = msg;
             },
-            [this] (bool ok, const juce::String& songId, const juce::String& errMsg)
+            [this, tok] (bool ok, const juce::String& songId, const juce::String& errMsg)
             {
+                if (! tok || ! tok->load (std::memory_order_acquire)) return;
                 juce::ignoreUnused (songId);
                 aiBusy.store (false, std::memory_order_release);
                 aiProgress.store (ok ? 1.0f : 0.0f, std::memory_order_relaxed);
@@ -526,15 +547,18 @@ public:
         aiProgress.store (0.0f, std::memory_order_relaxed);
         aiStatusText = "Separando stems con AI local: " + item.title;
 
+        auto tok = aliveToken;
         aiThread = std::make_unique<AiWorkerThread> (
-            AiWorkerThread::Task::SeparateSong, item, engineSampleRate, formatManager,
-            [this] (float p, const juce::String& msg)
+            AiWorkerThread::Task::SeparateSong, item, engineSampleRate, formatManager, tok,
+            [this, tok] (float p, const juce::String& msg)
             {
+                if (! tok || ! tok->load (std::memory_order_acquire)) return;
                 aiProgress.store (p, std::memory_order_relaxed);
                 aiStatusText = msg;
             },
-            [this] (bool ok, const juce::String& songId, const juce::String& errMsg)
+            [this, tok] (bool ok, const juce::String& songId, const juce::String& errMsg)
             {
+                if (! tok || ! tok->load (std::memory_order_acquire)) return;
                 aiBusy.store (false, std::memory_order_release);
                 aiProgress.store (ok ? 1.0f : 0.0f, std::memory_order_relaxed);
                 aiStatusText = ok ? "Stems AI listos y guardados en cache" : errMsg;
@@ -1243,104 +1267,156 @@ public:
     std::function<void(int)> onSongAutoAdvanced;
 
 private:
+    static void sanitizeAudioBuffer (juce::AudioBuffer<float>& buf, int numSamples) noexcept
+    {
+        const int chs = buf.getNumChannels();
+        const int n   = juce::jmin (numSamples, buf.getNumSamples());
+        for (int c = 0; c < chs; ++c)
+        {
+            float* p = buf.getWritePointer (c);
+            for (int i = 0; i < n; ++i)
+                if (! std::isfinite (p[i]))
+                    p[i] = 0.0f;
+        }
+    }
+
+    static bool resampleStereoSafe (const juce::AudioBuffer<float>& srcBuf, double srcSr,
+                                    double dstSr, int srcLen, juce::AudioBuffer<float>& outBuf)
+    {
+        if (srcLen <= 0 || srcBuf.getNumChannels() <= 0 || srcSr <= 0.0 || dstSr <= 0.0)
+            return false;
+
+        // Allocate +32 zero-padded tail samples so LagrangeInterpolator 5-tap stencil never reads out of bounds
+        juce::AudioBuffer<float> stereoSrc (2, srcLen + 32);
+        stereoSrc.clear();
+        const int chR = srcBuf.getNumChannels() > 1 ? 1 : 0;
+        stereoSrc.copyFrom (0, 0, srcBuf, 0,   0, srcLen);
+        stereoSrc.copyFrom (1, 0, srcBuf, chR, 0, srcLen);
+
+        if (std::abs (srcSr - dstSr) < 1.0)
+        {
+            outBuf.setSize (2, srcLen, false, true, true);
+            outBuf.copyFrom (0, 0, stereoSrc, 0, 0, srcLen);
+            outBuf.copyFrom (1, 0, stereoSrc, 1, 0, srcLen);
+            return true;
+        }
+
+        const double ratio = srcSr / dstSr;
+        const int dstLen = juce::jmax (1, static_cast<int> (std::floor (static_cast<double> (srcLen) / ratio)));
+        outBuf.setSize (2, dstLen, false, true, true);
+        for (int c = 0; c < 2; ++c)
+        {
+            juce::LagrangeInterpolator interp;
+            interp.reset();
+            interp.process (ratio, stereoSrc.getReadPointer (c), outBuf.getWritePointer (c), dstLen);
+        }
+        sanitizeAudioBuffer (outBuf, dstLen);
+        return true;
+    }
+
     class SongLoaderThread final : public juce::Thread
     {
     public:
         SongLoaderThread (PracticeSongItem songItem, double targetSr, juce::AudioFormatManager& fm,
+                          std::shared_ptr<std::atomic<bool>> alive,
                           std::function<void(std::shared_ptr<LoadedSongStems>, bool)> onDone)
-            : juce::Thread ("MiAmpSongLoader"), item (std::move (songItem)), targetSampleRate (targetSr),
-              formats (fm), doneCb (std::move (onDone)) {}
+            : juce::Thread ("MiAmpSongLoader", 2 * 1024 * 1024),
+              item (std::move (songItem)), targetSampleRate (targetSr),
+              formats (fm), aliveFlag (std::move (alive)), doneCb (std::move (onDone)) {}
 
         void run() override
         {
-            const auto cacheDir = getSongCacheDir (item.id);
-            bool hasAiCache = true;
-            for (int s = 0; s < kNumStems; ++s)
-                if (! cacheDir.getChildFile (stemFileName (s)).existsAsFile()) { hasAiCache = false; break; }
-
-            auto res = std::make_shared<LoadedSongStems>();
-            res->songId = item.id;
-            res->sampleRate = targetSampleRate;
-            res->isFreeTake = false;
-
-            if (hasAiCache)
+            try
             {
-                bool allOk = true;
-                int maxLen = 0;
-                for (int s = 0; s < kNumStems && ! threadShouldExit(); ++s)
+                const auto cacheDir = getSongCacheDir (item.id);
+                bool hasAiCache = true;
+                for (int s = 0; s < kNumStems; ++s)
+                    if (! cacheDir.getChildFile (stemFileName (s)).existsAsFile()) { hasAiCache = false; break; }
+
+                auto res = std::make_shared<LoadedSongStems>();
+                res->songId = item.id;
+                res->sampleRate = targetSampleRate;
+                res->isFreeTake = false;
+
+                if (hasAiCache)
                 {
-                    juce::AudioBuffer<float> tmp;
-                    if (! readAndResampleFile (cacheDir.getChildFile (stemFileName (s)), targetSampleRate, tmp))
+                    bool allOk = true;
+                    int maxLen = 0;
+                    for (int s = 0; s < kNumStems && ! threadShouldExit(); ++s)
                     {
-                        allOk = false;
-                        break;
+                        juce::AudioBuffer<float> tmp;
+                        if (! readAndResampleFile (cacheDir.getChildFile (stemFileName (s)), targetSampleRate, tmp))
+                        {
+                            allOk = false;
+                            break;
+                        }
+                        maxLen = juce::jmax (maxLen, tmp.getNumSamples());
+                        res->stems[static_cast<size_t> (s)] = std::move (tmp);
                     }
-                    maxLen = juce::jmax (maxLen, tmp.getNumSamples());
-                    res->stems[static_cast<size_t> (s)] = std::move (tmp);
+                    if (allOk && maxLen > 0 && ! threadShouldExit())
+                    {
+                        res->numSamples = maxLen;
+                        res->isAiSeparated = true;
+                        for (int s = 0; s < kNumStems; ++s)
+                            computePeaksForBuffer (res->stems[static_cast<size_t> (s)], maxLen, LoadedSongStems::kPeakBins, res->peaks[static_cast<size_t> (s)]);
+                        auto tok = aliveFlag;
+                        juce::MessageManager::callAsync ([cb = doneCb, tok, res]
+                        {
+                            if (tok && tok->load (std::memory_order_acquire) && cb)
+                                cb (res, false);
+                        });
+                        return;
+                    }
                 }
-                if (allOk && maxLen > 0)
-                {
-                    res->numSamples = maxLen;
-                    res->isAiSeparated = true;
-                    for (int s = 0; s < kNumStems; ++s)
-                        computePeaksForBuffer (res->stems[static_cast<size_t> (s)], maxLen, LoadedSongStems::kPeakBins, res->peaks[static_cast<size_t> (s)]);
-                    juce::MessageManager::callAsync ([cb = doneCb, res] { if (cb) cb (res, false); });
+
+                if (threadShouldExit()) return;
+
+                juce::AudioBuffer<float> fullAudio;
+                if (! readAndResampleFile (juce::File (item.audioFilePath), targetSampleRate, fullAudio) || fullAudio.getNumSamples() <= 0)
                     return;
-                }
+
+                res->numSamples = fullAudio.getNumSamples();
+                res->isAiSeparated = false;
+                splitStemsDspInstant (fullAudio, targetSampleRate, res->stems);
+                for (int s = 0; s < kNumStems; ++s)
+                    computePeaksForBuffer (res->stems[static_cast<size_t> (s)], res->numSamples, LoadedSongStems::kPeakBins, res->peaks[static_cast<size_t> (s)]);
+
+                auto tok = aliveFlag;
+                juce::MessageManager::callAsync ([cb = doneCb, tok, res]
+                {
+                    if (tok && tok->load (std::memory_order_acquire) && cb)
+                        cb (res, true);
+                });
             }
-
-            if (threadShouldExit()) return;
-
-            juce::AudioBuffer<float> fullAudio;
-            if (! readAndResampleFile (juce::File (item.audioFilePath), targetSampleRate, fullAudio) || fullAudio.getNumSamples() <= 0)
-                return;
-
-            res->numSamples = fullAudio.getNumSamples();
-            res->isAiSeparated = false;
-            splitStemsDspInstant (fullAudio, targetSampleRate, res->stems);
-            for (int s = 0; s < kNumStems; ++s)
-                computePeaksForBuffer (res->stems[static_cast<size_t> (s)], res->numSamples, LoadedSongStems::kPeakBins, res->peaks[static_cast<size_t> (s)]);
-
-            juce::MessageManager::callAsync ([cb = doneCb, res] { if (cb) cb (res, true); });
+            catch (...)
+            {
+            }
         }
 
         bool readAndResampleFile (const juce::File& file, double targetSr, juce::AudioBuffer<float>& outBuf)
         {
+            if (! file.existsAsFile())
+                return false;
             std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
-            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0)
+            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0 || reader->numChannels <= 0)
                 return false;
 
             const int srcLen = static_cast<int> (juce::jmin<int64_t> (reader->lengthInSamples, static_cast<int64_t> (reader->sampleRate * 900.0)));
+            if (srcLen <= 0)
+                return false;
             juce::AudioBuffer<float> srcBuf (juce::jmax (1, static_cast<int> (reader->numChannels)), srcLen);
+            srcBuf.clear();
             if (! reader->read (&srcBuf, 0, srcLen, 0, true, true))
                 return false;
 
-            // Ensure stereo
-            juce::AudioBuffer<float> stereoSrc (2, srcLen);
-            stereoSrc.copyFrom (0, 0, srcBuf, 0, 0, srcLen);
-            stereoSrc.copyFrom (1, 0, srcBuf, srcBuf.getNumChannels() > 1 ? 1 : 0, 0, srcLen);
-
-            if (std::abs (reader->sampleRate - targetSr) < 1.0)
-            {
-                outBuf = std::move (stereoSrc);
-                return true;
-            }
-
-            const double ratio = reader->sampleRate / targetSr;
-            const int dstLen = juce::jmax (1, static_cast<int> (std::llround (static_cast<double> (srcLen) / ratio)));
-            outBuf.setSize (2, dstLen);
-            for (int c = 0; c < 2; ++c)
-            {
-                juce::LagrangeInterpolator interp;
-                interp.reset();
-                interp.process (ratio, stereoSrc.getReadPointer (c), outBuf.getWritePointer (c), dstLen);
-            }
-            return true;
+            sanitizeAudioBuffer (srcBuf, srcLen);
+            return resampleStereoSafe (srcBuf, reader->sampleRate, targetSr, srcLen, outBuf);
         }
 
         PracticeSongItem item;
         double targetSampleRate;
         juce::AudioFormatManager& formats;
+        std::shared_ptr<std::atomic<bool>> aliveFlag;
         std::function<void(std::shared_ptr<LoadedSongStems>, bool)> doneCb;
     };
 
@@ -1349,19 +1425,33 @@ private:
     public:
         enum class Task { DownloadModel, SeparateSong };
         AiWorkerThread (Task t, PracticeSongItem songItem, double sr, juce::AudioFormatManager& fm,
+                        std::shared_ptr<std::atomic<bool>> alive,
                         std::function<void(float, const juce::String&)> progressCb,
                         std::function<void(bool, const juce::String&, const juce::String&)> doneCb)
-            : juce::Thread ("MiAmpDemucsAI"), task (t), item (std::move (songItem)),
-              targetSr (sr), formats (fm), onProg (std::move (progressCb)), onDone (std::move (doneCb)) {}
+            : juce::Thread ("MiAmpDemucsAI", 8 * 1024 * 1024),
+              task (t), item (std::move (songItem)),
+              targetSr (sr), formats (fm), aliveFlag (std::move (alive)),
+              onProg (std::move (progressCb)), onDone (std::move (doneCb)) {}
 
         void run() override
         {
-            if (task == Task::DownloadModel)
+            try
             {
-                runDownload();
-                return;
+                if (task == Task::DownloadModel)
+                {
+                    runDownload();
+                    return;
+                }
+                runSeparation();
             }
-            runSeparation();
+            catch (const std::exception& e)
+            {
+                postDone (false, juce::String ("Error AI: ") + e.what());
+            }
+            catch (...)
+            {
+                postDone (false, "Error inesperado en el motor AI");
+            }
         }
 
     private:
@@ -1384,7 +1474,8 @@ private:
                 return;
             }
 
-            const int64_t total = stream->getTotalLength() > 0 ? stream->getTotalLength() : 54855129;
+            const int64_t streamLen = stream->getTotalLength();
+            const int64_t total = streamLen > 0 ? streamLen : 54855129;
             juce::FileOutputStream fos (part);
             if (! fos.openedOk())
             {
@@ -1405,7 +1496,7 @@ private:
             }
             fos.flush();
 
-            if (threadShouldExit() || readTotal < 52000000)
+            if (threadShouldExit() || readTotal < 54000000 || (streamLen > 0 && readTotal < streamLen))
             {
                 part.deleteFile();
                 postDone (false, threadShouldExit() ? "Descarga cancelada" : "Descarga incompleta");
@@ -1441,103 +1532,189 @@ private:
                 return;
             }
 
-            postProg (0.04f, "Decodificando audio a 44.1 kHz...");
-            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (juce::File (item.audioFilePath)));
-            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0)
+            postProg (0.04f, "Decodificando audio a 44.1 kHz...", true);
+            const juce::File srcFile (item.audioFilePath);
+            if (! srcFile.existsAsFile())
+            {
+                postDone (false, "Archivo de audio no encontrado");
+                return;
+            }
+
+            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (srcFile));
+            if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0 || reader->numChannels <= 0)
             {
                 postDone (false, "No se pudo leer el archivo de audio");
                 return;
             }
 
             const int srcLen = static_cast<int> (juce::jmin<int64_t> (reader->lengthInSamples, static_cast<int64_t> (reader->sampleRate * 900.0)));
+            if (srcLen <= 0)
+            {
+                postDone (false, "El archivo de audio esta vacio");
+                return;
+            }
+
             juce::AudioBuffer<float> srcBuf (juce::jmax (1, static_cast<int> (reader->numChannels)), srcLen);
+            srcBuf.clear();
             if (! reader->read (&srcBuf, 0, srcLen, 0, true, true))
             {
                 postDone (false, "Error leyendo muestras de audio");
                 return;
             }
+            sanitizeAudioBuffer (srcBuf, srcLen);
 
             juce::AudioBuffer<float> audio44;
             const double demucsSr = static_cast<double> (demucscpp::SUPPORTED_SAMPLE_RATE);
-            if (std::abs (reader->sampleRate - demucsSr) < 1.0)
+            if (! resampleStereoSafe (srcBuf, reader->sampleRate, demucsSr, srcLen, audio44))
             {
-                audio44.setSize (2, srcLen);
-                audio44.copyFrom (0, 0, srcBuf, 0, 0, srcLen);
-                audio44.copyFrom (1, 0, srcBuf, srcBuf.getNumChannels() > 1 ? 1 : 0, 0, srcLen);
+                postDone (false, "Error remuestreando audio a 44.1 kHz");
+                return;
             }
-            else
-            {
-                const double ratio = reader->sampleRate / demucsSr;
-                const int dstLen = juce::jmax (1, static_cast<int> (std::llround (static_cast<double> (srcLen) / ratio)));
-                audio44.setSize (2, dstLen);
-                for (int c = 0; c < 2; ++c)
-                {
-                    juce::LagrangeInterpolator interp;
-                    interp.reset();
-                    interp.process (ratio, srcBuf.getReadPointer (c < srcBuf.getNumChannels() ? c : 0),
-                                    audio44.getWritePointer (c), dstLen);
-                }
-            }
+            srcBuf.setSize (0, 0);
             if (threadShouldExit()) return;
 
-            postProg (0.08f, "Cargando modelo HTDemucs-6s...");
+            const int n44 = audio44.getNumSamples();
+            if (n44 < 4410)
+            {
+                postDone (false, "El audio es demasiado corto para separar pistas");
+                return;
+            }
+
+            postProg (0.08f, "Cargando modelo HTDemucs-6s...", true);
             auto model = std::make_unique<demucscpp::demucs_model>();
-            if (! demucscpp::load_demucs_model (modelFile.getFullPathName().toStdString(), model.get()))
+            if (! demucscpp::load_demucs_model (modelFile.getFullPathName().toStdString(), model.get())
+                || model->is_4sources)
             {
                 postDone (false, "Error cargando pesos HTDemucs-6s");
                 return;
             }
             if (threadShouldExit()) return;
 
-            const int n44 = audio44.getNumSamples();
-            Eigen::MatrixXf mix (2, n44);
             const float* pL = audio44.getReadPointer (0);
             const float* pR = audio44.getReadPointer (1);
-            for (int i = 0; i < n44; ++i)
+
+            std::array<juce::AudioBuffer<float>, kNumStems> outStems;
+            for (int s = 0; s < kNumStems; ++s)
             {
-                mix (0, i) = pL[i];
-                mix (1, i) = pR[i];
+                outStems[static_cast<size_t> (s)].setSize (2, n44, false, true, true);
+                outStems[static_cast<size_t> (s)].clear();
             }
 
-            Eigen::Tensor3dXf stemsOut = demucscpp::demucs_inference (
-                *model, mix,
-                [this] (float prog, const std::string&)
+            // Process in <= 45s chunks with 2s crossfade overlap to cap peak RAM (~300 MB instead of 4+ GB!)
+            const int kChunkSamples   = 45 * 44100;
+            const int kOverlapSamples = 2 * 44100;
+            const int kStepSamples    = kChunkSamples - kOverlapSamples;
+
+            struct ChunkSpan { int start = 0; int len = 0; };
+            std::vector<ChunkSpan> chunks;
+            for (int pos = 0; pos < n44; )
+            {
+                const int remaining = n44 - pos;
+                const int len = (remaining <= kChunkSamples + 22050) ? remaining : kChunkSamples;
+                chunks.push_back ({ pos, len });
+                if (pos + len >= n44) break;
+                pos += kStepSamples;
+            }
+
+            for (size_t ci = 0; ci < chunks.size() && ! threadShouldExit(); ++ci)
+            {
+                const int cStart = chunks[ci].start;
+                const int cLen   = chunks[ci].len;
+
+                double chunkEnergy = 0.0;
+                for (int i = 0; i < cLen; ++i)
                 {
-                    const float p = juce::jlimit (0.10f, 0.94f, 0.10f + prog * 0.84f);
-                    postProg (p, "Separando 6 pistas AI: " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
-                });
+                    const float l = pL[cStart + i];
+                    const float r = pR[cStart + i];
+                    chunkEnergy += static_cast<double> (l) * static_cast<double> (l)
+                                 + static_cast<double> (r) * static_cast<double> (r);
+                }
+
+                // Skip demucs_inference on pure silence to avoid 0/0 normalization NaN inside demucs_inference
+                if (chunkEnergy < 1e-9)
+                    continue;
+
+                Eigen::MatrixXf mix (2, cLen);
+                for (int i = 0; i < cLen; ++i)
+                {
+                    mix (0, i) = pL[cStart + i];
+                    mix (1, i) = pR[cStart + i];
+                }
+
+                const float baseProg = 0.10f + (0.84f * static_cast<float> (ci)) / static_cast<float> (chunks.size());
+                const float spanProg = 0.84f / static_cast<float> (chunks.size());
+
+                Eigen::Tensor3dXf stemsOut = demucscpp::demucs_inference (
+                    *model, mix,
+                    [this, baseProg, spanProg] (float prog, const std::string&)
+                    {
+                        const float p = juce::jlimit (0.10f, 0.94f, baseProg + prog * spanProg);
+                        postProg (p, "Separando 6 pistas AI: " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
+                    });
+
+                if (threadShouldExit()) return;
+
+                if (stemsOut.dimension (0) < 6 || stemsOut.dimension (1) < 2 || stemsOut.dimension (2) <= 0)
+                {
+                    postDone (false, "Salida invalida del motor HTDemucs-6s");
+                    return;
+                }
+
+                const int copyLen = juce::jmin (cLen, static_cast<int> (stemsOut.dimension (2)));
+                const int fadeLen = (ci > 0) ? juce::jmin (kOverlapSamples, copyLen) : 0;
+
+                auto blendStem = [&] (int fileStemIdx, int demucsSrcA, int demucsSrcB = -1)
+                {
+                    float* oL = outStems[static_cast<size_t> (fileStemIdx)].getWritePointer (0);
+                    float* oR = outStems[static_cast<size_t> (fileStemIdx)].getWritePointer (1);
+                    for (int i = 0; i < copyLen; ++i)
+                    {
+                        float l = stemsOut (demucsSrcA, 0, i);
+                        float r = stemsOut (demucsSrcA, 1, i);
+                        if (demucsSrcB >= 0)
+                        {
+                            l += stemsOut (demucsSrcB, 0, i);
+                            r += stemsOut (demucsSrcB, 1, i);
+                        }
+                        if (! std::isfinite (l)) l = 0.0f;
+                        if (! std::isfinite (r)) r = 0.0f;
+
+                        const int dstIdx = cStart + i;
+                        if (i < fadeLen)
+                        {
+                            const float w = static_cast<float> (i) / static_cast<float> (fadeLen);
+                            oL[dstIdx] = oL[dstIdx] * (1.0f - w) + l * w;
+                            oR[dstIdx] = oR[dstIdx] * (1.0f - w) + r * w;
+                        }
+                        else
+                        {
+                            oL[dstIdx] = l;
+                            oR[dstIdx] = r;
+                        }
+                    }
+                };
+
+                // HTDemucs-6s order: 0=drums, 1=bass, 2=other, 3=vocals, 4=guitar, 5=piano
+                blendStem (0, 3);     // VOZ
+                blendStem (1, 4);     // GUITARRA
+                blendStem (2, 1);     // BAJO
+                blendStem (3, 0);     // BATERIA
+                blendStem (4, 2, 5);  // OTROS / FX (other + piano)
+            }
+
             model.reset();
+            audio44.setSize (0, 0);
             if (threadShouldExit()) return;
 
-            postProg (0.96f, "Guardando stems locales (.wav)...");
+            postProg (0.96f, "Guardando stems locales (.wav)...", true);
             const auto cacheDir = getSongCacheDir (item.id);
-            juce::AudioBuffer<float> stemBuf (2, n44);
-
-            auto writeSource = [&] (int fileStemIdx, int demucsSrcA, int demucsSrcB = -1) -> bool
-            {
-                float* oL = stemBuf.getWritePointer (0);
-                float* oR = stemBuf.getWritePointer (1);
-                for (int i = 0; i < n44; ++i)
+            bool ok = true;
+            for (int s = 0; s < kNumStems; ++s)
+                if (! writeWav24Static (cacheDir.getChildFile (stemFileName (s)), outStems[static_cast<size_t> (s)], demucsSr))
                 {
-                    float l = stemsOut (demucsSrcA, 0, i);
-                    float r = stemsOut (demucsSrcA, 1, i);
-                    if (demucsSrcB >= 0)
-                    {
-                        l += stemsOut (demucsSrcB, 0, i);
-                        r += stemsOut (demucsSrcB, 1, i);
-                    }
-                    oL[i] = l;
-                    oR[i] = r;
+                    ok = false;
+                    break;
                 }
-                return writeWav24Static (cacheDir.getChildFile (stemFileName (fileStemIdx)), stemBuf, demucsSr);
-            };
-
-            // HTDemucs-6s order: 0=drums, 1=bass, 2=other, 3=vocals, 4=guitar, 5=piano
-            const bool ok = writeSource (0, 3)      // VOZ
-                         && writeSource (1, 4)      // GUITARRA
-                         && writeSource (2, 1)      // BAJO
-                         && writeSource (3, 0)      // BATERIA
-                         && writeSource (4, 2, 5);  // OTROS / FX (other + piano)
 
             postDone (ok, ok ? juce::String() : "Error guardando cache WAV");
            #else
@@ -1546,19 +1723,35 @@ private:
            #endif
         }
 
-        void postProg (float p, const juce::String& msg)
+        void postProg (float p, const juce::String& msg, bool force = false)
         {
-            juce::MessageManager::callAsync ([cb = onProg, p, msg] { if (cb) cb (p, msg); });
+            const uint32_t now = juce::Time::getMillisecondCounter();
+            if (! force && (now - lastProgPostMs) < 120)
+                return;
+            lastProgPostMs = now;
+            auto tok = aliveFlag;
+            juce::MessageManager::callAsync ([cb = onProg, tok, p, msg]
+            {
+                if (tok && tok->load (std::memory_order_acquire) && cb)
+                    cb (p, msg);
+            });
         }
         void postDone (bool ok, const juce::String& err)
         {
-            juce::MessageManager::callAsync ([cb = onDone, ok, id = item.id, err] { if (cb) cb (ok, id, err); });
+            auto tok = aliveFlag;
+            juce::MessageManager::callAsync ([cb = onDone, tok, ok, id = item.id, err]
+            {
+                if (tok && tok->load (std::memory_order_acquire) && cb)
+                    cb (ok, id, err);
+            });
         }
 
         Task task;
         PracticeSongItem item;
         double targetSr;
         juce::AudioFormatManager& formats;
+        std::shared_ptr<std::atomic<bool>> aliveFlag;
+        uint32_t lastProgPostMs = 0;
         std::function<void(float, const juce::String&)> onProg;
         std::function<void(bool, const juce::String&, const juce::String&)> onDone;
     };
@@ -1570,11 +1763,12 @@ private:
         if (item.id != songId) return;
 
         if (loaderThread != nullptr) { loaderThread->signalThreadShouldExit(); loaderThread->stopThread (2000); }
+        auto tok = aliveToken;
         loaderThread = std::make_unique<SongLoaderThread> (
-            item, engineSampleRate, formatManager,
-            [this] (std::shared_ptr<LoadedSongStems> loaded, bool)
+            item, engineSampleRate, formatManager, tok,
+            [this, tok] (std::shared_ptr<LoadedSongStems> loaded, bool)
             {
-                if (loaded == nullptr) return;
+                if (! tok || ! tok->load (std::memory_order_acquire) || loaded == nullptr) return;
                 setActiveStems (loaded);
                 if (onStateChanged) onStateChanged();
             });
@@ -1781,6 +1975,7 @@ private:
 
     std::vector<double> tapTimesMs;
 
+    std::shared_ptr<std::atomic<bool>> aliveToken = std::make_shared<std::atomic<bool>> (true);
     std::unique_ptr<SongLoaderThread> loaderThread;
     std::unique_ptr<AiWorkerThread>   aiThread;
     std::atomic<bool>  aiBusy { false };
