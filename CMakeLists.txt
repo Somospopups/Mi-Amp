@@ -68,6 +68,7 @@ target_sources(MiAmp
         Source/RigStageComponents.h
         Source/StudioFxModal.h
         Source/CabPanels.h
+        Source/PracticeStudioView.h
         Source/PedalCatalogSpecs.h
         Source/ToneFinderEngine.h
         Source/PresetExporter.h
@@ -79,11 +80,15 @@ target_sources(MiAmp
         Source/DSP/MiAmpCabMicDSP.h
         Source/DSP/MiAmpStudioFxDSP.h
         Source/DSP/MiAmpBoutiquePedalsDSP.h
+        Source/DSP/MiAmpPracticeEngine.h
         Source/DSP/MiAmpCabIRs.h
         Source/DSP/XVBassDSP.h
         Source/DSP/XVCabIRs.h
         Source/DSP/XVBassTuner.h
         Source/DSP/XVPitchShifter.h
+        Source/ThirdParty/signalsmith/signalsmith-stretch.h
+        Source/ThirdParty/signalsmith/signalsmith-linear/stft.h
+        Source/ThirdParty/signalsmith/signalsmith-linear/fft.h
 )
 
 juce_add_binary_data(MiAmpAssets
@@ -223,6 +228,58 @@ target_compile_definitions(MiAmp
         MIAMP_BUILD_NUMBER=${MIAMP_BUILD_NUMBER}
         MIAMP_APP_VERSION="1.1.${MIAMP_BUILD_NUMBER}"
 )
+
+# Pure-C++ Offline AI Stem Separation (Eigen 3.4.0 + sevagh/demucs.cpp htdemucs_6s)
+option(MIAMP_ENABLE_DEMUCS "Build embedded pure-C++ Demucs 6-stem AI engine" ON)
+if(MIAMP_ENABLE_DEMUCS)
+    include(FetchContent)
+    if(POLICY CMP0169)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
+
+    if(POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
+    endif()
+    FetchContent_Declare(
+        eigen
+        URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+    )
+    FetchContent_GetProperties(eigen)
+    if(NOT eigen_POPULATED)
+        FetchContent_Populate(eigen)
+    endif()
+
+    FetchContent_Declare(
+        demucs_cpp
+        GIT_REPOSITORY https://github.com/sevagh/demucs.cpp.git
+        GIT_TAG        main
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_GetProperties(demucs_cpp)
+    if(NOT demucs_cpp_POPULATED)
+        FetchContent_Populate(demucs_cpp)
+    endif()
+
+    file(GLOB DEMUCS_CORE_SOURCES CONFIGURE_DEPENDS "${demucs_cpp_SOURCE_DIR}/src/*.cpp")
+    add_library(demucs_core STATIC ${DEMUCS_CORE_SOURCES})
+    set_target_properties(demucs_core PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        POSITION_INDEPENDENT_CODE ON
+    )
+    target_include_directories(demucs_core PUBLIC
+        "${demucs_cpp_SOURCE_DIR}/src"
+        "${eigen_SOURCE_DIR}"
+    )
+    target_compile_options(demucs_core PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8 /O2 /bigobj>
+        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-O2 -Wno-sign-conversion -Wno-unused-parameter>
+    )
+    target_link_libraries(MiAmp PRIVATE demucs_core)
+    target_compile_definitions(MiAmp PUBLIC MIAMP_HAS_DEMUCS=1)
+else()
+    target_compile_definitions(MiAmp PUBLIC MIAMP_HAS_DEMUCS=0)
+endif()
 
 target_compile_options(MiAmp
     PUBLIC

@@ -8,6 +8,7 @@
 #include "RigStageComponents.h"
 #include "StudioFxModal.h"
 #include "CabPanels.h"
+#include "PracticeStudioView.h"
 
 class MiAmpAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                         private juce::Timer
@@ -219,6 +220,7 @@ private:
     void rebuildRigHeadControls();
     void computeRigStageLayout (juce::Rectangle<float>& cabRectOut, juce::Rectangle<float>& headRectOut,
                                 juce::Rectangle<float>& grilleRectOut) const;
+    void setPracticeMode (bool practice);
     void syncPedalEditorControls();
     void syncPalettePositions();
     void layoutAll();
@@ -256,6 +258,7 @@ private:
     Images imgs;
 
     bool isFloorMode = false;
+    bool isPracticeMode = false;
     bool closeUpView = true; // true = Primer Plano (default, close to head), false = Rig & Mics (full stack + draggable mics)
     bool consoleOpen = false; // bottom console strip hidden by default
     bool cabDrawerOpen = false; // left cabinet picker & dual-mics drawer
@@ -310,7 +313,7 @@ private:
     juce::TextButton btnInstGuitar { "GUITARRA" }, btnInstBass { "BAJO" };
     juce::TextButton btnMainHeads { "CABEZALES" }, btnMainCabs { "CAJAS" };
     juce::TextButton btnMainPresets { "PRESETS" }, btnMainTuner { "AFINADOR" }, btnMainToneFinder { "BUSCAR TONO" },
-                     btnMainPedals { "PEDALES" }, btnMainStudioFx { "STUDIO FX" }, btnMainConsole { "CONSOLA" };
+                     btnMainPedals { "PEDALES" }, btnMainStudioFx { "STUDIO FX" }, btnMainPractice { "ENSAYO" }, btnMainConsole { "CONSOLA" };
     juce::TextButton btnDockDrop { "DROP" }, btnDockConfig { "CONFIG" };
     juce::TextButton btnViewCloseUp { "PRIMER PLANO" }, btnViewRigMics { "RIG & MICS" };
 
@@ -361,8 +364,10 @@ private:
     float paletteScrollCur    = 0.0f;
     std::unique_ptr<PalettePedalButton> paletteItems[14];
     juce::TextButton btnFloorPresets { "PRESETS" }, btnFloorTuner { "AFINADOR" };
-    juce::TextButton btnFloorToneFinder { "BUSCAR TONO" }, btnFloorDrop { "DROP" }, btnFloorConfig { "CONFIG" }, btnBackToAmp { "VOLVER AL AMPLI" };
+    juce::TextButton btnFloorToneFinder { "BUSCAR TONO" }, btnFloorDrop { "DROP" }, btnFloorConfig { "CONFIG" }, btnBackToAmp { "VOLVER AL AMPLI" }, btnFloorPractice { "ENSAYO" };
     juce::TextButton btnFloorTunerMute { "MUTE" }, btnFloorTunerNotation { "DO RE MI" };
+
+    std::unique_ptr<miamp_practice_ui::PracticeStudioView> practiceView;
 
     // Floating glass popover (.popover / .floor-popover)
     std::unique_ptr<GlassPopover> popover;

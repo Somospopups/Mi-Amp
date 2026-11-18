@@ -195,6 +195,27 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
 
     const bool active = b.getToggleState();
 
+    if (id == "recPill")
+    {
+        g.setColour (active ? juce::Colour::fromRGBA (235, 92, 92, down ? 185 : 155)
+                            : juce::Colour::fromRGBA (215, 95, 95, highlighted ? 105 : 68));
+        g.fillRoundedRectangle (r, 8.0f);
+        g.setColour (active ? juce::Colour::fromRGB (255, 165, 165)
+                            : juce::Colour::fromRGBA (255, 155, 155, 140));
+        g.drawRoundedRectangle (r, 8.0f, 1.2f);
+        return;
+    }
+
+    if (id == "mintPill")
+    {
+        g.setColour (active ? juce::Colour::fromRGBA (154, 216, 192, down ? 155 : 132)
+                            : juce::Colour::fromRGBA (154, 216, 192, highlighted ? 105 : 74));
+        g.fillRoundedRectangle (r, 8.0f);
+        g.setColour (mintBorder());
+        g.drawRoundedRectangle (r, 8.0f, 1.2f);
+        return;
+    }
+
     if (active)
     {
         g.setColour (juce::Colour::fromRGBA (154, 216, 192, down ? 128 : (highlighted ? 116 : 92)));
@@ -299,7 +320,7 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
     }
 
     if (id == "headMenuPresets" || id == "headMenuTuner" || id == "headMenuToneFinder" || id == "headMenuPedals"
-        || id == "headMenuCabs" || id == "headMenuStudioFx" || id == "headMenuConfig")
+        || id == "headMenuCabs" || id == "headMenuStudioFx" || id == "headMenuPractice" || id == "headMenuConfig")
     {
         const float bh = static_cast<float> (bounds.getHeight());
         const float sc = bh / 36.0f;
@@ -402,6 +423,17 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonText (
                 const float bh2 = sz * hs[k];
                 g.fillRoundedRectangle (bx - barW * 0.5f, cy - bh2 * 0.5f, barW, bh2, barW * 0.4f);
             }
+        }
+        else if (id == "headMenuPractice")
+        {
+            // 3-track stems + playhead waveform icon for ENSAYO
+            const float x0 = cx - sz * 0.44f, x1 = cx + sz * 0.44f;
+            const float ys[3] = { cy - sz * 0.28f, cy, cy + sz * 0.28f };
+            for (int k = 0; k < 3; ++k)
+                g.drawLine (x0, ys[k], x1, ys[k], lw);
+            g.fillEllipse (cx - sz * 0.14f - sz * 0.08f, ys[0] - sz * 0.08f, sz * 0.16f, sz * 0.16f);
+            g.fillEllipse (cx + sz * 0.18f - sz * 0.08f, ys[1] - sz * 0.08f, sz * 0.16f, sz * 0.16f);
+            g.fillEllipse (cx - sz * 0.04f - sz * 0.08f, ys[2] - sz * 0.08f, sz * 0.16f, sz * 0.16f);
         }
         else // headMenuConfig (gear)
         {
@@ -2787,14 +2819,14 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     loadImages();
 
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
-                     &btnInstGuitar, &btnInstBass, &btnMainHeads, &btnMainCabs, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainStudioFx, &btnMainConsole,
+                     &btnInstGuitar, &btnInstBass, &btnMainHeads, &btnMainCabs, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainStudioFx, &btnMainPractice, &btnMainConsole,
                      &btnDockDrop, &btnDockConfig, &btnViewCloseUp, &btnViewRigMics,
                      &btnAmpPrev, &btnAmpNext, &btnAmpBrowse, &btnCabPrev, &btnCabNext, &btnCabBrowse, &btnCabLoadWav,
                      &btnMic1On, &btnMic1Dist, &btnMic1Phase, &btnMic2On, &btnMic2Dist, &btnMic2Phase,
                      &btnConsoleStudioFx, &btnConsolePower,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
                      &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
-                     &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
+                     &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp, &btnFloorPractice,
                      &btnFloorTunerMute, &btnFloorTunerNotation })
     {
         b->setLookAndFeel (&glassLaf);
@@ -2857,6 +2889,10 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
             layoutAll();
         }
     };
+
+    addAndMakeVisible (btnMainPractice);
+    btnMainPractice.setComponentID ("headMenuPractice");
+    btnMainPractice.onClick = [this] { setPracticeMode (true); };
 
     addChildComponent (btnDockDrop); // Drop is now integrated inside AFINADOR
     btnDockDrop.onClick = [this] { togglePopover (PopoverKind::Tuner); };
@@ -3198,6 +3234,25 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
     btnFloorConfig.onClick = [this] { togglePopover (PopoverKind::Config); };
     addChildComponent (btnBackToAmp);
     btnBackToAmp.onClick = [this] { setFloorMode (false); };
+    addChildComponent (btnFloorPractice);
+    btnFloorPractice.onClick = [this] { setPracticeMode (true); };
+
+    miamp_practice_ui::PracticeStudioView::Callbacks practiceCbs;
+    practiceCbs.onBackToAmp = [this] { setPracticeMode (false); };
+    practiceCbs.onSwitchInstrument = [this] (bool bass) { switchInstrument (bass); };
+    practiceCbs.onOpenTuner = [this] { togglePopover (PopoverKind::Tuner); };
+    practiceCbs.onOpenAmpCab = [this]
+    {
+        closeFloatingOverlays ("rigBrowser");
+        if (rigBrowser) rigBrowser->openMode (miamp_rig::RigBrowserOverlay::Mode::Heads);
+    };
+    practiceCbs.onOpenFloorPedals = [this] { setPracticeMode (false); setFloorMode (true); };
+    practiceCbs.onOpenPresets = [this] { togglePopover (PopoverKind::Presets); };
+    practiceCbs.onOpenToneFinder = [this] { togglePopover (PopoverKind::ToneFinder); };
+    practiceCbs.onHud = [this] (const juce::String& msg) { showHud (msg); };
+    practiceView = std::make_unique<miamp_practice_ui::PracticeStudioView> (audioProcessor, std::move (practiceCbs));
+    practiceView->setLookAndFeel (&glassLaf);
+    addChildComponent (*practiceView);
 
     addChildComponent (btnFloorTunerNotation);
     btnFloorTunerNotation.onClick = [this]
@@ -3285,18 +3340,20 @@ MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
     if (updateDownloadThread != nullptr)
         updateDownloadThread->stopThread (1200);
     for (auto* b : { &btnSkipIntro, &btnCreditClose,
-                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainCabs, &btnMainStudioFx,
+                     &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals, &btnMainCabs, &btnMainStudioFx, &btnMainPractice,
                      &btnDockDrop, &btnDockConfig, &btnViewCloseUp, &btnViewRigMics,
                      &btnAmpPrev, &btnAmpNext, &btnAmpBrowse, &btnCabPrev, &btnCabNext, &btnCabBrowse, &btnCabLoadWav,
                      &btnMic1On, &btnMic1Dist, &btnMic1Phase, &btnMic2On, &btnMic2Dist, &btnMic2Phase,
                      &btnConsoleStudioFx, &btnConsolePower,
                      &btnEditClose, &btnMoveLeft, &btnMoveRight,
                      &btnHeadModeAmp, &btnHeadModePedals, &btnPaletteLeft, &btnPaletteRight,
-                     &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp,
+                     &btnFloorPresets, &btnFloorTuner, &btnFloorToneFinder, &btnFloorDrop, &btnFloorConfig, &btnBackToAmp, &btnFloorPractice,
                      &btnFloorTunerMute, &btnFloorTunerNotation, &btnUpdateNow, &btnUpdateLater })
     {
         b->setLookAndFeel (nullptr);
     }
+    if (practiceView != nullptr)
+        practiceView->setLookAndFeel (nullptr);
     if (cabPickerPanel != nullptr)
         cabPickerPanel->setLookAndFeel (nullptr);
     if (rigBrowser != nullptr)
@@ -3470,6 +3527,7 @@ void MiAmpAudioProcessorEditor::applyLanguageTexts()
     btnMainPedals.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnPedals));
     btnMainCabs.setButtonText        (miamp_i18n::tr (miamp_i18n::Msg::BtnCabs));
     btnMainStudioFx.setButtonText    (miamp_i18n::tr (miamp_i18n::Msg::BtnStudioFx));
+    btnMainPractice.setButtonText    (miamp_i18n::tr (miamp_i18n::Msg::BtnPractice));
     btnDockConfig.setButtonText      (miamp_i18n::tr (miamp_i18n::Msg::BtnConfig));
 
     btnHeadModeAmp.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnWithAmp));
@@ -3479,6 +3537,7 @@ void MiAmpAudioProcessorEditor::applyLanguageTexts()
     btnFloorToneFinder.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::BtnToneFinder));
     btnFloorConfig.setButtonText     (miamp_i18n::tr (miamp_i18n::Msg::BtnConfig));
     btnBackToAmp.setButtonText       (miamp_i18n::tr (miamp_i18n::Msg::BtnBackToAmp));
+    btnFloorPractice.setButtonText   (miamp_i18n::tr (miamp_i18n::Msg::BtnPractice));
     btnFloorTunerMute.setButtonText  (miamp_i18n::tr (miamp_i18n::Msg::TunerMuteShort));
     btnFloorTunerNotation.setButtonText (miamp_i18n::tr (miamp_i18n::Msg::TunerNotesSolfege));
 
@@ -3487,6 +3546,8 @@ void MiAmpAudioProcessorEditor::applyLanguageTexts()
                                                                         : miamp_i18n::Msg::UpdBtnLater));
     if (popover != nullptr)
         popover->refreshLanguage();
+    if (practiceView != nullptr)
+        practiceView->syncTextsAndButtons();
     repaint();
 }
 
@@ -3656,7 +3717,7 @@ void MiAmpAudioProcessorEditor::closeFloatingOverlays (const char* except)
 
 void MiAmpAudioProcessorEditor::cycleActiveHead (int delta)
 {
-    if (isFloorMode || introRunning) return;
+    if (isFloorMode || isPracticeMode || introRunning) return;
     const bool bass = audioProcessor.isBassMode();
     const auto& headList = bass ? miamp_rig::getBassHeadSpecs() : miamp_rig::getGuitarHeadSpecs();
     const char* id = bass ? MiAmpParams::bassHeadModel : MiAmpParams::gtrHeadModel;
@@ -3683,7 +3744,7 @@ bool MiAmpAudioProcessorEditor::keyPressed (const juce::KeyPress& key)
         }
         return false;
     }
-    if (isFloorMode || introRunning)
+    if (isFloorMode || isPracticeMode || introRunning)
         return false;
 
     if (key == juce::KeyPress::escapeKey)
@@ -3712,7 +3773,7 @@ void MiAmpAudioProcessorEditor::switchInstrument (bool toBass)
     if (audioProcessor.isBassMode() == toBass)
         return;
 
-    if (! isFloorMode && ! introRunning && getWidth() > 0 && getHeight() > 0)
+    if (! isFloorMode && ! isPracticeMode && ! introRunning && getWidth() > 0 && getHeight() > 0)
     {
         instOutSnapshot = juce::Image (juce::Image::ARGB, getWidth(), getHeight(), true);
         juce::Graphics snapG (instOutSnapshot);
@@ -3746,6 +3807,7 @@ void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
     if (floor && introRunning)
         finishIntro();
 
+    isPracticeMode = false;
     isFloorMode = floor;
     instSwitching = false;
     instSwitchAnim = 1.0f;
@@ -3775,6 +3837,35 @@ void MiAmpAudioProcessorEditor::setFloorMode (bool floor)
     syncHeadControls();
     syncPedalEditorControls();
     layoutAll();
+    repaint();
+}
+
+void MiAmpAudioProcessorEditor::setPracticeMode (bool practice)
+{
+    if (practice && introRunning)
+        finishIntro();
+
+    isPracticeMode = practice;
+    if (practice)
+        isFloorMode = false;
+
+    instSwitching = false;
+    instSwitchAnim = 1.0f;
+    instOutSnapshot = {};
+    closeFloatingOverlays();
+    if (popover != nullptr) popover->setVisible (false);
+    popoverClosing = false;
+    popoverAnim = 0.0f;
+    rightMenuAnim = 1.0f;
+    if (studioFxModal != nullptr) studioFxModal->forceCloseImmediate();
+    if (rigBrowser != nullptr) rigBrowser->forceCloseImmediate();
+    cabDrawerAnim = 0.0f;
+
+    syncHeadControls();
+    syncPedalEditorControls();
+    layoutAll();
+    if (practiceView != nullptr)
+        practiceView->syncTextsAndButtons();
     repaint();
 }
 
@@ -3980,8 +4071,8 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     const bool bass = audioProcessor.isBassMode();
     rebuildRigHeadControls();
 
-    const bool showHeadUi  = ! isFloorMode && (! introRunning || introElapsed >= 2.42f);
-    const bool showAmpFace = ! isFloorMode && (! introRunning || headSceneYOffsetStage < 680.0f);
+    const bool showHeadUi  = ! isFloorMode && ! isPracticeMode && (! introRunning || introElapsed >= 2.42f);
+    const bool showAmpFace = ! isFloorMode && ! isPracticeMode && (! introRunning || headSceneYOffsetStage < 680.0f);
     const float uiAlpha    = introRunning ? juce::jlimit (0.0f, 1.0f, (introElapsed - 2.42f) / 0.40f) : 1.0f;
 
     btnInstGuitar.setToggleState (! bass, juce::dontSendNotification);
@@ -3990,7 +4081,7 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     const bool showRightMenu = showHeadUi && (activePopover == PopoverKind::None || rightMenuAnim > 0.01f);
     const float menuFade   = uiAlpha * silkEase (rightMenuAnim);
     for (auto* b : { &btnInstGuitar, &btnInstBass, &btnMainPresets, &btnMainTuner, &btnMainToneFinder, &btnMainPedals,
-                     &btnMainCabs, &btnMainStudioFx, &btnDockConfig })
+                     &btnMainCabs, &btnMainStudioFx, &btnMainPractice, &btnDockConfig })
     {
         b->setVisible (showRightMenu);
         b->setAlpha (showRightMenu ? menuFade : 1.0f);
@@ -4122,18 +4213,22 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
     btnConsoleStudioFx.setToggleState (sfxActive || (studioFxModal && studioFxModal->isVisible()), juce::dontSendNotification);
 
     const bool headByp = audioProcessor.isHeadBypassed (bass);
-    btnHeadModeAmp.setVisible    (isFloorMode);
-    btnHeadModePedals.setVisible (isFloorMode);
+    const bool showFloorUi = isFloorMode && ! isPracticeMode;
+    btnHeadModeAmp.setVisible    (showFloorUi);
+    btnHeadModePedals.setVisible (showFloorUi);
     btnHeadModeAmp.setToggleState    (! headByp, juce::dontSendNotification);
     btnHeadModePedals.setToggleState (headByp,   juce::dontSendNotification);
 
-    btnFloorPresets.setVisible    (isFloorMode);
-    btnFloorTuner.setVisible      (isFloorMode);
-    btnFloorToneFinder.setVisible (isFloorMode);
+    btnFloorPresets.setVisible    (showFloorUi);
+    btnFloorTuner.setVisible      (showFloorUi);
+    btnFloorToneFinder.setVisible (showFloorUi);
     btnFloorDrop.setVisible       (false);
     btnFloorConfig.setVisible     (false);
-    btnBackToAmp.setVisible       (isFloorMode);
-    btnSkipIntro.setVisible       (introRunning && ! isFloorMode && introElapsed < 2.38f);
+    btnBackToAmp.setVisible       (showFloorUi);
+    btnFloorPractice.setVisible   (showFloorUi);
+    btnSkipIntro.setVisible       (introRunning && ! isFloorMode && ! isPracticeMode && introElapsed < 2.38f);
+    if (practiceView != nullptr)
+        practiceView->setVisible (isPracticeMode);
 }
 
 void MiAmpAudioProcessorEditor::togglePopover (PopoverKind kind)
@@ -4187,7 +4282,7 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
     if (isFloorMode && ! hasSelected && ! chain.empty())
         sel = chain.front();
 
-    const bool showEd = isFloorMode && editorOpen && ! chain.empty();
+    const bool showEd = isFloorMode && ! isPracticeMode && editorOpen && ! chain.empty();
 
     btnEditClose.setVisible (showEd);
     btnMoveLeft.setVisible (showEd);
@@ -4271,16 +4366,16 @@ void MiAmpAudioProcessorEditor::syncPedalEditorControls()
                 paintMiniPedalKnobs (g, bass, pt, fitted);
             });
         paletteItems[idx]->setInChain (inChain);
-        paletteItems[idx]->setVisible (isFloorMode && ! floorTunerOpen);
+        paletteItems[idx]->setVisible (isFloorMode && ! isPracticeMode && ! floorTunerOpen);
     }
 
-    const bool showPal = isFloorMode && ! floorTunerOpen;
+    const bool showPal = isFloorMode && ! isPracticeMode && ! floorTunerOpen;
     paletteStrip.setVisible    (showPal);
     btnPaletteLeft.setVisible  (showPal);
     btnPaletteRight.setVisible (showPal);
 
-    btnFloorTunerNotation.setVisible (isFloorMode && floorTunerOpen);
-    btnFloorTunerMute.setVisible     (isFloorMode && floorTunerOpen);
+    btnFloorTunerNotation.setVisible (isFloorMode && ! isPracticeMode && floorTunerOpen);
+    btnFloorTunerMute.setVisible     (isFloorMode && ! isPracticeMode && floorTunerOpen);
 
     if (! showEd)
     {
@@ -4552,6 +4647,8 @@ void MiAmpAudioProcessorEditor::timerCallback()
     tunerReading = audioProcessor.tuner.analyze();
     if (activePopover == PopoverKind::Tuner && popover != nullptr)
         popover->updateTuner (tunerReading);
+    if (practiceView != nullptr && isPracticeMode)
+        practiceView->updateFromTimer (tunerReading, useSolfege);
 
     if (hudTicks > 0 && --hudTicks == 0)
         hudText.clear();
@@ -4742,10 +4839,24 @@ void MiAmpAudioProcessorEditor::layoutAll()
         }
     }
 
+    if (practiceView != nullptr)
+        practiceView->setBounds (getLocalBounds());
     if (rigBrowser != nullptr)
         rigBrowser->setBounds (getLocalBounds());
     if (studioFxModal != nullptr)
         studioFxModal->setBounds (getLocalBounds());
+
+    if (isPracticeMode)
+    {
+        if (popover->isVisible())
+        {
+            const int popH = popover->getPreferredHeight (620);
+            const float popEase = silkEase (popoverAnim);
+            const float popY = 74.0f + (1.0f - popEase) * 10.0f;
+            popover->setBounds (toScreenInt (1206.0f, popY, 309.0f, static_cast<float> (popH)));
+        }
+        return;
+    }
 
     if (! isFloorMode)
     {
@@ -4753,16 +4864,17 @@ void MiAmpAudioProcessorEditor::layoutAll()
         const float menuDy  = (1.0f - silkEase (rightMenuAnim)) * 6.0f;
         const float drawerEase = silkEase (cabDrawerAnim);
 
-        // Centered right glass panel (.menu 1291, 173, 224, 422) on main screen
-        btnInstGuitar.setBounds      (toScreenInt (1306, 188.0f + menuDy, 94,  36));
-        btnInstBass.setBounds        (toScreenInt (1404, 188.0f + menuDy, 94,  36));
-        btnMainPresets.setBounds     (toScreenInt (1303, 232.0f + menuDy, 200, 36));
-        btnMainTuner.setBounds       (toScreenInt (1303, 274.0f + menuDy, 200, 36));
-        btnMainToneFinder.setBounds  (toScreenInt (1303, 316.0f + menuDy, 200, 36));
-        btnMainPedals.setBounds      (toScreenInt (1303, 358.0f + menuDy, 200, 36));
-        btnMainCabs.setBounds        (toScreenInt (1303, 400.0f + menuDy, 200, 36));
-        btnMainStudioFx.setBounds    (toScreenInt (1303, 442.0f + menuDy, 200, 36));
-        btnDockConfig.setBounds      (toScreenInt (1303, 484.0f + menuDy, 200, 36));
+        // Centered right glass panel (.menu 1291, 154, 224, 444) on main screen
+        btnInstGuitar.setBounds      (toScreenInt (1306, 169.0f + menuDy, 94,  36));
+        btnInstBass.setBounds        (toScreenInt (1404, 169.0f + menuDy, 94,  36));
+        btnMainPresets.setBounds     (toScreenInt (1303, 212.0f + menuDy, 200, 34));
+        btnMainTuner.setBounds       (toScreenInt (1303, 251.0f + menuDy, 200, 34));
+        btnMainToneFinder.setBounds  (toScreenInt (1303, 290.0f + menuDy, 200, 34));
+        btnMainPedals.setBounds      (toScreenInt (1303, 329.0f + menuDy, 200, 34));
+        btnMainCabs.setBounds        (toScreenInt (1303, 368.0f + menuDy, 200, 34));
+        btnMainStudioFx.setBounds    (toScreenInt (1303, 407.0f + menuDy, 200, 34));
+        btnMainPractice.setBounds    (toScreenInt (1303, 446.0f + menuDy, 200, 34));
+        btnDockConfig.setBounds      (toScreenInt (1303, 485.0f + menuDy, 200, 34));
 
         if (cabPickerPanel)
             cabPickerPanel->setBounds (toScreenInt (28.0f - (1.0f - drawerEase) * 14.0f, 25, 420, consoleOpen ? 595 : 716));
@@ -4947,7 +5059,8 @@ void MiAmpAudioProcessorEditor::layoutAll()
     }
     else
     {
-        // Top-right Amp vs Pedals-Only segmented switch (above board)
+        // Top-right Amp vs Pedals-Only segmented switch (above board) + Practice Studio shortcut
+        btnFloorPractice.setBounds  (toScreenInt (1094, 30, 134, 30));
         btnHeadModeAmp.setBounds    (toScreenInt (1236, 30, 134, 30));
         btnHeadModePedals.setBounds (toScreenInt (1374, 30, 136, 30));
 
@@ -5397,10 +5510,10 @@ void MiAmpAudioProcessorEditor::paintHeadScene (juce::Graphics& g, float yOff)
     if (activePopover == PopoverKind::None || menuEase > 0.01f)
     {
     const float menuDy = (1.0f - menuEase) * 6.0f;
-    // Layer 4a: Centered right glass panel (.menu 1291, 173, 224, 422) on main screen
-    paintGlassPanel (g, toScreen (1291.0f, 173.0f + menuDy, 224.0f, 422.0f), 22.0f, menuAlpha);
+    // Layer 4a: Centered right glass panel (.menu 1291, 154, 224, 444) on main screen
+    paintGlassPanel (g, toScreen (1291.0f, 154.0f + menuDy, 224.0f, 444.0f), 22.0f, menuAlpha);
 
-    auto swBox = toScreen (1305.0f, 187.0f + menuDy, 196.0f, 38.0f);
+    auto swBox = toScreen (1305.0f, 168.0f + menuDy, 196.0f, 38.0f);
     g.setColour (juce::Colour::fromRGBA (255, 255, 255, static_cast<uint8_t> (24.0f * menuAlpha)));
     g.fillRoundedRectangle (swBox, 8.0f * s);
     g.setColour (juce::Colour::fromRGBA (241, 224, 190, static_cast<uint8_t> (102.0f * menuAlpha)));
@@ -5810,7 +5923,12 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
 void MiAmpAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (juce::Colour::fromRGB (82, 110, 121)); // .holder sky/slate background
-    if (! isFloorMode)
+    if (isPracticeMode)
+    {
+        if (imgs.floorBg.isValid())
+            g.drawImage (imgs.floorBg, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
+    }
+    else if (! isFloorMode)
         paintHeadScene (g, headSceneYOffsetStage);
     else
         paintFloorScene (g);
@@ -5904,7 +6022,7 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
     const auto stagePt = juce::Point<float> (e.position.x / s, e.position.y / s);
     const bool bass = audioProcessor.isBassMode();
 
-    if (creditOpen)
+    if (creditOpen || isPracticeMode)
         return;
 
     if (! isFloorMode)
@@ -5934,7 +6052,7 @@ void MiAmpAudioProcessorEditor::mouseDown (const juce::MouseEvent& e)
         }
 
         // Click outside panels/head/cab returns smoothly to clean Primer Plano view
-        const bool inRightMenu = (activePopover == PopoverKind::None) && juce::Rectangle<float> (1291, 173, 224, 422).contains (stagePt);
+        const bool inRightMenu = (activePopover == PopoverKind::None) && juce::Rectangle<float> (1291, 154, 224, 444).contains (stagePt);
         const bool inCabDrawer = cabDrawerOpen && juce::Rectangle<float> (28, 25, 420, consoleOpen ? 595.0f : 716.0f).contains (stagePt);
         const bool inConsole   = consoleOpen && juce::Rectangle<float> (34, 636, 1482, 114).contains (stagePt);
         bool inPopover = false;
