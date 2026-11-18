@@ -5044,14 +5044,18 @@ void MiAmpAudioProcessorEditor::paintGlassPanel (juce::Graphics& g, juce::Rectan
     miamp_theme::paintFrostedGlassPanel (g, r, radius * stageScale(), alpha);
 }
 
-void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const
+void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect, bool dimmed) const
 {
     const auto& spec = mipedalui::getPedalSpec (bassMode, type);
+    const auto tintForPedal = [dimmed] (const juce::Image& im) -> juce::Image
+    {
+        return (dimmed && im.isValid()) ? miamp_rig::getCachedDimmedImage (im, 0.54f, 0.82f) : im;
+    };
 
     // 1. Knobs (for all non-EQ pedals including XV)
     if (! spec.eq.hasEq)
     {
-        const juce::Image& kImg = (spec.artKey < 0) ? imgs.xvKnobPtr : imgs.pedKnobs[spec.artKey];
+        const juce::Image kImg = tintForPedal ((spec.artKey < 0) ? imgs.xvKnobPtr : imgs.pedKnobs[spec.artKey]);
         if (kImg.isValid())
         {
             for (int i = 0; i < spec.numKnobs; ++i)
@@ -5080,6 +5084,7 @@ void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bas
                                        ? static_cast<float> (imgs.pedSliderCap.getHeight()) / juce::jmax (1, imgs.pedSliderCap.getWidth())
                                        : 0.72f);
         const float travel = juce::jmax (1.0f, (trBot - trTop) - capH);
+        const juce::Image capImg = tintForPedal (imgs.pedSliderCap);
         for (int b = 0; b < 7; ++b)
         {
             const float val = audioProcessor.apvts.getRawParameterValue (spec.eq.paramIds[static_cast<size_t> (b)])->load();
@@ -5087,11 +5092,11 @@ void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bas
             const float cx = pedalRect.getX() + spec.eq.xs[static_cast<size_t> (b)] * pedalRect.getWidth();
             const float cy = trTop + (1.0f - norm) * travel + capH * 0.5f;
             const auto capR = juce::Rectangle<float> (cx - capW * 0.5f, cy - capH * 0.5f, capW, capH);
-            if (imgs.pedSliderCap.isValid())
-                g.drawImage (imgs.pedSliderCap, capR, juce::RectanglePlacement::stretchToFit);
+            if (capImg.isValid())
+                g.drawImage (capImg, capR, juce::RectanglePlacement::stretchToFit);
             else
             {
-                g.setColour (juce::Colour::fromRGB (34, 34, 38));
+                g.setColour (juce::Colour::fromRGB (34, 34, 38).darker (dimmed ? 0.4f : 0.0f));
                 g.fillRoundedRectangle (capR, 1.5f);
             }
         }
@@ -5108,17 +5113,22 @@ void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bas
         const float cy = pedalRect.getY() + ts.cy * pedalRect.getHeight();
         if (ts.threeWay && val == 1)
         {
+            const float kScale = dimmed ? 0.54f : 1.0f;
             const float nutR = swW * 0.34f;
-            g.setColour (juce::Colour::fromRGB (165, 168, 172));
+            g.setColour (juce::Colour::fromRGB (static_cast<juce::uint8> (165 * kScale),
+                                                static_cast<juce::uint8> (168 * kScale),
+                                                static_cast<juce::uint8> (172 * kScale)));
             g.fillEllipse (cx - nutR, cy - nutR, nutR * 2.0f, nutR * 2.0f);
             const float tipR = swW * 0.19f;
-            g.setColour (juce::Colour::fromRGB (228, 232, 238));
+            g.setColour (juce::Colour::fromRGB (static_cast<juce::uint8> (228 * kScale),
+                                                static_cast<juce::uint8> (232 * kScale),
+                                                static_cast<juce::uint8> (238 * kScale)));
             g.fillEllipse (cx - tipR, cy - tipR, tipR * 2.0f, tipR * 2.0f);
         }
         else
         {
             const bool isUp = ts.threeWay ? (val >= 2) : (val >= 1);
-            const auto& img = isUp ? imgs.toggleUp : imgs.toggleDown;
+            const juce::Image img = tintForPedal (isUp ? imgs.toggleUp : imgs.toggleDown);
             if (img.isValid())
                 g.drawImage (img, juce::Rectangle<float> (cx - swW * 0.50f, cy - swH * 0.5147f, swW, swH),
                              juce::RectanglePlacement::stretchToFit);
@@ -5129,7 +5139,7 @@ void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bas
     if (spec.artKey < 0)
     {
         const int cabIdx = static_cast<int> (std::lround (audioProcessor.apvts.getRawParameterValue (MiAmpParams::xvCab)->load()));
-        const auto& cabImg = (cabIdx == 0) ? imgs.xvCabBass : (cabIdx == 1 ? imgs.xvCabPunk : imgs.xvCabClean);
+        const juce::Image cabImg = tintForPedal ((cabIdx == 0) ? imgs.xvCabBass : (cabIdx == 1 ? imgs.xvCabPunk : imgs.xvCabClean));
         if (cabImg.isValid())
         {
             const auto cr = juce::Rectangle<float> (
@@ -5245,7 +5255,7 @@ void MiAmpAudioProcessorEditor::paintRigOnly (juce::Graphics& g, float yOff, flo
         {
             if (cSpec.isOff)
             {
-                auto dimmed = miamp_rig::makeDimmedCabImage (cImg, 0.44f);
+                auto dimmed = miamp_rig::getCachedDimmedImage (cImg, 0.56f, 0.72f);
                 g.setOpacity (0.94f);
                 g.drawImage (dimmed, toScreen (cabR.getX(), cabR.getY(), cabR.getWidth(), cabR.getHeight()),
                              juce::RectanglePlacement::stretchToFit, false);
@@ -5550,20 +5560,16 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
             const float artH = static_cast<float> (pSpec.natH) * scFit;
             const auto artR = juce::Rectangle<float> (sr.getCentreX() - artW * 0.5f, sr.getCentreY() - artH * 0.5f, artW, artH);
 
-            // Dim bypassed pedals visually on the board so active vs bypassed is immediately clear
+            // Dim bypassed pedals strictly within their PNG alpha contour (no rectangular ghost border)
             g.setOpacity (isBeingDragged ? 0.25f : 1.0f);
 
-            if (pImg.isValid())
-                g.drawImage (pImg, artR, juce::RectanglePlacement::stretchToFit);
+            const juce::Image drawImg = (active || ! pImg.isValid())
+                                            ? pImg
+                                            : miamp_rig::getCachedDimmedImage (pImg, 0.54f, 0.82f);
+            if (drawImg.isValid())
+                g.drawImage (drawImg, artR, juce::RectanglePlacement::stretchToFit);
 
-            paintMiniPedalKnobs (g, bass, pt, artR);
-
-            if (! active && ! isBeingDragged)
-            {
-                g.setColour (juce::Colour::fromRGBA (8, 12, 14, 138));
-                g.fillRoundedRectangle (artR, 8.0f * s);
-                paintPedalStateOverlays (g, bass, pt, artR, false);
-            }
+            paintMiniPedalKnobs (g, bass, pt, artR, ! active);
             g.setOpacity (1.0f);
 
             if (pt == sel && showEd && ! isBeingDragged)
@@ -5601,11 +5607,14 @@ void MiAmpAudioProcessorEditor::paintFloorScene (juce::Graphics& g)
 
         const bool active = audioProcessor.apvts.getRawParameterValue (pedalBypassParamId (bass, draggingPedalType))->load() > 0.5f;
         const auto& gImg = pedalImage (bass, draggingPedalType, active);
-        if (gImg.isValid())
+        const juce::Image drawDragImg = (active || ! gImg.isValid())
+                                            ? gImg
+                                            : miamp_rig::getCachedDimmedImage (gImg, 0.54f, 0.82f);
+        if (drawDragImg.isValid())
         {
             g.setOpacity (0.96f);
-            g.drawImage (gImg, ghostR, juce::RectanglePlacement::stretchToFit);
-            paintMiniPedalKnobs (g, bass, draggingPedalType, ghostR);
+            g.drawImage (drawDragImg, ghostR, juce::RectanglePlacement::stretchToFit);
+            paintMiniPedalKnobs (g, bass, draggingPedalType, ghostR, ! active);
             g.setOpacity (1.0f);
         }
 

@@ -234,7 +234,7 @@ private:
     void paintRigOnly (juce::Graphics& g, float yOffsetStage = 0.0f, float opacity = 1.0f);
     void paintFloorScene (juce::Graphics& g);
     void paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> r, float radius = 22.0f, float alpha = 1.0f) const;
-    void paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const;
+    void paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect, bool dimmed = false) const;
     void paintPedalStateOverlays (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect, bool active) const;
 
     void mouseDown (const juce::MouseEvent& e) override;

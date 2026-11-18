@@ -73,26 +73,67 @@ private:
 };
 
 //==============================================================================
-// Helpers: dimmed cab (only used on stage rig), plus dedicated .WAV IR & DIRECT DI icons
-inline juce::Image makeDimmedCabImage (const juce::Image& src, float brightness = 0.42f)
+// Helpers: safe non-mutating dimmed image (clones & caches so ImageCache is never mutated),
+// plus dedicated .WAV IR & DIRECT DI icons
+inline juce::Image makeDimmedCabImage (const juce::Image& src, float brightness = 0.56f, float satKeep = 0.72f)
 {
     if (! src.isValid()) return {};
-    auto dim = src.convertedToFormat (juce::Image::ARGB);
-    dim.desaturate();
-    juce::Image::BitmapData bd (dim, juce::Image::BitmapData::readWrite);
+    auto copy = src.createCopy();
+    auto dim  = (copy.getFormat() == juce::Image::ARGB)
+                    ? std::move (copy)
+                    : copy.convertedToFormat (juce::Image::ARGB);
+    dim.duplicateIfShared();
+
     const int mult = juce::roundToInt (juce::jlimit (0.0f, 1.0f, brightness) * 256.0f);
+    const int satQ = juce::roundToInt (juce::jlimit (0.0f, 1.0f, satKeep) * 256.0f);
+    const int invSatQ = 256 - satQ;
+
+    juce::Image::BitmapData bd (dim, juce::Image::BitmapData::readWrite);
     for (int y = 0; y < bd.height; ++y)
     {
         auto* row = bd.getLinePointer (y);
         for (int x = 0; x < bd.width; ++x)
         {
             auto* px = row + x * bd.pixelStride;
-            px[juce::PixelARGB::indexR] = static_cast<juce::uint8> ((px[juce::PixelARGB::indexR] * mult) >> 8);
-            px[juce::PixelARGB::indexG] = static_cast<juce::uint8> ((px[juce::PixelARGB::indexG] * mult) >> 8);
-            px[juce::PixelARGB::indexB] = static_cast<juce::uint8> ((px[juce::PixelARGB::indexB] * mult) >> 8);
+            const int r = px[juce::PixelARGB::indexR];
+            const int g = px[juce::PixelARGB::indexG];
+            const int b = px[juce::PixelARGB::indexB];
+            const int lum = (r * 77 + g * 150 + b * 29) >> 8;
+            const int sr = (r * satQ + lum * invSatQ) >> 8;
+            const int sg = (g * satQ + lum * invSatQ) >> 8;
+            const int sb = (b * satQ + lum * invSatQ) >> 8;
+            px[juce::PixelARGB::indexR] = static_cast<juce::uint8> ((sr * mult) >> 8);
+            px[juce::PixelARGB::indexG] = static_cast<juce::uint8> ((sg * mult) >> 8);
+            px[juce::PixelARGB::indexB] = static_cast<juce::uint8> ((sb * mult) >> 8);
         }
     }
     return dim;
+}
+
+inline juce::Image getCachedDimmedImage (const juce::Image& src, float brightness = 0.56f, float satKeep = 0.72f)
+{
+    if (! src.isValid()) return {};
+
+    const int bKey = juce::roundToInt (juce::jlimit (0.0f, 1.0f, brightness) * 1000.0f);
+    const int sKey = juce::roundToInt (juce::jlimit (0.0f, 1.0f, satKeep) * 1000.0f);
+    const int key  = (bKey << 10) | sKey;
+
+    struct CacheEntry { juce::Image orig; int key = 0; juce::Image dimmed; };
+    static juce::CriticalSection cacheLock;
+    static std::vector<CacheEntry> cache;
+
+    const juce::ScopedLock sl (cacheLock);
+    for (const auto& entry : cache)
+    {
+        if (entry.key == key && entry.orig == src)
+            return entry.dimmed;
+    }
+
+    auto dimmed = makeDimmedCabImage (src, brightness, satKeep);
+    if (cache.size() >= 72)
+        cache.erase (cache.begin());
+    cache.push_back ({ src, key, dimmed });
+    return dimmed;
 }
 
 inline void paintCabOffSign (juce::Graphics& g, juce::Point<float> centre, float diam)
