@@ -6,10 +6,10 @@
 #include <algorithm>
 #include "XVBassDSP.h"
 #include "XVPitchShifter.h"
-#include "ZenboxCabIRs.h"
+#include "MiAmpCabIRs.h"
 #include "MiAmpBoutiquePedalsDSP.h"
 
-namespace zenbox
+namespace miamp_gtr
 {
 
 enum class GuitarPedalType : int
@@ -32,19 +32,19 @@ enum class GuitarPedalType : int
 
 struct GuitarControlSnapshot
 {
-    // Global Utility (Zenbox top/side bar)
+    // Global Utility (MI AMP top/side bar)
     float inputGain  = 50.0f; // 0..100 -> -12..+12 dB
     float gateThresh = 18.0f; // 0..100 (0 = off)
     bool  os4x       = true;  // 4x Oversampling
-    int   cabIndex   = 1;     // 0..3 = 4 Zenbox Cabs, 4 = CAB OFF
+    int   cabIndex   = 1;     // 0..3 = 4 Classic Cabs, 4 = CAB OFF
 
     // Amp switches & Model Selection
-    int   headModel  = 0;     // 0=800, 1=Plexi, 2=Recto, 3=6505, 4=AC30, 5=Rocker, 6=BE100, 7=Twin, 8=Zenbox
+    int   headModel  = 0;     // 0=800, 1=Plexi, 2=Recto, 3=6505, 4=AC30, 5=Rocker, 6=BE100, 7=Twin, 8=MI AMP Classic
     bool  useExternalCabEngine = true;
     bool  ampPower   = true;
     bool  ampStandby = false;
     bool  ampModeBright = true; // MODE switch = 70s Bright Cap
-    int   activeChannel = 1;    // 0 = CH1 (Clean/Breakup), 1 = CH2 (Zenbox Crunch), 2 = CH3 (Punk Lead)
+    int   activeChannel = 1;    // 0 = CH1 (Clean/Breakup), 1 = CH2 (Classic Crunch), 2 = CH3 (Punk Lead)
 
     // 3 Channels x 6 knobs (Gain, Bass, Mid, Treble, Presence, Master) + Output
     std::array<float, 3> chGain     { 38.0f, 56.0f, 74.0f };
@@ -222,7 +222,7 @@ private:
 };
 
 //==============================================================================
-// Zenbox Screamer / Classic Overdrive Pedal (MI GREEN DRIVE)
+// Classic Screamer / Overdrive Pedal (MI GREEN DRIVE)
 class GuitarDriveFX
 {
 public:
@@ -547,8 +547,8 @@ private:
 };
 
 //==============================================================================
-// 512-Tap Zero-Latency Guitar Cabinet Convolver (4 Zenbox Cabs, auto-resampled)
-class ZenboxCabConvolver
+// 512-Tap Zero-Latency Guitar Cabinet Convolver (4 Classic Cabs, auto-resampled)
+class MiAmpCabConvolver
 {
 public:
     void prepare (double sampleRate)
@@ -605,8 +605,8 @@ private:
 };
 
 //==============================================================================
-// Multi-Model Guitar Amp Head Processor (8 Classic Modeled Amps + Zenbox Mint)
-class ZenboxHeadProcessor
+// Multi-Model Guitar Amp Head Processor (8 Classic Modeled Amps + MI AMP Classic)
+class MiAmpHeadProcessor
 {
 public:
     void prepare (double sampleRate)
@@ -734,7 +734,7 @@ public:
                     bassHz = 82.0; midHz = 480.0; trebHz = 3100.0; presHz = 4800.0;
                     brightDb = (snap.ampModeBright || snap.bright2) ? 4.8 : 0.0;
                     break;
-                default: // 8: MI AMP ZENBOX (Original v24 signature voicing)
+                default: // 8: MI AMP CLASSIC (Original signature voicing)
                     hpfHz = (ch == 0) ? 78.0 : (ch == 1 ? 105.0 : 118.0);
                     midFocusHz = (ch == 2 ? 1550.0 : 1200.0);
                     midFocusDb = (ch == 0) ? 1.0 : (ch == 1 ? 2.8 : 3.4);
@@ -820,7 +820,7 @@ public:
                 drive2 = 0.92f + gn * 0.95f;
                 symBias = 0.03f;
                 break;
-            default: // 8: ZENBOX
+            default: // 8: MI AMP CLASSIC
                 drive1 = (ch == 0) ? (1.15f + gn * 4.5f) : (ch == 1 ? (2.4f + gn * 11.5f) : (4.4f + gn * 22.0f));
                 drive2 = (ch == 0) ? (1.0f  + gn * 1.4f) : (ch == 1 ? (1.65f + gn * 4.8f) : (2.7f + gn * 8.2f));
                 symBias = (ch == 0) ? 0.06f : -0.18f;
@@ -926,7 +926,7 @@ private:
     xvdsp::Biquad millerLpfOs, aaLpfOs1, aaLpfOs2, aaLpf1x;
     xvdsp::Biquad eqBass, eqMid, eqTreble, eqPresence;
     GuitarReverbFX springRev;
-    ZenboxCabConvolver cab;
+    MiAmpCabConvolver cab;
 
     float prevIn = 0.0f, prevJcmIn = 0.0f, sagEnv = 0.0f, tremPhase = 0.0f;
     float muteSmooth = 1.0f, cabSmooth = 1.0f;
@@ -1059,7 +1059,7 @@ private:
     mipedals::BoutiqueNoiseGateFX gatePedal;
     mipedals::BoutiqueOctaverFX octaver;
     mipedals::Boutique7BandEQFX eq7;
-    ZenboxHeadProcessor head;
+    MiAmpHeadProcessor head;
 };
 
 class MiAmpGuitarChainDSP
@@ -1099,4 +1099,4 @@ private:
     std::vector<MiAmpGuitarChannel> channels;
 };
 
-} // namespace zenbox
+} // namespace miamp_gtr

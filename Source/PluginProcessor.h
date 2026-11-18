@@ -102,7 +102,7 @@ namespace MiAmpParams
     inline constexpr const char* gtrChPresence[3] = { "gtr_ch1_presence", "gtr_ch2_presence", "gtr_ch3_presence" };
     inline constexpr const char* gtrChMaster[3]   = { "gtr_ch1_master",   "gtr_ch2_master",   "gtr_ch3_master" };
 
-    // Guitar Pedalboard Slots (-1 = Empty, 0..12 = zenbox::GuitarPedalType)
+    // Guitar Pedalboard Slots (-1 = Empty, 0..12 = miamp_gtr::GuitarPedalType)
     inline constexpr const char* gtrSlot[10] = {
         "gtr_slot_0", "gtr_slot_1", "gtr_slot_2", "gtr_slot_3", "gtr_slot_4",
         "gtr_slot_5", "gtr_slot_6", "gtr_slot_7", "gtr_slot_8", "gtr_slot_9"
@@ -124,7 +124,7 @@ namespace MiAmpParams
     inline constexpr const char* gtrEqBand[7]  = { "gtr_eq_0", "gtr_eq_1", "gtr_eq_2", "gtr_eq_3", "gtr_eq_4", "gtr_eq_5", "gtr_eq_6" };
 
     // Expanded Head & Cab Selection + Extended Amp Controls (v25)
-    inline constexpr const char* gtrHeadModel  = "gtr_head_model"; // 0..7 new + 8=Zenbox
+    inline constexpr const char* gtrHeadModel  = "gtr_head_model"; // 0..7 new + 8=MI AMP Classic
     inline constexpr const char* gtrResonance  = "gtr_resonance";
     inline constexpr const char* gtrVol2       = "gtr_vol2";
     inline constexpr const char* gtrCleanBass  = "gtr_clean_bass";
@@ -325,7 +325,7 @@ public:
     void loadUserPreset (int index);
 
     miamp::BassControlSnapshot getBassSnapshot() const noexcept { return readBassSnapshot(); }
-    zenbox::GuitarControlSnapshot getGuitarSnapshot() const noexcept { return readGuitarSnapshot(); }
+    miamp_gtr::GuitarControlSnapshot getGuitarSnapshot() const noexcept { return readGuitarSnapshot(); }
     miamp::CabMicSnapshot getCabMicSnapshot() const noexcept { return readCabMicSnapshot(); }
     miamp::StudioFxSnapshot getStudioFxSnapshot() const noexcept { return readStudioFxSnapshot(); }
     bool loadCustomCabIR (bool forBass, const juce::File& file);
@@ -346,7 +346,7 @@ public:
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     miamp::BassControlSnapshot readBassSnapshot() const noexcept;
-    zenbox::GuitarControlSnapshot readGuitarSnapshot() const noexcept;
+    miamp_gtr::GuitarControlSnapshot readGuitarSnapshot() const noexcept;
     miamp::CabMicSnapshot readCabMicSnapshot() const noexcept;
     miamp::StudioFxSnapshot readStudioFxSnapshot() const noexcept;
     static float dbToXvKnob (float db) noexcept { return std::clamp (((db + 12.0f) / 24.0f) * 100.0f, 0.0f, 100.0f); }
@@ -356,7 +356,7 @@ private:
     void saveUserPresetsToDisk() const;
 
     miamp::MiAmpBassChainDSP bassDsp;
-    zenbox::MiAmpGuitarChainDSP guitarDsp;
+    miamp_gtr::MiAmpGuitarChainDSP guitarDsp;
     miamp::MiAmpCabMicDSP cabMicDsp;
     miamp::MiAmpStudioFxDSP studioFxDsp;
     juce::String customGtrIrPath, customGtrIrName;

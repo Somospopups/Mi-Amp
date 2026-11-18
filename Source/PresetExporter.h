@@ -1,6 +1,6 @@
 #pragma once
 #include "PluginProcessor.h"
-#include "DSP/ZenboxCabIRs.h"
+#include "DSP/MiAmpCabIRs.h"
 #include "DSP/XVBassDSP.h"
 #include "DSP/MiAmpBoutiquePedalsDSP.h"
 #include "DSP/MiAmpGuitarChainDSP.h"
@@ -115,7 +115,7 @@ public:
         return s;
     }
 
-    static zenbox::GuitarControlSnapshot snapshotFromGuitarPreset (const MiAmpAudioProcessor& proc, const MiAmpGuitarPreset& p)
+    static miamp_gtr::GuitarControlSnapshot snapshotFromGuitarPreset (const MiAmpAudioProcessor& proc, const MiAmpGuitarPreset& p)
     {
         auto s = proc.getGuitarSnapshot();
         s.headBypass    = p.headBypass;
@@ -184,7 +184,7 @@ public:
 
     static CaptureDataset captureChain (bool bass,
                                         const miamp::BassControlSnapshot& bassIn,
-                                        const zenbox::GuitarControlSnapshot& gtrIn,
+                                        const miamp_gtr::GuitarControlSnapshot& gtrIn,
                                         int lengthSamples = 384)
     {
         constexpr double kSr = 48000.0;
@@ -228,7 +228,7 @@ public:
             snap.gateThresh   = 0.0f;
             snap.gatePedalOn  = false;
             snap.pitchEnabled = false;
-            zenbox::MiAmpGuitarChannel chain;
+            miamp_gtr::MiAmpGuitarChannel chain;
             chain.prepare (kSr, 0);
             for (int n = 0; n < total; ++n)
                 out[static_cast<size_t> (n)] = chain.processSample (sig[static_cast<size_t> (n)], snap);
@@ -945,7 +945,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportNamA2 (bool bass,
                              const miamp::BassControlSnapshot& bassSnap,
-                             const zenbox::GuitarControlSnapshot& gtrSnap,
+                             const miamp_gtr::GuitarControlSnapshot& gtrSnap,
                              const juce::String& presetName,
                              const juce::File& outFile,
                              float* outEsr = nullptr)
@@ -981,7 +981,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportNamA1 (bool bass,
                              const miamp::BassControlSnapshot& bassSnap,
-                             const zenbox::GuitarControlSnapshot& gtrSnap,
+                             const miamp_gtr::GuitarControlSnapshot& gtrSnap,
                              const juce::String& presetName,
                              const juce::File& outFile,
                              float* outEsr = nullptr)
@@ -1023,7 +1023,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportNamLstm (bool bass,
                                const miamp::BassControlSnapshot& bassSnap,
-                               const zenbox::GuitarControlSnapshot& gtrSnap,
+                               const miamp_gtr::GuitarControlSnapshot& gtrSnap,
                                const juce::String& presetName,
                                const juce::File& outFile,
                                float* outEsr = nullptr)
@@ -1066,7 +1066,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportAidaX (bool bass,
                              const miamp::BassControlSnapshot& bassSnap,
-                             const zenbox::GuitarControlSnapshot& gtrSnap,
+                             const miamp_gtr::GuitarControlSnapshot& gtrSnap,
                              const juce::String& presetName,
                              const juce::File& outFile,
                              float* outEsr = nullptr)
@@ -1116,7 +1116,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportGuitarMlJson (bool bass,
                                     const miamp::BassControlSnapshot& bassSnap,
-                                    const zenbox::GuitarControlSnapshot& gtrSnap,
+                                    const miamp_gtr::GuitarControlSnapshot& gtrSnap,
                                     int hiddenSize,
                                     const juce::File& outFile,
                                     float* outEsr = nullptr)
@@ -1158,7 +1158,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportIrWav44k24Bit (bool bass,
                                      const miamp::BassControlSnapshot& snap,
-                                     const zenbox::GuitarControlSnapshot& gsnap,
+                                     const miamp_gtr::GuitarControlSnapshot& gsnap,
                                      const juce::File& outFile)
     {
         constexpr int kSr  = 44100;
@@ -1221,7 +1221,7 @@ public:
             mipedals::Boutique7BandEQFX eq7;
             eq7.prepare (kSr, false);
 
-            zenbox::ZenboxCabConvolver cab;
+            miamp_gtr::MiAmpCabConvolver cab;
             cab.prepare (kSr);
             const bool cabEnabled = (gsnap.cabIndex >= 0 && gsnap.cabIndex < 8);
             const int cabIdx = std::clamp (gsnap.cabIndex, 0, 6) % 4;
@@ -1287,7 +1287,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportBlackboxGuide (bool bass,
                                      const miamp::BassControlSnapshot& s,
-                                     const zenbox::GuitarControlSnapshot& gs,
+                                     const miamp_gtr::GuitarControlSnapshot& gs,
                                      const juce::String& presetName,
                                      const juce::File& outFile)
     {
@@ -1335,7 +1335,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportHelixHlx (bool bass,
                                 const miamp::BassControlSnapshot& s,
-                                const zenbox::GuitarControlSnapshot& gs,
+                                const miamp_gtr::GuitarControlSnapshot& gs,
                                 const juce::String& presetName,
                                 const juce::File& outFile)
     {
@@ -1363,7 +1363,7 @@ public:
     // -------------------------------------------------------------------------
     static bool exportHeadrushRig (bool bass,
                                    const miamp::BassControlSnapshot& s,
-                                   const zenbox::GuitarControlSnapshot& gs,
+                                   const miamp_gtr::GuitarControlSnapshot& gs,
                                    const juce::String& presetName,
                                    const juce::File& outFile)
     {

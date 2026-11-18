@@ -166,6 +166,25 @@ void MiAmpAudioProcessorEditor::GlassLookAndFeel::drawButtonBackground (
         return;
     }
 
+    if (id == "cabTabCabs" || id == "cabTabMics")
+    {
+        const bool active = b.getToggleState();
+        const float rad = r.getHeight() * 0.5f;
+        if (active)
+        {
+            g.setColour (juce::Colour::fromRGBA (166, 223, 201, highlighted ? 105 : 88));
+            g.fillRoundedRectangle (r, rad);
+            g.setColour (juce::Colour::fromRGBA (255, 255, 255, 90));
+            g.drawRoundedRectangle (r, rad, 1.0f);
+        }
+        else if (highlighted || down)
+        {
+            g.setColour (juce::Colour::fromRGBA (255, 250, 236, 36));
+            g.fillRoundedRectangle (r, rad);
+        }
+        return;
+    }
+
     const bool active = b.getToggleState();
 
     if (active)
@@ -1627,12 +1646,7 @@ public:
     void paint (juce::Graphics& g) override
     {
         const auto r = getLocalBounds().toFloat().reduced (0.75f);
-        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 88), r.getX(), r.getY(),
-                                   juce::Colour::fromRGBA (45, 48, 40, 215), r.getRight(), r.getBottom(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (r, 22.0f);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 158));
-        g.drawRoundedRectangle (r, 22.0f, 1.5f);
+        miamp_theme::paintFrostedGlassPanel (g, r, 22.0f);
 
         auto inner = r.reduced (18.0f, 16.0f);
         g.setColour (inkColour());
@@ -2218,11 +2232,8 @@ private:
         void paint (juce::Graphics& g) override
         {
             const auto r = getLocalBounds().toFloat().reduced (0.5f);
-            g.setColour (juce::Colour::fromRGBA (20, 24, 22, 130));
-            g.fillRoundedRectangle (r, 8.0f);
-            g.setColour (juce::Colour::fromRGBA (241, 224, 190, 55));
-            g.drawRoundedRectangle (r, 8.0f, 1.0f);
-            g.setColour (juce::Colour::fromRGBA (241, 228, 205, 170));
+            miamp_theme::paintGlassSubPanel (g, r, 8.0f);
+            g.setColour (juce::Colour::fromRGBA (250, 243, 227, 210));
             g.setFont (sansFont (9.2f));
             g.drawFittedText (miamp_i18n::tr (miamp_i18n::Msg::ExportProprietaryNote),
                               getLocalBounds().reduced (8, 5), juce::Justification::centredLeft, 3);
@@ -2232,7 +2243,7 @@ private:
     void openExportView (const juce::String& presetName,
                          bool targetIsBass,
                          const miamp::BassControlSnapshot& bassSnap,
-                         const zenbox::GuitarControlSnapshot& gtrSnap,
+                         const miamp_gtr::GuitarControlSnapshot& gtrSnap,
                          std::function<void()> applyForMiAmpXml)
     {
         exportTargetName     = presetName;
@@ -2607,7 +2618,7 @@ private:
     juce::String exportTargetName, exportStatusMsg;
     bool exportTargetIsBass = false;
     miamp::BassControlSnapshot exportTargetBassSnap;
-    zenbox::GuitarControlSnapshot exportTargetGtrSnap;
+    miamp_gtr::GuitarControlSnapshot exportTargetGtrSnap;
     std::function<void()> exportApplyForXml;
 
     juce::TextButton btnDropToggle;
@@ -2660,12 +2671,7 @@ public:
         g.fillRect (getLocalBounds());
 
         const auto card = editor.toScreen (465, 240, 620, 250);
-        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 82), card.getX(), card.getY(),
-                                   juce::Colour::fromRGBA (38, 44, 38, 232), card.getRight(), card.getBottom(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (card, 20.0f * s);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 165));
-        g.drawRoundedRectangle (card, 20.0f * s, 1.5f);
+        miamp_theme::paintFrostedGlassPanel (g, card, 20.0f * s);
 
         g.setColour (mintBorder());
         g.setFont (sansFont (juce::jmax (10.5f, 12.5f * s), juce::Font::bold));
@@ -2822,37 +2828,15 @@ MiAmpAudioProcessorEditor::MiAmpAudioProcessorEditor (MiAmpAudioProcessor& p)
             layoutAll();
             repaint();
         },
-        [this]
+        [this] (bool micMode)
         {
-            cabMicZoom = false;
-            if (cabPickerPanel) cabPickerPanel->setMicZoom (false);
-            if (cabMicsPanel) cabMicsPanel->setMicZoomActive (false);
+            cabMicZoom = micMode;
             layoutAll();
             repaint();
         },
         [this] { if (rigBrowser) rigBrowser->openWavChooser(); });
     cabPickerPanel->setLookAndFeel (&glassLaf);
     addChildComponent (*cabPickerPanel);
-
-    cabMicsPanel = std::make_unique<miamp_rig::CabMicsPanel> (
-        audioProcessor,
-        [this]
-        {
-            if (cabPickerPanel && cabMicZoom) cabPickerPanel->repaint();
-            syncHeadControls();
-            layoutAll();
-            repaint();
-        },
-        [this]
-        {
-            cabMicZoom = ! cabMicZoom;
-            if (cabPickerPanel) cabPickerPanel->setMicZoom (cabMicZoom);
-            if (cabMicsPanel) cabMicsPanel->setMicZoomActive (cabMicZoom);
-            layoutAll();
-            repaint();
-        });
-    cabMicsPanel->setLookAndFeel (&glassLaf);
-    addChildComponent (*cabMicsPanel);
 
     // Bottom Analog Console Strip Controls
     auto cycleHead = [this] (int delta)
@@ -3242,8 +3226,6 @@ MiAmpAudioProcessorEditor::~MiAmpAudioProcessorEditor()
     }
     if (cabPickerPanel != nullptr)
         cabPickerPanel->setLookAndFeel (nullptr);
-    if (cabMicsPanel != nullptr)
-        cabMicsPanel->setLookAndFeel (nullptr);
     if (rigBrowser != nullptr)
         rigBrowser->setLookAndFeel (nullptr);
     if (studioFxModal != nullptr)
@@ -3735,7 +3717,7 @@ void MiAmpAudioProcessorEditor::computeRigStageLayout (
                 case 5: return { 0.825f, 0.036f }; // 4x12 tangerine
                 case 6: return { 0.843f, 0.029f }; // 2x12 twin
                 case 7:
-                case 8: return { 0.820f, 0.036f }; // 4x12 MI ZENBOX (Mint) + Custom IR
+                case 8: return { 0.820f, 0.036f }; // 4x12 MI CLASSIC (Mint) + Custom IR
                 default: return { 0.820f, 0.036f };
             }
         }
@@ -3962,15 +3944,6 @@ void MiAmpAudioProcessorEditor::syncHeadControls()
         {
             cabPickerPanel->setMicZoom (cabMicZoom);
             cabPickerPanel->refresh();
-        }
-    }
-    if (cabMicsPanel)
-    {
-        cabMicsPanel->setVisible (showCabDrawer);
-        if (showCabDrawer)
-        {
-            cabMicsPanel->setMicZoomActive (cabMicZoom);
-            cabMicsPanel->refresh();
         }
     }
 
@@ -4596,9 +4569,7 @@ void MiAmpAudioProcessorEditor::layoutAll()
         btnDockConfig.setBounds      (toScreenInt (1303, 336, 199, 36));
 
         if (cabPickerPanel)
-            cabPickerPanel->setBounds (toScreenInt (28, 25, 420, consoleOpen ? 595 : 554));
-        if (cabMicsPanel)
-            cabMicsPanel->setBounds (toScreenInt (28, 591, 420, 150));
+            cabPickerPanel->setBounds (toScreenInt (28, 25, 420, consoleOpen ? 595 : 716));
 
         // Mirrored side head-selector arrows flanking the active amp head
         const float axLeft  = juce::jmap (cabDrawerAnim, 211.0f, 472.0f);
@@ -4700,7 +4671,7 @@ void MiAmpAudioProcessorEditor::layoutAll()
         }
         else
         {
-            // Classic Zenbox Mint Guitar Head (head_zenbox_mint.png: 19 knobs, 3 switches)
+            // Classic MI AMP Mint Guitar Head (head_miamp_mint.png: 19 knobs, 3 switches)
             const float wStage = headR.getWidth() * 0.043f;
             static constexpr float kZenCols[9] = { 0.228f, 0.292f, 0.355f, 0.456f, 0.519f, 0.581f, 0.662f, 0.725f, 0.788f };
             for (int i = 0; i < 9; ++i)
@@ -4856,13 +4827,7 @@ void MiAmpAudioProcessorEditor::syncPalettePositions()
 
 void MiAmpAudioProcessorEditor::paintGlassPanel (juce::Graphics& g, juce::Rectangle<float> r, float radius, float alpha) const
 {
-    const float rad = radius * stageScale();
-    juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, static_cast<uint8_t> (74.0f * alpha)), r.getX(), r.getY(),
-                               juce::Colour::fromRGBA (53, 54, 45, static_cast<uint8_t> (178.0f * alpha)), r.getRight(), r.getBottom(), false);
-    g.setGradientFill (grad);
-    g.fillRoundedRectangle (r, rad);
-    g.setColour (juce::Colour::fromRGBA (255, 243, 210, static_cast<uint8_t> (158.0f * alpha)));
-    g.drawRoundedRectangle (r, rad, 1.5f);
+    miamp_theme::paintFrostedGlassPanel (g, r, radius * stageScale(), alpha);
 }
 
 void MiAmpAudioProcessorEditor::paintMiniPedalKnobs (juce::Graphics& g, bool bassMode, int type, juce::Rectangle<float> pedalRect) const

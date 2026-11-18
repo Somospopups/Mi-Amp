@@ -20,10 +20,11 @@ Documento de referencia técnica integral para retomar el desarrollo de **MI AMP
 | `Source/PluginEditor.h` / `.cpp` | Escenario principal (`paintHeadScene`, `paintFloorScene`, `paintOverChildren`), animación de intro, `computeRigStageLayout()`, controles dinámicos sobre `headR`, popovers laterales, consola inferior, pedalboard y drag-and-drop. |
 | `Source/AmpCatalogSpecs.h` | Catálogo visual y calibración normalizada (`0..1`) de **18 cabezales** (9 guitarra + 9 bajo) y **10 cajas guitarra / 9 cajas bajo** (`grilleX/Y/W/H`, `knobs`, `switches`, `sliders`). |
 | `Source/PedalCatalogSpecs.h` | Especificaciones visuales y parámetros de los pedales de **Guitarra (13)** y **Bajo (14)**. |
-| `Source/RigStageComponents.h` | Componentes de UI del escenario: `RigKnob`, `RigSwitch`, `RigSlider`, `HeadSelectorArrow`, `PedalPaletteItem`, `makeDimmedCabImage`, popover lateral (`CabDrawerPanel` / `PresetDrawer`). |
-| `Source/CabPanels.h` | Cajón de cabinas, controles de microfonía dual (`MI-57` / `MI-87`), fase, distancia, botón `Load Custom IR (.wav)` y estado `CAB OFF (DI)`. |
+| `Source/MiAmpGlassTheme.h` | **Referencia única obligatoria de `Vidrio Claro`**: `paintFrostedGlassPanel`, `paintGlassSubPanel` y `paintGlassCard` compartidas por todos los paneles, popovers y modales. |
+| `Source/RigStageComponents.h` | Componentes de UI del escenario: `RigKnob`, `RigSwitch`, `RigSlider`, `PedalPaletteItem`, `makeDimmedCabImage`, `RigSelectorModal`. |
+| `Source/CabPanels.h` | Panel unificado izquierdo (`28, 25, 420, 716`) con toggle `[ CAJAS | MICRÓFONOS ]`, Hero sin flechas laterales, grilla `5×2`, íconos propios `.WAV IR` y `DIRECT DI`, y controles Dual Mics (`MI-57`/`MI-87`, `MIC MIX`, `ROOM`). |
 | `Source/StudioFxModal.h` | Modal de efectos de estudio post-cab (Gate/Comp/EQ/Delay/Reverb/Limiter master). |
-| `Source/ToneFinderEngine.h` | Buscador inteligente de presets/tonos por género, instrumento y artista; sincronizado con los índices de heads/cabs actuales (`7` = `4x12 MI ZENBOX`, `6` = `8x10 MI CLASSIC`, etc.). |
+| `Source/ToneFinderEngine.h` | Buscador inteligente de presets/tonos por género, instrumento y artista; sincronizado con los índices de heads/cabs actuales (`7` = `4x12 MI CLASSIC`, `6` = `8x10 MI CLASSIC`, etc.). |
 | `Source/PresetExporter.h` | Exportación e importación de presets en disco. |
 | `Source/Localization.h` | Traducciones i18n (`ES` / `EN`). |
 | `Source/AutoUpdater.h` | Chequeo de actualizaciones en GitHub Releases (`Somospopups/Mi-Amp`). |
@@ -35,14 +36,14 @@ Documento de referencia técnica integral para retomar el desarrollo de **MI AMP
 - `MiAmpCabMicDSP.h`: motor de cabinas + microfonía dual + convolución **Custom WAV IR** + modo bypass `CAB OFF`.
 - `MiAmpBoutiquePedalsDSP.h` + `XVBassDSP.h` + `XVBassTuner.h` + `XVPitchShifter.h`: pedales boutique, afinador cromático y pitch shifter polifónico.
 - `MiAmpStudioFxDSP.h`: cadena de efectos de estudio master.
-- `ZenboxCabIRs.h` / `XVCabIRs.h`: respuestas al impulso embebidas en código.
+- `MiAmpCabIRs.h` / `XVCabIRs.h`: respuestas al impulso embebidas en código.
 
 ---
 
 ## 3. Catálogo Actual de Cabezales y Cajas (`Source/AmpCatalogSpecs.h`)
 
 ### Guitarra — 9 Cabezales (`gtr_head_model`, `0..8`)
-`0`: `MI AMP 800` · `1`: `MI AMP PLEXI` · `2`: `MI AMP RECTO` · `3`: `MI AMP HG-120` · `4`: `MI AMP AC-30` · `5`: `MI AMP ROCKER` · `6`: `MI AMP BE-100` · `7`: `MI AMP TWIN` · `8`: `MI AMP ZENBOX` (Mint original).
+`0`: `MI AMP 800` · `1`: `MI AMP PLEXI` · `2`: `MI AMP RECTO` · `3`: `MI AMP HG-120` · `4`: `MI AMP AC-30` · `5`: `MI AMP ROCKER` · `6`: `MI AMP BE-100` · `7`: `MI AMP TWIN` · `8`: `MI AMP CLASSIC` (Mint original).
 
 ### Guitarra — 10 Cajas (`gtr_cab`, `0..9`)
 - `0`: `4x12 GREENBACK` (`cab_4x12_green.png`)
@@ -52,8 +53,8 @@ Documento de referencia técnica integral para retomar el desarrollo de **MI AMP
 - `4`: `2x12 CLASS-A` (`cab_2x12_classa.png`)
 - `5`: `4x12 TANGERINE` (`cab_4x12_tangerine.png`)
 - `6`: `2x12 BLACKFACE` (`cab_2x12_twin.png`)
-- `7`: **`4x12 MI ZENBOX`** (`cab_4x12_zenbox.png`, **880×888 px**, 32-bit RGBA, Mint Tolex original, default)
-- `8`: `CUSTOM WAV IR` (usa `cab_4x12_zenbox.png`, carga `.wav` externo)
+- `7`: **`4x12 MI CLASSIC`** (`cab_4x12_mint.png`, **880×888 px**, 32-bit RGBA, Mint Tolex original, default)
+- `8`: `CUSTOM WAV IR` (usa `cab_4x12_mint.png`, carga `.wav` externo)
 - `9`: `CAB OFF` (`isOff = true`, muestra imagen atenuada de la caja original sin grill/mics)
 
 ### Bajo — 9 Cabezales (`bass_head_model`, `0..8`)
@@ -81,7 +82,7 @@ Revisar siempre estos archivos antes de modificar gráficos o layouts:
 - **Resolución y formato de assets en `Resources/rig/`**:
   - Todos los cabezales son `1200 px` de ancho RGBA sin fondo ni patas sobrantes.
   - Si un cabezal tipo rack (`PRO-450`, `RB-800`, `DB-750`) tiene esquineros cromados, dejar `≥ 5 px` de aire transparente en los bordes laterales y asegurar que el riel horizontal inferior sea continuo por encima de las patas de goma.
-  - Las cajas originales (`4x12 MI ZENBOX` `880×888` y `8x10 MI CLASSIC` `600×1423`) deben guardarse siempre en **PNG 32-bit RGBA puro (`color_type = 6`, sin paleta `PLTE`/`tRNS`)** y mantenerse bajo `1536 px` de altura (evitando el bug de silueta negra en Windows JUCE 8 `libpng` + Direct2D) y por encima de `580 px` de ancho para que `closeUpView` se vea 100% nítido y en color real de 24-bit sin cuantización.
+  - Las cajas originales (`4x12 MI CLASSIC` `880×888` y `8x10 MI CLASSIC` `600×1423`) deben guardarse siempre en **PNG 32-bit RGBA puro (`color_type = 6`, sin paleta `PLTE`/`tRNS`)** y mantenerse bajo `1536 px` de altura (evitando el bug de silueta negra en Windows JUCE 8 `libpng` + Direct2D) y por encima de `580 px` de ancho para que `closeUpView` se vea 100% nítido y en color real de 24-bit sin cuantización.
   - Todo nuevo recurso agregado en `Resources/` debe declararse en `CMakeLists.txt` (`juce_add_binary_data`) para compilar en `BinaryData`.
 
 ---
@@ -93,7 +94,11 @@ Revisar siempre estos archivos antes de modificar gráficos o layouts:
 
 ---
 
-## 6. Estado Alcanzado en esta Entrega (`v26b`)
-- Fixes #1–7 de UI completos (`UI_RULES.md`), limpieza de artefactos en pies de los 18 cabezales, reparación fotorealista completa de los esquineros y riel inferior en `bass_head_svt3pro.png` (`PRO-450`) y `bass_head_gk800.png` (`RB-800`).
-- Cajas originales fotorealistas HD en **32-bit RGBA puro (`ct=6`)** (`cab_4x12_zenbox.png` `880×888` y `bass_cab_8x10_mint.png` `600×1423`) — corrigiendo el fallo de silueta negra en Windows JUCE 8 — sincronizadas en las 10 cajas de guitarra y 9 de bajo junto a `CUSTOM WAV IR` y `CAB OFF`.
-- Documentación completa de creación de fondos (`FONDO_GUIA.md` + `scripts/crear_fondos_mi_amp.py`) y guía técnica (`PROJECT_HANDOFF.md`).
+## 6. Estado Alcanzado en esta Entrega (`v27`)
+- **Selector Unificado `CAJAS ↔ MICRÓFONOS` (`Source/CabPanels.h`)**:
+  - Un solo panel izquierdo de vidrio claro (`28, 25, 420, 716`) con pill toggle **`[ CAJAS | MICRÓFONOS ]`** en la cabecera.
+  - En **`CAJAS`**: Hero grande superior sin flechas `< >` laterales + grilla **`5×2`** completa (los 10 modelos de guitarra / 9 de bajo visibles sin recortes) + íconos propios para **`.WAV IR`** y **`DIRECT DI`** (sin repetir la caja Mint).
+  - En **`MICRÓFONOS`**: el mismo Hero grande muestra la grilla y pines arrastrables `57` / `87`, y debajo aparecen los controles `MI-57 DYN`, `MI-87 COND`, distancia (`CLOSE/MED/FAR`), fase `Ø`, `MIC MIX`, `ROOM` y botón `← VOLVER A CAJAS`.
+- **Vidrio Claro Unificado (`Source/MiAmpGlassTheme.h` + `UI_RULES.md` §7)**: todos los paneles, popovers, modales (`StudioFxModal`, `RigSelectorModal`, `UpdateOverlayComponent`) y tarjetas comparten exactamente el mismo tono `Vidrio Claro` (`(239,222,183,74) → (53,54,45,178)`, borde `(255,243,210,158)`).
+- **Identidad 100% `MI AMP`**: eliminada toda referencia anterior en UI, código C++, recursos y nombres de archivo (`MiAmpCabIRs.h`, `cab_4x12_mint.png`, `head_miamp_mint.png`, `knob_miamp_mint.png`).
+- **Assets RGBA 32-bit (`ct=6`)**: `cab_4x12_mint.png` (`880×888`) y `bass_cab_8x10_mint.png` (`600×1423`) y guía de fondos (`FONDO_GUIA.md` + `scripts/crear_fondos_mi_amp.py`).

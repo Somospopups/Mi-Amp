@@ -4,6 +4,7 @@
 #include "Localization.h"
 #include "AutoUpdater.h"
 #include "AmpCatalogSpecs.h"
+#include "MiAmpGlassTheme.h"
 #include "RigStageComponents.h"
 #include "StudioFxModal.h"
 #include "CabPanels.h"
@@ -312,7 +313,6 @@ private:
     std::unique_ptr<miamp_rig::RigMicBody> mic1Body, mic2Body;
     std::unique_ptr<miamp_rig::HeadSideArrowButton> btnHeadSidePrev, btnHeadSideNext;
     std::unique_ptr<miamp_rig::CabPickerPanel> cabPickerPanel;
-    std::unique_ptr<miamp_rig::CabMicsPanel> cabMicsPanel;
     std::unique_ptr<miamp_rig::RigBrowserOverlay> rigBrowser;
     std::unique_ptr<miamp_rig::StudioFxModal> studioFxModal;
 
@@ -325,7 +325,7 @@ private:
     std::unique_ptr<miamp_rig::StudioMiniKnob> conKnobs[5]; // Gain, Bass, Mid, Treble, Master
     std::unique_ptr<miamp_rig::StudioMiniKnob> conMicMixKnob, conRoomKnob;
 
-    // Legacy Mint Head physical knobs & switches (used when Zenbox/Classic Mint selected)
+    // Legacy Mint Head physical knobs & switches (used when MI AMP Classic Mint selected)
     std::unique_ptr<ImageRotaryKnob> guitarHeadKnobs[19];
     std::unique_ptr<ImageToggleSwitch> guitarHeadSwitches[3];
     std::unique_ptr<ImageRotaryKnob> bassHeadKnobs[5];

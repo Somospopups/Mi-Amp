@@ -35,7 +35,7 @@ struct EqSpec
 struct PedalVisualSpec
 {
     int artKey = 0;       // 0..21 into Images::pedBodies/pedKnobs, -1 = XV Preamp
-    int pedalType = 0;    // zenbox::GuitarPedalType or miamp::PedalType
+    int pedalType = 0;    // miamp_gtr::GuitarPedalType or miamp::PedalType
     const char* name = "";
     const char* shortName = "";
     const char* bypassParamId = nullptr;

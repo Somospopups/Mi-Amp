@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "AmpCatalogSpecs.h"
+#include "MiAmpGlassTheme.h"
 
 namespace miamp_rig
 {
@@ -416,12 +417,7 @@ public:
         g.fillRect (b);
 
         const auto card = b.reduced (b.getWidth() * 0.09f, b.getHeight() * 0.08f);
-        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 86), card.getX(), card.getY(),
-                                   juce::Colour::fromRGBA (42, 44, 38, 226), card.getRight(), card.getBottom(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (card, 22.0f);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 175));
-        g.drawRoundedRectangle (card, 22.0f, 1.5f);
+        miamp_theme::paintFrostedGlassPanel (g, card, 22.0f);
 
         const bool bass = processor.isBassMode();
         const juce::String title = (mode == Mode::Heads)
@@ -440,10 +436,7 @@ public:
         {
             const auto& r = cells[i];
             const bool sel = (static_cast<int> (i) == curIdx);
-            g.setColour (sel ? juce::Colour::fromRGBA (164, 217, 196, 78) : juce::Colour::fromRGBA (255, 255, 255, 18));
-            g.fillRoundedRectangle (r, 12.0f);
-            g.setColour (sel ? juce::Colour::fromRGB (191, 252, 225) : juce::Colour::fromRGBA (255, 243, 210, 68));
-            g.drawRoundedRectangle (r, 12.0f, sel ? 1.8f : 1.0f);
+            miamp_theme::paintGlassCard (g, r, 12.0f, sel, false);
 
             const auto imgBox = r.reduced (10.0f, 8.0f).withTrimmedBottom (34.0f);
             juce::Image thumb;

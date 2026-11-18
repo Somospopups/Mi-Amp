@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "AmpCatalogSpecs.h"
+#include "MiAmpGlassTheme.h"
 #include "RigStageComponents.h"
 #include "StudioFxModal.h"
 #include <cmath>
@@ -37,25 +38,22 @@ public:
 
         juce::ColourGradient grad (
             juce::Colour::fromRGBA (255, 248, 232, highlighted ? 88 : 62), drawR.getX(), drawR.getY(),
-            juce::Colour::fromRGBA (16, 20, 18, highlighted ? 176 : 148), drawR.getX(), drawR.getBottom(), false);
+            juce::Colour::fromRGBA (53, 54, 45, highlighted ? 186 : 168), drawR.getX(), drawR.getBottom(), false);
         grad.addColour (0.48, juce::Colour::fromRGBA (166, 223, 201, highlighted ? 62 : 26));
         g.setGradientFill (grad);
         g.fillRoundedRectangle (drawR, rad);
 
-        // Top specular edge
         g.setColour (juce::Colour::fromRGBA (255, 252, 240, highlighted ? 150 : 105));
         g.drawHorizontalLine (juce::roundToInt (drawR.getY() + 1.0f), drawR.getX() + rad * 0.45f, drawR.getRight() - rad * 0.45f);
 
         g.setColour (highlighted ? juce::Colour::fromRGB (166, 223, 201)
-                                 : juce::Colour::fromRGBA (255, 243, 210, 132));
+                                 : juce::Colour::fromRGBA (255, 243, 210, 158));
         g.drawRoundedRectangle (drawR, rad, 1.3f);
 
-        // Inner vertical glass accent line
         const float accentX = isRight ? (drawR.getX() + 3.5f * sc) : (drawR.getRight() - 3.5f * sc);
         g.setColour (juce::Colour::fromRGBA (255, 248, 232, highlighted ? 120 : 75));
         g.drawVerticalLine (juce::roundToInt (accentX), drawR.getY() + 7.0f * sc, drawR.getBottom() - 7.0f * sc);
 
-        // Double chevron SVG (main + echo), mirrored on right
         const float vw = drawR.getWidth() * 0.58f;
         const float vh = drawR.getHeight() * 0.58f;
         const float vx = drawR.getCentreX() - vw * 0.5f;
@@ -89,7 +87,7 @@ private:
 };
 
 //==============================================================================
-// Helper: draw red circle-slash "OFF / DI" sign matching preview SVG
+// Helpers: dimmed cab (only used on stage rig), plus dedicated .WAV IR & DIRECT DI icons
 inline juce::Image makeDimmedCabImage (const juce::Image& src, float brightness = 0.42f)
 {
     if (! src.isValid()) return {};
@@ -123,39 +121,126 @@ inline void paintCabOffSign (juce::Graphics& g, juce::Point<float> centre, float
     g.drawLine (centre.x - d, centre.y - d, centre.x + d, centre.y + d, stroke);
 }
 
+inline void paintWavIrIcon (juce::Graphics& g, juce::Rectangle<float> box)
+{
+    const float sz = juce::jmin (box.getWidth(), box.getHeight());
+    const auto r = juce::Rectangle<float> (sz, sz).withCentre (box.getCentre());
+    const float u = sz / 64.0f;
+
+    const auto frame = juce::Rectangle<float> (r.getX() + 6.0f * u, r.getY() + 10.0f * u, 52.0f * u, 44.0f * u);
+    g.setColour (juce::Colour::fromRGBA (166, 223, 201, 36));
+    g.fillRoundedRectangle (frame, 10.0f * u);
+    g.setColour (juce::Colour::fromRGB (166, 223, 201));
+    g.drawRoundedRectangle (frame, 10.0f * u, juce::jmax (1.4f, 2.2f * u));
+
+    static constexpr float pts[11][2] = {
+        {13, 30}, {18, 30}, {21, 18}, {25, 42}, {29, 15}, {33, 45}, {37, 21}, {41, 38}, {44, 27}, {47, 30}, {51, 30}
+    };
+    juce::Path wave;
+    wave.startNewSubPath (r.getX() + pts[0][0] * u, r.getY() + pts[0][1] * u);
+    for (int i = 1; i < 11; ++i)
+        wave.lineTo (r.getX() + pts[i][0] * u, r.getY() + pts[i][1] * u);
+    g.setColour (juce::Colour::fromRGB (250, 243, 227));
+    g.strokePath (wave, juce::PathStrokeType (juce::jmax (1.6f, 2.5f * u), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+    g.setColour (juce::Colour::fromRGB (166, 223, 201));
+    g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (7.5f, 8.6f * u), juce::Font::bold)));
+    g.drawText (".WAV IR", frame.getX(), frame.getBottom() - 14.0f * u, frame.getWidth(), 11.0f * u, juce::Justification::centred);
+}
+
+inline void paintDirectDiIcon (juce::Graphics& g, juce::Rectangle<float> box)
+{
+    const float sz = juce::jmin (box.getWidth(), box.getHeight());
+    const auto r = juce::Rectangle<float> (sz, sz).withCentre (box.getCentre());
+    const float u = sz / 64.0f;
+    const auto cx = r.getX() + 32.0f * u;
+    const auto cy = r.getY() + 27.0f * u;
+    const float rad = 18.0f * u;
+    const float d = rad * 0.7071f;
+    const float sw = juce::jmax (2.0f, 3.4f * u);
+
+    g.setColour (juce::Colour::fromRGBA (239, 68, 68, 32));
+    g.fillEllipse (cx - rad, cy - rad, rad * 2.0f, rad * 2.0f);
+    g.setColour (juce::Colour::fromRGB (239, 68, 68));
+    g.drawEllipse (cx - rad, cy - rad, rad * 2.0f, rad * 2.0f, sw);
+    g.drawLine (cx - d, cy - d, cx + d, cy + d, sw);
+
+    g.setColour (juce::Colour::fromRGB (252, 165, 165));
+    g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (7.5f, 8.4f * u), juce::Font::bold)));
+    g.drawText ("DIRECT DI", r.getX(), r.getY() + 49.0f * u, r.getWidth(), 12.0f * u, juce::Justification::centred);
+}
+
 //==============================================================================
-// Left Frosted Glass Cabinet Picker Panel (+ Zoomed Full-Size Mic Stage)
+// Unified Left Frosted-Glass Cabinet & Dual-Mic Panel: [ CAJAS | MICRÓFONOS ]
 class CabPickerPanel final : public juce::Component
 {
 public:
     CabPickerPanel (MiAmpAudioProcessor& proc,
                     std::function<void()> onChanged,
                     std::function<void()> onClose,
-                    std::function<void()> onBackFromMicZoom,
+                    std::function<void(bool)> onModeChanged,
                     std::function<void()> onOpenWav)
         : processor (proc),
           changedCb (std::move (onChanged)),
           closeCb (std::move (onClose)),
-          backCabsCb (std::move (onBackFromMicZoom)),
+          modeCb (std::move (onModeChanged)),
           wavCb (std::move (onOpenWav))
     {
         btnClose.setComponentID ("popoverClose");
         btnClose.onClick = [this] { if (closeCb) closeCb(); };
         addAndMakeVisible (btnClose);
 
-        btnBackCabs.onClick = [this] { if (backCabsCb) backCabsCb(); };
-        addChildComponent (btnBackCabs);
-
-        btnPrev.onClick = [this] { cycleCab (-1); };
-        btnNext.onClick = [this] { cycleCab (+1); };
-        addAndMakeVisible (btnPrev);
-        addAndMakeVisible (btnNext);
+        btnTabCabs.setComponentID ("cabTabCabs");
+        btnTabMics.setComponentID ("cabTabMics");
+        btnTabCabs.setClickingTogglesState (false);
+        btnTabMics.setClickingTogglesState (false);
+        btnTabCabs.onClick = [this] { setModeAndNotify (false); };
+        btnTabMics.onClick = [this] { setModeAndNotify (true); };
+        addAndMakeVisible (btnTabCabs);
+        addAndMakeVisible (btnTabMics);
 
         btnHeroWav.onClick = [this] { if (wavCb) wavCb(); };
-        addChildComponent (btnHeroWav);
+        addAndMakeVisible (btnHeroWav);
 
-        btnFooterWav.onClick = [this] { if (wavCb) wavCb(); };
-        addAndMakeVisible (btnFooterWav);
+        btnBackCabs.onClick = [this] { setModeAndNotify (false); };
+        addChildComponent (btnBackCabs);
+
+        auto bindTog = [this] (juce::TextButton& b, const char* id)
+        {
+            b.setClickingTogglesState (true);
+            b.onClick = [this, &b, id]
+            {
+                setParamPlain (processor.apvts, id, b.getToggleState() ? 1.0f : 0.0f);
+                if (changedCb) changedCb();
+                refresh();
+            };
+            addChildComponent (b);
+        };
+        bindTog (btnMic1On, MiAmpParams::mic1On);
+        bindTog (btnMic1Phase, MiAmpParams::mic1Phase);
+        bindTog (btnMic2On, MiAmpParams::mic2On);
+        bindTog (btnMic2Phase, MiAmpParams::mic2Phase);
+
+        auto bindDist = [this] (juce::TextButton& b, const char* id)
+        {
+            b.onClick = [this, id]
+            {
+                const int cur = static_cast<int> (std::lround (processor.apvts.getRawParameterValue (id)->load()));
+                setParamPlain (processor.apvts, id, static_cast<float> ((cur + 1) % 3));
+                if (changedCb) changedCb();
+                refresh();
+            };
+            addChildComponent (b);
+        };
+        bindDist (btnMic1Dist, MiAmpParams::mic1Dist);
+        bindDist (btnMic2Dist, MiAmpParams::mic2Dist);
+
+        micMixKnob = std::make_unique<StudioMiniKnob> (processor.apvts, MiAmpParams::cabMicMix, "MIC MIX", "%");
+        roomKnob   = std::make_unique<StudioMiniKnob> (processor.apvts, MiAmpParams::cabRoom,   "ROOM", "%");
+        addChildComponent (*micMixKnob);
+        addChildComponent (*roomKnob);
+
+        syncVisibility();
     }
 
     void setMicZoom (bool zoom)
@@ -171,23 +256,27 @@ public:
 
     void refresh()
     {
+        static constexpr const char* kDistTags[3] = { "CLOSE", "MED", "FAR" };
+        btnMic1On.setToggleState    (processor.apvts.getRawParameterValue (MiAmpParams::mic1On)->load() >= 0.5f, juce::dontSendNotification);
+        btnMic1Phase.setToggleState (processor.apvts.getRawParameterValue (MiAmpParams::mic1Phase)->load() >= 0.5f, juce::dontSendNotification);
+        btnMic1Dist.setButtonText   (kDistTags[juce::jlimit (0, 2, static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::mic1Dist)->load())))]);
+
+        btnMic2On.setToggleState    (processor.apvts.getRawParameterValue (MiAmpParams::mic2On)->load() >= 0.5f, juce::dontSendNotification);
+        btnMic2Phase.setToggleState (processor.apvts.getRawParameterValue (MiAmpParams::mic2Phase)->load() >= 0.5f, juce::dontSendNotification);
+        btnMic2Dist.setButtonText   (kDistTags[juce::jlimit (0, 2, static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::mic2Dist)->load())))]);
+
         syncVisibility();
-        resized();
         repaint();
     }
 
     void paint (juce::Graphics& g) override
     {
         const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
+        const float s  = b.getWidth() / 420.0f;
+        const float sy = b.getHeight() / 716.0f;
 
-        // Frosted glass panel background
-        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 74), b.getX(), b.getY(),
-                                   juce::Colour::fromRGBA (53, 54, 45, 184), b.getRight(), b.getBottom(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (b, 20.0f * s);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 158));
-        g.drawRoundedRectangle (b, 20.0f * s, 1.5f);
+        // 1. Canonical Frosted Glass Panel ("Vidrio Claro")
+        miamp_theme::paintFrostedGlassPanel (g, b, 20.0f * s);
 
         const bool bass = processor.isBassMode();
         const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
@@ -197,152 +286,255 @@ public:
         const auto& fallbackCab = cabs[static_cast<size_t> (bass ? 6 : 7)];
         const auto& visualCab = cSpec.isOff ? fallbackCab : cSpec;
 
-        // Header title
+        // 2. Header Title + Pill Switcher Shell [ CAJAS | MICRÓFONOS ]
         g.setColour (juce::Colour::fromRGB (250, 243, 227));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (11.0f, 13.5f * s), juce::Font::bold)));
-        if (cabMicZoom)
-        {
-            const juce::String ttl = juce::String ("MICS \u00b7 ") + (cSpec.isOff ? "DI (SIN CAJA)" : cSpec.displayName);
-            g.drawText (ttl, 98.0f * s, 12.0f * s, 272.0f * s, 26.0f * s, juce::Justification::centredLeft, true);
-        }
-        else
-        {
-            const juce::String ttl = bass ? juce::String::fromUTF8 (u8"CAJAS \u00b7 BAJO")
-                                          : juce::String::fromUTF8 (u8"CAJAS \u00b7 GUITARRA");
-            g.drawText (ttl, 16.0f * s, 12.0f * s, 350.0f * s, 26.0f * s, juce::Justification::centredLeft, true);
-        }
+        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (10.5f, 13.0f * s), juce::Font::bold)));
+        const juce::String ttl = bass ? juce::String::fromUTF8 (u8"CAJAS \u00b7 BAJO")
+                                      : juce::String::fromUTF8 (u8"CAJAS \u00b7 GUITARRA");
+        g.drawFittedText (ttl, juce::roundToInt (16.0f * s), juce::roundToInt (12.0f * s),
+                          juce::roundToInt (152.0f * s), juce::roundToInt (24.0f * s),
+                          juce::Justification::centredLeft, 1);
 
-        if (cabMicZoom)
+        const auto tabsPill = juce::Rectangle<float> (174.0f * s, 11.0f * s, 200.0f * s, 26.0f * s);
+        g.setColour (juce::Colour::fromRGBA (255, 250, 236, 36));
+        g.fillRoundedRectangle (tabsPill, 13.0f * s);
+        g.setColour (juce::Colour::fromRGBA (255, 244, 214, 78));
+        g.drawRoundedRectangle (tabsPill, 13.0f * s, 1.0f);
+
+        // 3. Top Hero Box (NO < > arrows; clean light glass sub-panel)
+        const auto heroR = computeHeroRect (b, s, sy);
+        miamp_theme::paintGlassSubPanel (g, heroR, 15.0f * s);
+
+        const auto heroImgBox = computeHeroStageRect (heroR, s, sy);
+        if (cSpec.isOff)
         {
-            paintMicZoomStage (g, b, s, cSpec, visualCab);
-            return;
+            paintDirectDiIcon (g, heroImgBox.reduced (26.0f * s, 18.0f * sy));
         }
-
-        // Hero Box
-        const auto heroR = computeHeroRect (b, s);
-        g.setColour (juce::Colour::fromRGBA (16, 18, 17, 108));
-        g.fillRoundedRectangle (heroR, 14.0f * s);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 66));
-        g.drawRoundedRectangle (heroR, 14.0f * s, 1.0f);
-
-        const auto heroImgBox = juce::Rectangle<float> (heroR.getX() + 50.0f * s, heroR.getY() + 8.0f * s,
-                                                        heroR.getWidth() - 100.0f * s, 94.0f * s);
-        const auto& heroSpec = cSpec.isOff ? fallbackCab : cSpec;
-        if (heroSpec.imageData != nullptr && heroSpec.imageSize > 0)
+        else if (cSpec.isCustomIr)
         {
-            auto im = juce::ImageCache::getFromMemory (heroSpec.imageData, heroSpec.imageSize);
+            paintWavIrIcon (g, heroImgBox.reduced (26.0f * s, 18.0f * sy));
+        }
+        else if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
+        {
+            auto im = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
             if (im.isValid())
             {
-                if (cSpec.isOff)
-                {
-                    auto dim = makeDimmedCabImage (im, 0.44f);
-                    g.setOpacity (0.94f);
-                    g.drawImage (dim, heroImgBox, juce::RectanglePlacement::centred, false);
-                    g.setOpacity (1.0f);
-                    paintCabOffSign (g, heroImgBox.getCentre(), 54.0f * s);
-                }
-                else
-                {
-                    g.setOpacity (1.0f);
-                    g.drawImage (im, heroImgBox, juce::RectanglePlacement::centred);
-                }
+                const auto cabR = computeHeroCabRect (heroImgBox, visualCab);
+                g.setOpacity (1.0f);
+                g.drawImage (im, cabR, juce::RectanglePlacement::stretchToFit);
+
+                if (cabMicZoom)
+                    paintHeroMicPins (g, s, cabR, visualCab);
             }
         }
 
-        const juce::String heroName = (cSpec.isCustomIr && processor.getCustomCabIRName (bass).isNotEmpty())
-            ? ("IR: " + processor.getCustomCabIRName (bass))
-            : juce::String (cSpec.displayName);
+        // Hero metadata footer
+        const juce::String heroName = cSpec.isOff
+            ? juce::String ("SIN CAJA (DI)")
+            : ((cSpec.isCustomIr && processor.getCustomCabIRName (bass).isNotEmpty())
+                ? ("IR: " + processor.getCustomCabIRName (bass))
+                : juce::String (cSpec.displayName));
 
+        const float metaY = heroR.getBottom() - 48.0f * sy;
         g.setColour (juce::Colour::fromRGB (250, 243, 227));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (10.5f, 13.0f * s), juce::Font::bold)));
-        g.drawText (heroName, heroR.getX() + 12.0f * s, heroImgBox.getBottom() + 4.0f * s, heroR.getWidth() - 24.0f * s, 18.0f * s,
-                    juce::Justification::centred, true);
+        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (11.0f, 13.5f * s), juce::Font::bold)));
+        g.drawFittedText (heroName,
+                          juce::roundToInt (heroR.getX() + 14.0f * s), juce::roundToInt (metaY),
+                          juce::roundToInt (heroR.getWidth() - 166.0f * s), juce::roundToInt (18.0f * sy),
+                          juce::Justification::centredLeft, 1);
 
-        g.setColour (juce::Colour::fromRGBA (250, 243, 227, 194));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (9.0f, 10.5f * s), juce::Font::plain)));
-        g.drawText (cSpec.subtitle, heroR.getX() + 12.0f * s, heroImgBox.getBottom() + 21.0f * s, heroR.getWidth() - 24.0f * s, 14.0f * s,
-                    juce::Justification::centred, true);
-
-        // 3x3 Cabinet Grid
-        const auto cells = computeGridCells (b, s);
-        for (size_t i = 0; i < cells.size() && i < cabs.size(); ++i)
+        juce::String subText = cSpec.subtitle;
+        if (cabMicZoom)
         {
-            const auto& r = cells[i];
-            const auto& item = cabs[i];
-            const bool sel = (static_cast<int> (i) == cabIdx);
+            const int x1 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load());
+            const int y1 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load());
+            const int x2 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load());
+            const int y2 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load());
+            subText = "MI-57: " + juce::String (x1) + "%, " + juce::String (y1) + "%  \u00b7  MI-87: " + juce::String (x2) + "%, " + juce::String (y2) + "%";
+        }
+        g.setColour (cabMicZoom ? juce::Colour::fromRGB (166, 223, 201) : juce::Colour::fromRGBA (250, 243, 227, 200));
+        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (9.0f, 10.2f * s), cabMicZoom ? juce::Font::bold : juce::Font::plain)));
+        g.drawFittedText (subText,
+                          juce::roundToInt (heroR.getX() + 14.0f * s), juce::roundToInt (metaY + 19.0f * sy),
+                          juce::roundToInt (heroR.getWidth() - 166.0f * s), juce::roundToInt (15.0f * sy),
+                          juce::Justification::centredLeft, 1);
 
-            g.setColour (sel ? juce::Colour::fromRGBA (166, 223, 201, 42) : juce::Colour::fromRGBA (20, 22, 20, 134));
-            g.fillRoundedRectangle (r, 11.0f * s);
-            g.setColour (sel ? juce::Colour::fromRGB (166, 223, 201) : juce::Colour::fromRGBA (255, 243, 210, 62));
-            g.drawRoundedRectangle (r, 11.0f * s, sel ? 1.5f : 1.1f);
+        // Counter pill ("CAJA X/10")
+        const auto cntPill = juce::Rectangle<float> (heroR.getRight() - 146.0f * s, metaY + 7.0f * sy, 70.0f * s, 23.0f * sy);
+        g.setColour (juce::Colour::fromRGBA (166, 223, 201, 46));
+        g.fillRoundedRectangle (cntPill, cntPill.getHeight() * 0.5f);
+        g.setColour (juce::Colour::fromRGBA (166, 223, 201, 145));
+        g.drawRoundedRectangle (cntPill, cntPill.getHeight() * 0.5f, 1.0f);
+        g.setColour (juce::Colour::fromRGB (220, 255, 240));
+        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.5f, 9.5f * s), juce::Font::bold)));
+        g.drawText ("CAJA " + juce::String (cabIdx + 1) + "/" + juce::String (static_cast<int> (cabs.size())),
+                    cntPill, juce::Justification::centred);
 
-            const auto imgR = r.reduced (6.0f * s, 5.0f * s).withTrimmedBottom (20.0f * s);
-            const auto& thumbSpec = item.isOff ? fallbackCab : item;
-            if (thumbSpec.imageData != nullptr && thumbSpec.imageSize > 0)
+        // 4. Lower Section: 5x2 Grid (CAJAS mode) OR Mic Controls Card (MICRÓFONOS mode)
+        if (! cabMicZoom)
+        {
+            const auto cells = computeGridCells (b, s, sy);
+            for (size_t i = 0; i < cells.size() && i < cabs.size(); ++i)
             {
-                auto im = juce::ImageCache::getFromMemory (thumbSpec.imageData, thumbSpec.imageSize);
-                if (im.isValid())
+                const auto& r = cells[i];
+                const auto& item = cabs[i];
+                const bool sel = (static_cast<int> (i) == cabIdx);
+                const bool hov = (static_cast<int> (i) == hoveredCell);
+
+                miamp_theme::paintGlassCard (g, r, 11.0f * s, sel, hov);
+
+                const auto imgR = r.reduced (5.0f * s, 4.0f * sy).withTrimmedBottom (23.0f * sy);
+                if (item.isOff)
                 {
-                    if (item.isOff)
-                    {
-                        auto dim = makeDimmedCabImage (im, 0.44f);
-                        g.setOpacity (0.92f);
-                        g.drawImage (dim, imgR, juce::RectanglePlacement::centred, false);
-                        g.setOpacity (1.0f);
-                        paintCabOffSign (g, imgR.getCentre(), 32.0f * s);
-                    }
-                    else
+                    paintDirectDiIcon (g, imgR);
+                }
+                else if (item.isCustomIr)
+                {
+                    paintWavIrIcon (g, imgR);
+                }
+                else if (item.imageData != nullptr && item.imageSize > 0)
+                {
+                    auto im = juce::ImageCache::getFromMemory (item.imageData, item.imageSize);
+                    if (im.isValid())
                     {
                         g.setOpacity (1.0f);
                         g.drawImage (im, imgR, juce::RectanglePlacement::centred);
                     }
                 }
+
+                g.setColour (sel ? juce::Colours::white : juce::Colour::fromRGB (250, 243, 227));
+                g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (7.4f, 7.8f * s), juce::Font::bold)));
+                g.drawFittedText (item.isOff ? "SIN CAJA (DI)" : item.displayName,
+                                  juce::roundToInt (r.getX() + 3.0f * s),
+                                  juce::roundToInt (r.getBottom() - 22.0f * sy),
+                                  juce::roundToInt (r.getWidth() - 6.0f * s),
+                                  juce::roundToInt (19.0f * sy),
+                                  juce::Justification::centred, 2);
             }
+        }
+        else
+        {
+            const auto micsR = computeMicsCardRect (b, s, sy);
+            miamp_theme::paintGlassSubPanel (g, micsR, 15.0f * s);
 
             g.setColour (juce::Colour::fromRGB (250, 243, 227));
-            g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.0f, 9.0f * s), juce::Font::bold)));
-            g.drawText (item.isOff ? "SIN CAJA (DI)" : item.displayName,
-                        r.getX() + 4.0f * s, r.getBottom() - 20.0f * s, r.getWidth() - 8.0f * s, 16.0f * s,
-                        juce::Justification::centred, true);
-        }
+            g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (9.0f, 10.5f * s), juce::Font::bold)));
+            g.drawText (juce::String::fromUTF8 (u8"POSICI\u00d3N Y MEZCLA DE MICR\u00d3FONOS"),
+                        micsR.getX() + 13.0f * s, micsR.getY() + 10.0f * sy, 230.0f * s, 20.0f * sy,
+                        juce::Justification::centredLeft);
 
-        // Footer index
-        g.setColour (juce::Colour::fromRGBA (250, 243, 227, 224));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (9.5f, 11.0f * s), juce::Font::bold)));
-        g.drawText ("CAJA " + juce::String (cabIdx + 1) + "/" + juce::String (static_cast<int> (cabs.size())),
-                    16.0f * s, b.getHeight() - 34.0f * s, 140.0f * s, 24.0f * s, juce::Justification::centredLeft);
+            // Row containers & numbered badges (57 / 87)
+            for (int row = 0; row < 2; ++row)
+            {
+                const auto rowR = computeMicRowRect (micsR, row, s, sy);
+                miamp_theme::paintGlassCard (g, rowR, 10.0f * s, false, false);
+
+                const float badgeSz = 22.0f * juce::jmin (s, sy);
+                const auto badgeR = juce::Rectangle<float> (rowR.getX() + 8.0f * s,
+                                                          rowR.getCentreY() - badgeSz * 0.5f,
+                                                          badgeSz, badgeSz);
+                const auto fill = (row == 0) ? juce::Colour::fromRGB (18, 34, 28) : juce::Colour::fromRGB (36, 28, 14);
+                const auto rim  = (row == 0) ? juce::Colour::fromRGB (158, 246, 212) : juce::Colour::fromRGB (255, 208, 123);
+                const auto txt  = (row == 0) ? juce::Colour::fromRGB (220, 255, 241) : juce::Colour::fromRGB (255, 242, 212);
+                g.setColour (fill);
+                g.fillEllipse (badgeR);
+                g.setColour (rim);
+                g.drawEllipse (badgeR, 1.8f);
+                g.setColour (txt);
+                g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.5f, 9.5f * s), juce::Font::bold)));
+                g.drawText (row == 0 ? "57" : "87", badgeR, juce::Justification::centred);
+            }
+        }
     }
 
     void resized() override
     {
         const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
+        const float s  = b.getWidth() / 420.0f;
+        const float sy = b.getHeight() / 716.0f;
 
-        btnClose.setBounds (juce::roundToInt (b.getWidth() - 40.0f * s), juce::roundToInt (11.0f * s),
-                            juce::roundToInt (26.0f * s), juce::roundToInt (24.0f * s));
-        btnBackCabs.setBounds (juce::roundToInt (14.0f * s), juce::roundToInt (12.0f * s),
-                               juce::roundToInt (78.0f * s), juce::roundToInt (24.0f * s));
+        btnClose.setBounds (juce::roundToInt (b.getWidth() - 38.0f * s), juce::roundToInt (11.0f * s),
+                            juce::roundToInt (24.0f * s), juce::roundToInt (24.0f * s));
 
-        const auto heroR = computeHeroRect (b, s);
-        btnPrev.setBounds (juce::roundToInt (heroR.getX() + 10.0f * s),
-                           juce::roundToInt (heroR.getY() + 26.0f * s),
-                           juce::roundToInt (32.0f * s), juce::roundToInt (56.0f * s));
-        btnNext.setBounds (juce::roundToInt (heroR.getRight() - 42.0f * s),
-                           juce::roundToInt (heroR.getY() + 26.0f * s),
-                           juce::roundToInt (32.0f * s), juce::roundToInt (56.0f * s));
-        btnHeroWav.setBounds (juce::roundToInt (heroR.getCentreX() - 72.0f * s),
-                              juce::roundToInt (heroR.getBottom() - 28.0f * s),
-                              juce::roundToInt (144.0f * s), juce::roundToInt (22.0f * s));
+        btnTabCabs.setBounds (juce::roundToInt (177.0f * s), juce::roundToInt (13.0f * s),
+                              juce::roundToInt (84.0f * s),  juce::roundToInt (22.0f * s));
+        btnTabMics.setBounds (juce::roundToInt (264.0f * s), juce::roundToInt (13.0f * s),
+                              juce::roundToInt (107.0f * s), juce::roundToInt (22.0f * s));
 
-        btnFooterWav.setBounds (juce::roundToInt (b.getWidth() - 96.0f * s),
-                                juce::roundToInt (b.getHeight() - 36.0f * s),
-                                juce::roundToInt (80.0f * s), juce::roundToInt (26.0f * s));
+        const auto heroR = computeHeroRect (b, s, sy);
+        const float metaY = heroR.getBottom() - 48.0f * sy;
+        btnHeroWav.setBounds (juce::roundToInt (heroR.getRight() - 70.0f * s),
+                              juce::roundToInt (metaY + 7.0f * sy),
+                              juce::roundToInt (58.0f * s),
+                              juce::roundToInt (23.0f * sy));
+
+        const auto micsR = computeMicsCardRect (b, s, sy);
+        btnBackCabs.setBounds (juce::roundToInt (micsR.getRight() - 134.0f * s),
+                               juce::roundToInt (micsR.getY() + 9.0f * sy),
+                               juce::roundToInt (122.0f * s),
+                               juce::roundToInt (22.0f * sy));
+
+        const auto r1 = computeMicRowRect (micsR, 0, s, sy);
+        const auto r2 = computeMicRowRect (micsR, 1, s, sy);
+        auto placeRowBtns = [&] (const juce::Rectangle<float>& rr, juce::TextButton& onB, juce::TextButton& distB, juce::TextButton& phB)
+        {
+            const float x0 = rr.getX() + 38.0f * s;
+            const float avail = rr.getRight() - 8.0f * s - x0;
+            const float gap = 6.0f * s;
+            const float phW = 34.0f * s;
+            const float rem = avail - phW - gap * 2.0f;
+            const float onW = rem * 0.54f;
+            const float dW  = rem * 0.46f;
+            const float bh  = juce::jmin (24.0f * sy, rr.getHeight() - 8.0f * sy);
+            const float by  = rr.getCentreY() - bh * 0.5f;
+            onB.setBounds   (juce::roundToInt (x0), juce::roundToInt (by), juce::roundToInt (onW), juce::roundToInt (bh));
+            distB.setBounds (juce::roundToInt (x0 + onW + gap), juce::roundToInt (by), juce::roundToInt (dW), juce::roundToInt (bh));
+            phB.setBounds   (juce::roundToInt (x0 + onW + gap + dW + gap), juce::roundToInt (by), juce::roundToInt (phW), juce::roundToInt (bh));
+        };
+        placeRowBtns (r1, btnMic1On, btnMic1Dist, btnMic1Phase);
+        placeRowBtns (r2, btnMic2On, btnMic2Dist, btnMic2Phase);
+
+        const float knobY = r2.getBottom() + 6.0f * sy;
+        const float knobH = juce::jmax (54.0f, micsR.getBottom() - knobY - 6.0f * sy);
+        const float knobW = 78.0f * s;
+        if (micMixKnob)
+            micMixKnob->setBounds (juce::roundToInt (micsR.getCentreX() - knobW - 18.0f * s), juce::roundToInt (knobY),
+                                   juce::roundToInt (knobW), juce::roundToInt (knobH));
+        if (roomKnob)
+            roomKnob->setBounds   (juce::roundToInt (micsR.getCentreX() + 18.0f * s), juce::roundToInt (knobY),
+                                   juce::roundToInt (knobW), juce::roundToInt (knobH));
+    }
+
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        if (cabMicZoom)
+        {
+            if (hoveredCell != -1) { hoveredCell = -1; repaint(); }
+            return;
+        }
+        const auto b = getLocalBounds().toFloat();
+        const auto cells = computeGridCells (b, b.getWidth() / 420.0f, b.getHeight() / 716.0f);
+        int hit = -1;
+        for (size_t i = 0; i < cells.size(); ++i)
+            if (cells[i].contains (e.position)) { hit = static_cast<int> (i); break; }
+        if (hit != hoveredCell)
+        {
+            hoveredCell = hit;
+            setMouseCursor (hit >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+            repaint();
+        }
+    }
+
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        if (hoveredCell != -1) { hoveredCell = -1; repaint(); }
     }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
         const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
+        const float s  = b.getWidth() / 420.0f;
+        const float sy = b.getHeight() / 716.0f;
         const bool bass = processor.isBassMode();
 
         if (cabMicZoom)
@@ -351,23 +543,25 @@ public:
             const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
                 static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
             const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-            const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-            const auto gr = computeZoomGrilleRect (b, s, visualCab);
-            if (! gr.isEmpty())
+            if (cSpec.isOff || cSpec.isCustomIr) return;
+
+            const auto heroR = computeHeroRect (b, s, sy);
+            const auto heroImgBox = computeHeroStageRect (heroR, s, sy);
+            const auto cabR = computeHeroCabRect (heroImgBox, cSpec);
+            const auto gr = computeHeroGrilleRect (cabR, cSpec);
+            if (! gr.isEmpty() && heroImgBox.contains (e.position))
             {
                 const auto p1 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth(),
                                                     gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f) * gr.getHeight());
                 const auto p2 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f) * gr.getWidth(),
                                                     gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load() * 0.01f) * gr.getHeight());
-                const float d1 = e.position.getDistanceFrom (p1);
-                const float d2 = e.position.getDistanceFrom (p2);
-                dragMic = (d1 <= d2) ? 1 : 2;
-                updateZoomMicFromPt (e.position, gr);
+                dragMic = (e.position.getDistanceFrom (p1) <= e.position.getDistanceFrom (p2)) ? 1 : 2;
+                updateHeroMicFromPt (e.position, gr);
             }
             return;
         }
 
-        const auto cells = computeGridCells (b, s);
+        const auto cells = computeGridCells (b, s, sy);
         const char* paramId = bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab;
         for (size_t i = 0; i < cells.size(); ++i)
         {
@@ -385,16 +579,21 @@ public:
     {
         if (! cabMicZoom || dragMic == 0) return;
         const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
+        const float s  = b.getWidth() / 420.0f;
+        const float sy = b.getHeight() / 716.0f;
         const bool bass = processor.isBassMode();
         const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-        const auto gr = computeZoomGrilleRect (b, s, visualCab);
+        if (cSpec.isOff || cSpec.isCustomIr) return;
+
+        const auto heroR = computeHeroRect (b, s, sy);
+        const auto heroImgBox = computeHeroStageRect (heroR, s, sy);
+        const auto cabR = computeHeroCabRect (heroImgBox, cSpec);
+        const auto gr = computeHeroGrilleRect (cabR, cSpec);
         if (! gr.isEmpty())
-            updateZoomMicFromPt (e.position, gr);
+            updateHeroMicFromPt (e.position, gr);
     }
 
     void mouseUp (const juce::MouseEvent&) override { dragMic = 0; }
@@ -403,15 +602,21 @@ public:
     {
         if (! cabMicZoom) return;
         const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
+        const float s  = b.getWidth() / 420.0f;
+        const float sy = b.getHeight() / 716.0f;
         const bool bass = processor.isBassMode();
         const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
         const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
             static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
         const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-        const auto gr = computeZoomGrilleRect (b, s, visualCab);
-        if (gr.isEmpty()) return;
+        if (cSpec.isOff || cSpec.isCustomIr) return;
+
+        const auto heroR = computeHeroRect (b, s, sy);
+        const auto heroImgBox = computeHeroStageRect (heroR, s, sy);
+        const auto cabR = computeHeroCabRect (heroImgBox, cSpec);
+        const auto gr = computeHeroGrilleRect (cabR, cSpec);
+        if (gr.isEmpty() || ! heroImgBox.contains (e.position)) return;
+
         const auto p1 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth(),
                                             gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f) * gr.getHeight());
         const auto p2 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f) * gr.getWidth(),
@@ -424,87 +629,104 @@ public:
     }
 
 private:
+    void setModeAndNotify (bool micMode)
+    {
+        if (cabMicZoom == micMode) return;
+        cabMicZoom = micMode;
+        syncVisibility();
+        resized();
+        repaint();
+        if (modeCb) modeCb (cabMicZoom);
+    }
+
     void syncVisibility()
     {
-        const bool bass = processor.isBassMode();
-        const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
-        const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
-            static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
-        const bool isCustom = cabs[static_cast<size_t> (cabIdx)].isCustomIr;
+        btnTabCabs.setToggleState (! cabMicZoom, juce::dontSendNotification);
+        btnTabMics.setToggleState (cabMicZoom, juce::dontSendNotification);
 
         btnBackCabs.setVisible (cabMicZoom);
-        btnPrev.setVisible (! cabMicZoom);
-        btnNext.setVisible (! cabMicZoom);
-        btnHeroWav.setVisible (! cabMicZoom && isCustom);
-        btnFooterWav.setVisible (! cabMicZoom);
+        btnMic1On.setVisible (cabMicZoom);
+        btnMic1Dist.setVisible (cabMicZoom);
+        btnMic1Phase.setVisible (cabMicZoom);
+        btnMic2On.setVisible (cabMicZoom);
+        btnMic2Dist.setVisible (cabMicZoom);
+        btnMic2Phase.setVisible (cabMicZoom);
+        if (micMixKnob) micMixKnob->setVisible (cabMicZoom);
+        if (roomKnob)   roomKnob->setVisible (cabMicZoom);
     }
 
-    void cycleCab (int delta)
+    juce::Rectangle<float> computeHeroRect (juce::Rectangle<float> b, float s, float sy) const
     {
-        const bool bass = processor.isBassMode();
-        const int total = bass ? 9 : 10;
-        const char* id = bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab;
-        const int cur = static_cast<int> (std::lround (processor.apvts.getRawParameterValue (id)->load()));
-        const int nxt = (cur + delta + total) % total;
-        setParamPlain (processor.apvts, id, static_cast<float> (nxt));
-        if (changedCb) changedCb();
-        refresh();
+        return { 16.0f * s, 46.0f * sy, b.getWidth() - 32.0f * s, 434.0f * sy };
     }
 
-    juce::Rectangle<float> computeHeroRect (juce::Rectangle<float> b, float s) const
+    juce::Rectangle<float> computeHeroStageRect (juce::Rectangle<float> heroR, float s, float sy) const
     {
-        return { 16.0f * s, 44.0f * s, b.getWidth() - 32.0f * s, 162.0f * s };
+        return { heroR.getX() + 18.0f * s, heroR.getY() + 12.0f * sy,
+                 heroR.getWidth() - 36.0f * s, heroR.getHeight() - 68.0f * sy };
     }
 
-    std::vector<juce::Rectangle<float>> computeGridCells (juce::Rectangle<float> b, float s) const
+    juce::Rectangle<float> computeHeroCabRect (juce::Rectangle<float> stageR, const CabSpec& visualCab) const
+    {
+        if (visualCab.imageData == nullptr || visualCab.imageSize <= 0) return {};
+        auto im = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
+        if (! im.isValid()) return {};
+        const float fit = juce::jmin (stageR.getWidth() / static_cast<float> (im.getWidth()),
+                                      stageR.getHeight() / static_cast<float> (im.getHeight()));
+        const float w = im.getWidth() * fit;
+        const float h = im.getHeight() * fit;
+        return { stageR.getCentreX() - w * 0.5f, stageR.getCentreY() - h * 0.5f, w, h };
+    }
+
+    juce::Rectangle<float> computeHeroGrilleRect (juce::Rectangle<float> cabR, const CabSpec& visualCab) const
+    {
+        if (cabR.isEmpty()) return {};
+        return { cabR.getX() + visualCab.grilleX * cabR.getWidth(),
+                 cabR.getY() + visualCab.grilleY * cabR.getHeight(),
+                 visualCab.grilleW * cabR.getWidth(),
+                 visualCab.grilleH * cabR.getHeight() };
+    }
+
+    std::vector<juce::Rectangle<float>> computeGridCells (juce::Rectangle<float> b, float s, float sy) const
     {
         const bool bass = processor.isBassMode();
         const int count = bass ? 9 : 10;
-        const int cols = 3;
-        const int rows = (count + cols - 1) / cols;
-        const float topY = 214.0f * s;
-        const float botY = b.getHeight() - 42.0f * s;
-        const float gap = 8.0f * s;
+        const int cols = 5;
+        const int rows = 2;
+        const auto heroR = computeHeroRect (b, s, sy);
+        const float topY = heroR.getBottom() + 12.0f * sy;
+        const float botY = b.getHeight() - 16.0f * sy;
+        const float gapX = 6.0f * s;
+        const float gapY = 7.0f * sy;
         const float gx = 16.0f * s;
         const float gw = b.getWidth() - 32.0f * s;
         const float gh = botY - topY;
-        const float cw = (gw - gap * (cols - 1)) / cols;
-        const float ch = (gh - gap * (rows - 1)) / rows;
+        const float cw = (gw - gapX * (cols - 1)) / cols;
+        const float ch = (gh - gapY * (rows - 1)) / rows;
         std::vector<juce::Rectangle<float>> out;
+        out.reserve (static_cast<size_t> (count));
         for (int i = 0; i < count; ++i)
         {
             const int r = i / cols, c = i % cols;
-            out.emplace_back (gx + c * (cw + gap), topY + r * (ch + gap), cw, ch);
+            out.emplace_back (gx + c * (cw + gapX), topY + r * (ch + gapY), cw, ch);
         }
         return out;
     }
 
-    juce::Rectangle<float> computeZoomCabRect (juce::Rectangle<float> b, float s, const CabSpec& visualCab) const
+    juce::Rectangle<float> computeMicsCardRect (juce::Rectangle<float> b, float s, float sy) const
     {
-        if (visualCab.imageData == nullptr || visualCab.imageSize <= 0) return {};
-        auto im = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
-        if (! im.isValid()) return {};
-        const float maxW = b.getWidth() - 44.0f * s;
-        const float maxH = b.getHeight() - 104.0f * s;
-        const float fit = juce::jmin (maxW / static_cast<float> (im.getWidth()),
-                                      maxH / static_cast<float> (im.getHeight()));
-        const float w = im.getWidth() * fit;
-        const float h = im.getHeight() * fit;
-        const float areaTop = 48.0f * s;
-        return { b.getCentreX() - w * 0.5f, areaTop + (maxH - h) * 0.5f, w, h };
+        const auto heroR = computeHeroRect (b, s, sy);
+        const float topY = heroR.getBottom() + 12.0f * sy;
+        return { 16.0f * s, topY, b.getWidth() - 32.0f * s, b.getHeight() - 16.0f * sy - topY };
     }
 
-    juce::Rectangle<float> computeZoomGrilleRect (juce::Rectangle<float> b, float s, const CabSpec& visualCab) const
+    juce::Rectangle<float> computeMicRowRect (juce::Rectangle<float> micsR, int row, float s, float sy) const
     {
-        const auto cr = computeZoomCabRect (b, s, visualCab);
-        if (cr.isEmpty()) return {};
-        return { cr.getX() + visualCab.grilleX * cr.getWidth(),
-                 cr.getY() + visualCab.grilleY * cr.getHeight(),
-                 visualCab.grilleW * cr.getWidth(),
-                 visualCab.grilleH * cr.getHeight() };
+        const float y0 = micsR.getY() + 36.0f * sy + row * (40.0f * sy);
+        return { micsR.getX() + 12.0f * s, y0, micsR.getWidth() - 24.0f * s, 34.0f * sy };
     }
 
-    void updateZoomMicFromPt (juce::Point<float> pt, juce::Rectangle<float> gr)
+    void updateHeroMicFromPt (juce::Point<float> pt, juce::Rectangle<float> gr)
     {
         const float nx = juce::jlimit (0.0f, 100.0f, ((pt.x - gr.getX()) / juce::jmax (1.0f, gr.getWidth())) * 100.0f);
         const float ny = juce::jlimit (0.0f, 100.0f, ((pt.y - gr.getY()) / juce::jmax (1.0f, gr.getHeight())) * 100.0f);
@@ -514,436 +736,62 @@ private:
         repaint();
     }
 
-    void paintMicZoomStage (juce::Graphics& g, juce::Rectangle<float> b, float s, const CabSpec& cSpec, const CabSpec& visualCab) const
+    void paintHeroMicPins (juce::Graphics& g, float s, juce::Rectangle<float> cabR, const CabSpec& visualCab) const
     {
-        const auto cabR = computeZoomCabRect (b, s, visualCab);
-        const auto grR  = computeZoomGrilleRect (b, s, visualCab);
-        if (! cabR.isEmpty() && visualCab.imageData != nullptr)
-        {
-            auto im = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
-            if (im.isValid())
-            {
-                if (cSpec.isOff)
-                {
-                    auto dim = makeDimmedCabImage (im, 0.44f);
-                    g.setOpacity (0.94f);
-                    g.drawImage (dim, cabR, juce::RectanglePlacement::stretchToFit, false);
-                    g.setOpacity (1.0f);
-                }
-                else
-                {
-                    g.setOpacity (1.0f);
-                    g.drawImage (im, cabR, juce::RectanglePlacement::stretchToFit);
-                }
-            }
-        }
+        const auto gr = computeHeroGrilleRect (cabR, visualCab);
+        if (gr.isEmpty()) return;
 
-        if (! grR.isEmpty())
-        {
-            const float dashLen[2] = { 4.0f * s, 4.0f * s };
-            juce::Path gp;
-            gp.addRoundedRectangle (grR, 6.0f * s);
-            juce::PathStrokeType pst (1.0f);
-            juce::Path dashed;
-            pst.createDashedStroke (dashed, gp, dashLen, 2);
-            g.setColour (juce::Colour::fromRGBA (166, 223, 201, 64));
-            g.fillPath (dashed);
-
-            static constexpr float kDistScale[3] = { 1.0f, 0.86f, 0.72f };
-            const bool m1On = processor.apvts.getRawParameterValue (MiAmpParams::mic1On)->load() >= 0.5f;
-            const bool m2On = processor.apvts.getRawParameterValue (MiAmpParams::mic2On)->load() >= 0.5f;
-            const int  m1D  = juce::jlimit (0, 2, static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::mic1Dist)->load())));
-            const int  m2D  = juce::jlimit (0, 2, static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::mic2Dist)->load())));
-
-            const auto img57 = juce::ImageCache::getFromMemory (BinaryData::mic_mi57_clean_png, BinaryData::mic_mi57_clean_pngSize);
-            const auto img87 = juce::ImageCache::getFromMemory (BinaryData::mic_mi87_clean_png, BinaryData::mic_mi87_clean_pngSize);
-
-            const float x1p = processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load();
-            const float y1p = processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load();
-            const float x2p = processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load();
-            const float y2p = processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load();
-
-            if (img57.isValid())
-            {
-                const float mw1 = cabR.getWidth() * 0.25f * kDistScale[m1D];
-                const float mh1 = mw1 * (static_cast<float> (img57.getHeight()) / juce::jmax (1, img57.getWidth()));
-                const float cx1 = grR.getX() + (x1p * 0.01f) * grR.getWidth();
-                const float cy1 = grR.getY() + (y1p * 0.01f) * grR.getHeight();
-                const auto mr1 = juce::Rectangle<float> (cx1 - mw1 * 0.5f, cy1 - mh1 * 0.5f, mw1, mh1);
-                g.setOpacity (m1On ? 1.0f : 0.34f);
-                g.drawImage (img57, mr1, juce::RectanglePlacement::centred);
-                g.setOpacity (1.0f);
-                const auto tag1 = juce::Rectangle<float> (cx1 - 20.0f * s, mr1.getBottom() - 2.0f * s, 40.0f * s, 14.0f * s);
-                g.setColour (juce::Colour::fromRGBA (16, 18, 17, 215));
-                g.fillRoundedRectangle (tag1, 4.0f * s);
-                g.setColour (juce::Colour::fromRGB (158, 246, 212));
-                g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.0f, 9.0f * s), juce::Font::bold)));
-                g.drawText ("MI-57", tag1, juce::Justification::centred);
-            }
-
-            if (img87.isValid())
-            {
-                const float mh2 = cabR.getWidth() * 0.26f * kDistScale[m2D];
-                const float mw2 = mh2 * (static_cast<float> (img87.getWidth()) / juce::jmax (1, img87.getHeight()));
-                const float cx2 = grR.getX() + (x2p * 0.01f) * grR.getWidth();
-                const float cy2 = grR.getY() + (y2p * 0.01f) * grR.getHeight();
-                const auto mr2 = juce::Rectangle<float> (cx2 - mw2 * 0.5f, cy2 - mh2 * 0.5f, mw2, mh2);
-                g.setOpacity (m2On ? 1.0f : 0.34f);
-                g.drawImage (img87, mr2, juce::RectanglePlacement::centred);
-                g.setOpacity (1.0f);
-                const auto tag2 = juce::Rectangle<float> (cx2 - 20.0f * s, mr2.getBottom() - 2.0f * s, 40.0f * s, 14.0f * s);
-                g.setColour (juce::Colour::fromRGBA (16, 18, 17, 215));
-                g.fillRoundedRectangle (tag2, 4.0f * s);
-                g.setColour (juce::Colour::fromRGB (255, 208, 123));
-                g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.0f, 9.0f * s), juce::Font::bold)));
-                g.drawText ("MI-87", tag2, juce::Justification::centred);
-            }
-        }
-
-        if (cSpec.isOff && ! cabR.isEmpty())
-        {
-            const auto offPill = juce::Rectangle<float> (cabR.getCentreX() - 62.0f * s, cabR.getCentreY() - 11.0f * s, 124.0f * s, 22.0f * s);
-            g.setColour (juce::Colour::fromRGBA (16, 18, 17, 225));
-            g.fillRoundedRectangle (offPill, 6.0f * s);
-            g.setColour (juce::Colour::fromRGBA (239, 68, 68, 190));
-            g.drawRoundedRectangle (offPill, 6.0f * s, 1.0f);
-            g.setColour (juce::Colour::fromRGB (252, 165, 165));
-            g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.5f, 9.5f * s), juce::Font::bold)));
-            g.drawText ("CABINET OFF (DI)", offPill, juce::Justification::centred);
-        }
-
-        // Footer coordinates bar
-        const float fy = b.getHeight() - 34.0f * s;
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 36));
-        g.drawHorizontalLine (juce::roundToInt (fy - 2.0f * s), 16.0f * s, b.getWidth() - 16.0f * s);
-
-        const int x1 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load());
-        const int y1 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load());
-        const int x2 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load());
-        const int y2 = juce::roundToInt (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load());
-
-        g.setColour (juce::Colour::fromRGB (166, 223, 201));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (9.0f, 10.5f * s), juce::Font::bold)));
-        g.drawText ("MI-57: " + juce::String (x1) + "%, " + juce::String (y1) + "%  \u00b7  MI-87: " + juce::String (x2) + "%, " + juce::String (y2) + "%",
-                    16.0f * s, fy, 260.0f * s, 24.0f * s, juce::Justification::centredLeft);
-
-        g.setColour (juce::Colour::fromRGBA (250, 243, 227, 175));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.5f, 10.0f * s), juce::Font::plain)));
-        g.drawText (juce::String::fromUTF8 (u8"Arrastr\u00e1 los mics"),
-                    b.getWidth() - 140.0f * s, fy, 124.0f * s, 24.0f * s, juce::Justification::centredRight);
-    }
-
-    MiAmpAudioProcessor& processor;
-    std::function<void()> changedCb, closeCb, backCabsCb, wavCb;
-    bool cabMicZoom = false;
-    int dragMic = 0;
-
-    juce::TextButton btnClose     { juce::String::fromUTF8 (u8"\u00d7") };
-    juce::TextButton btnBackCabs  { juce::String::fromUTF8 (u8"\u2190 CAJAS") };
-    juce::TextButton btnPrev      { "<" };
-    juce::TextButton btnNext      { ">" };
-    juce::TextButton btnHeroWav   { "+ CARGAR .WAV IR" };
-    juce::TextButton btnFooterWav { ".WAV IR" };
-};
-
-//==============================================================================
-// Bottom-Left Glass Dual Mics & Room Popup (below CabPickerPanel)
-class CabMicsPanel final : public juce::Component
-{
-public:
-    CabMicsPanel (MiAmpAudioProcessor& proc,
-                  std::function<void()> onChanged,
-                  std::function<void()> onToggleMicZoom)
-        : processor (proc), changedCb (std::move (onChanged)), toggleZoomCb (std::move (onToggleMicZoom))
-    {
-        auto bindTog = [this] (juce::TextButton& b, const char* id)
-        {
-            b.setClickingTogglesState (true);
-            b.onClick = [this, &b, id]
-            {
-                setParamPlain (processor.apvts, id, b.getToggleState() ? 1.0f : 0.0f);
-                if (changedCb) changedCb();
-                refresh();
-            };
-            addAndMakeVisible (b);
-        };
-        bindTog (btnMic1On, MiAmpParams::mic1On);
-        bindTog (btnMic1Phase, MiAmpParams::mic1Phase);
-        bindTog (btnMic2On, MiAmpParams::mic2On);
-        bindTog (btnMic2Phase, MiAmpParams::mic2Phase);
-
-        auto bindDist = [this] (juce::TextButton& b, const char* id)
-        {
-            b.onClick = [this, id]
-            {
-                const int cur = static_cast<int> (std::lround (processor.apvts.getRawParameterValue (id)->load()));
-                setParamPlain (processor.apvts, id, static_cast<float> ((cur + 1) % 3));
-                if (changedCb) changedCb();
-                refresh();
-            };
-            addAndMakeVisible (b);
-        };
-        bindDist (btnMic1Dist, MiAmpParams::mic1Dist);
-        bindDist (btnMic2Dist, MiAmpParams::mic2Dist);
-
-        btnMoveMics.onClick = [this] { if (toggleZoomCb) toggleZoomCb(); };
-        addAndMakeVisible (btnMoveMics);
-
-        micMixKnob = std::make_unique<StudioMiniKnob> (processor.apvts, MiAmpParams::cabMicMix, "MIC MIX", "%");
-        roomKnob   = std::make_unique<StudioMiniKnob> (processor.apvts, MiAmpParams::cabRoom,   "ROOM", "%");
-        addAndMakeVisible (*micMixKnob);
-        addAndMakeVisible (*roomKnob);
-    }
-
-    void setMicZoomActive (bool zoom)
-    {
-        micZoomActive = zoom;
-        btnMoveMics.setToggleState (zoom, juce::dontSendNotification);
-        btnMoveMics.setButtonText (zoom ? juce::String::fromUTF8 (u8"\u2190 VER CAJAS") : "MOVER EN CAB");
-    }
-
-    void refresh()
-    {
-        static constexpr const char* kDistTags[3] = { "CLOSE", "MED", "FAR" };
-        btnMic1On.setToggleState    (processor.apvts.getRawParameterValue (MiAmpParams::mic1On)->load() >= 0.5f, juce::dontSendNotification);
-        btnMic1Phase.setToggleState (processor.apvts.getRawParameterValue (MiAmpParams::mic1Phase)->load() >= 0.5f, juce::dontSendNotification);
-        btnMic1Dist.setButtonText   (kDistTags[juce::jlimit (0, 2, static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::mic1Dist)->load())))]);
-
-        btnMic2On.setToggleState    (processor.apvts.getRawParameterValue (MiAmpParams::mic2On)->load() >= 0.5f, juce::dontSendNotification);
-        btnMic2Phase.setToggleState (processor.apvts.getRawParameterValue (MiAmpParams::mic2Phase)->load() >= 0.5f, juce::dontSendNotification);
-        btnMic2Dist.setButtonText   (kDistTags[juce::jlimit (0, 2, static_cast<int> (std::lround (processor.apvts.getRawParameterValue (MiAmpParams::mic2Dist)->load())))]);
-
-        repaint();
-    }
-
-    void paint (juce::Graphics& g) override
-    {
-        const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
-
-        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 74), b.getX(), b.getY(),
-                                   juce::Colour::fromRGBA (53, 54, 45, 184), b.getRight(), b.getBottom(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (b, 20.0f * s);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 158));
-        g.drawRoundedRectangle (b, 20.0f * s, 1.5f);
-
-        g.setColour (juce::Colour::fromRGBA (191, 252, 225, 218));
-        g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (8.5f, 10.0f * s), juce::Font::bold)));
-        g.drawText ("DUAL MICS", 14.0f * s, 12.0f * s, 132.0f * s, 14.0f * s, juce::Justification::centredLeft);
-
-        // Mini XY Pad (full uncropped cab + aligned 57 / 87 pins)
-        const auto padR = computeXyPadRect (b, s);
-        g.setColour (juce::Colour::fromRGBA (12, 14, 13, 198));
-        g.fillRoundedRectangle (padR, 12.0f * s);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 96));
-        g.drawRoundedRectangle (padR, 12.0f * s, 1.3f);
-
-        const bool bass = processor.isBassMode();
-        const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
-        const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
-            static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
-        const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-
-        const auto innerR = padR.reduced (4.0f * s);
-        if (visualCab.imageData != nullptr && visualCab.imageSize > 0)
-        {
-            auto im = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
-            if (im.isValid())
-            {
-                if (cSpec.isOff)
-                {
-                    auto dim = makeDimmedCabImage (im, 0.36f);
-                    g.setOpacity (0.86f);
-                    g.drawImage (dim, innerR, juce::RectanglePlacement::centred, false);
-                    g.setOpacity (1.0f);
-                }
-                else
-                {
-                    g.setOpacity (0.86f);
-                    g.drawImage (im, innerR, juce::RectanglePlacement::centred);
-                    g.setOpacity (1.0f);
-                }
-            }
-        }
-
-        // Subtle 4x4 grid inside XY pad
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 20));
+        // Subtle 4x4 guide grid over cabinet grille
+        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 34));
         for (int k = 1; k < 4; ++k)
         {
             const float f = static_cast<float> (k) * 0.25f;
-            g.drawVerticalLine (juce::roundToInt (padR.getX() + f * padR.getWidth()), padR.getY() + 2.0f, padR.getBottom() - 2.0f);
-            g.drawHorizontalLine (juce::roundToInt (padR.getY() + f * padR.getHeight()), padR.getX() + 2.0f, padR.getRight() - 2.0f);
+            g.drawVerticalLine (juce::roundToInt (gr.getX() + f * gr.getWidth()), gr.getY() + 2.0f, gr.getBottom() - 2.0f);
+            g.drawHorizontalLine (juce::roundToInt (gr.getY() + f * gr.getHeight()), gr.getX() + 2.0f, gr.getRight() - 2.0f);
         }
 
-        const auto gr = computeMiniGrilleRect (padR, s, visualCab);
-        if (! gr.isEmpty())
+        const bool m1On = processor.apvts.getRawParameterValue (MiAmpParams::mic1On)->load() >= 0.5f;
+        const bool m2On = processor.apvts.getRawParameterValue (MiAmpParams::mic2On)->load() >= 0.5f;
+        const float px1 = gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth();
+        const float py1 = gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f) * gr.getHeight();
+        const float px2 = gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f) * gr.getWidth();
+        const float py2 = gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load() * 0.01f) * gr.getHeight();
+
+        auto drawPin = [&] (float x, float y, const char* lbl, juce::Colour fill, juce::Colour rim, juce::Colour txt, bool on)
         {
-            const bool m1On = processor.apvts.getRawParameterValue (MiAmpParams::mic1On)->load() >= 0.5f;
-            const bool m2On = processor.apvts.getRawParameterValue (MiAmpParams::mic2On)->load() >= 0.5f;
-            const float px1 = gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth();
-            const float py1 = gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f) * gr.getHeight();
-            const float px2 = gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f) * gr.getWidth();
-            const float py2 = gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load() * 0.01f) * gr.getHeight();
+            const float r = 14.5f * s;
+            g.setOpacity (on ? 1.0f : 0.36f);
+            g.setColour (juce::Colour::fromRGBA (0, 0, 0, 145));
+            g.fillEllipse (x - r, y - r + 2.5f * s, r * 2.0f, r * 2.0f);
+            g.setColour (fill);
+            g.fillEllipse (x - r, y - r, r * 2.0f, r * 2.0f);
+            g.setColour (rim);
+            g.drawEllipse (x - r, y - r, r * 2.0f, r * 2.0f, 2.2f);
+            g.setColour (txt);
+            g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (9.0f, 10.5f * s), juce::Font::bold)));
+            g.drawText (lbl, x - r, y - r, r * 2.0f, r * 2.0f, juce::Justification::centred);
+            g.setOpacity (1.0f);
+        };
 
-            auto drawPin = [&] (float x, float y, const char* lbl, juce::Colour fill, juce::Colour rim, juce::Colour txt, bool on)
-            {
-                const float r = 10.5f * s;
-                g.setOpacity (on ? 1.0f : 0.35f);
-                g.setColour (fill);
-                g.fillEllipse (x - r, y - r, r * 2.0f, r * 2.0f);
-                g.setColour (rim);
-                g.drawEllipse (x - r, y - r, r * 2.0f, r * 2.0f, 1.8f);
-                g.setColour (txt);
-                g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (7.5f, 8.5f * s), juce::Font::bold)));
-                g.drawText (lbl, x - r, y - r, r * 2.0f, r * 2.0f, juce::Justification::centred);
-                g.setOpacity (1.0f);
-            };
-            drawPin (px1, py1, "57", juce::Colour::fromRGB (18, 34, 28), juce::Colour::fromRGB (158, 246, 212), juce::Colour::fromRGB (220, 255, 241), m1On);
-            drawPin (px2, py2, "87", juce::Colour::fromRGB (36, 28, 14), juce::Colour::fromRGB (255, 208, 123), juce::Colour::fromRGB (255, 242, 212), m2On);
-        }
-
-        if (cSpec.isOff)
-        {
-            const auto offPill = juce::Rectangle<float> (padR.getCentreX() - 28.0f * s, padR.getCentreY() - 9.0f * s, 56.0f * s, 18.0f * s);
-            g.setColour (juce::Colour::fromRGBA (16, 18, 17, 226));
-            g.fillRoundedRectangle (offPill, 5.0f * s);
-            g.setColour (juce::Colour::fromRGBA (239, 68, 68, 190));
-            g.drawRoundedRectangle (offPill, 5.0f * s, 1.0f);
-            g.setColour (juce::Colour::fromRGB (252, 165, 165));
-            g.setFont (juce::Font (juce::FontOptions ("Arial", juce::jmax (7.5f, 8.5f * s), juce::Font::bold)));
-            g.drawText ("DI (OFF)", offPill, juce::Justification::centred);
-        }
-    }
-
-    void resized() override
-    {
-        const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
-
-        btnMic1On.setBounds    (juce::roundToInt (14.0f * s), juce::roundToInt (32.0f * s), juce::roundToInt (46.0f * s), juce::roundToInt (24.0f * s));
-        btnMic1Dist.setBounds  (juce::roundToInt (63.0f * s), juce::roundToInt (32.0f * s), juce::roundToInt (54.0f * s), juce::roundToInt (24.0f * s));
-        btnMic1Phase.setBounds (juce::roundToInt (120.0f * s),juce::roundToInt (32.0f * s), juce::roundToInt (26.0f * s), juce::roundToInt (24.0f * s));
-
-        btnMic2On.setBounds    (juce::roundToInt (14.0f * s), juce::roundToInt (62.0f * s), juce::roundToInt (46.0f * s), juce::roundToInt (24.0f * s));
-        btnMic2Dist.setBounds  (juce::roundToInt (63.0f * s), juce::roundToInt (62.0f * s), juce::roundToInt (54.0f * s), juce::roundToInt (24.0f * s));
-        btnMic2Phase.setBounds (juce::roundToInt (120.0f * s),juce::roundToInt (62.0f * s), juce::roundToInt (26.0f * s), juce::roundToInt (24.0f * s));
-
-        btnMoveMics.setBounds  (juce::roundToInt (14.0f * s), juce::roundToInt (96.0f * s), juce::roundToInt (132.0f * s), juce::roundToInt (26.0f * s));
-
-        if (micMixKnob) micMixKnob->setBounds (juce::roundToInt (278.0f * s), juce::roundToInt (24.0f * s), juce::roundToInt (64.0f * s), juce::roundToInt (98.0f * s));
-        if (roomKnob)   roomKnob->setBounds   (juce::roundToInt (344.0f * s), juce::roundToInt (24.0f * s), juce::roundToInt (64.0f * s), juce::roundToInt (98.0f * s));
-    }
-
-    void mouseDown (const juce::MouseEvent& e) override
-    {
-        const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
-        const auto padR = computeXyPadRect (b, s);
-        if (! padR.contains (e.position)) return;
-
-        const bool bass = processor.isBassMode();
-        const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
-        const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
-            static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
-        const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-        const auto gr = computeMiniGrilleRect (padR, s, visualCab);
-        if (gr.isEmpty()) return;
-
-        const auto p1 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth(),
-                                            gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f) * gr.getHeight());
-        const auto p2 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f) * gr.getWidth(),
-                                            gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load() * 0.01f) * gr.getHeight());
-        dragMic = (e.position.getDistanceFrom (p1) <= e.position.getDistanceFrom (p2)) ? 1 : 2;
-        updateFromPt (e.position, gr);
-    }
-
-    void mouseDrag (const juce::MouseEvent& e) override
-    {
-        if (dragMic == 0) return;
-        const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
-        const auto padR = computeXyPadRect (b, s);
-        const bool bass = processor.isBassMode();
-        const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
-        const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
-            static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
-        const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-        const auto gr = computeMiniGrilleRect (padR, s, visualCab);
-        if (! gr.isEmpty())
-            updateFromPt (e.position, gr);
-    }
-
-    void mouseUp (const juce::MouseEvent&) override { dragMic = 0; }
-
-    void mouseDoubleClick (const juce::MouseEvent& e) override
-    {
-        const auto b = getLocalBounds().toFloat();
-        const float s = b.getWidth() / 420.0f;
-        const auto padR = computeXyPadRect (b, s);
-        if (! padR.contains (e.position)) return;
-        const bool bass = processor.isBassMode();
-        const auto& cabs = bass ? getBassCabSpecs() : getGuitarCabSpecs();
-        const int cabIdx = juce::jlimit (0, static_cast<int> (cabs.size()) - 1,
-            static_cast<int> (std::lround (processor.apvts.getRawParameterValue (bass ? MiAmpParams::bassCabModel : MiAmpParams::gtrCab)->load())));
-        const auto& cSpec = cabs[static_cast<size_t> (cabIdx)];
-        const auto& visualCab = cSpec.isOff ? cabs[static_cast<size_t> (bass ? 6 : 7)] : cSpec;
-        const auto gr = computeMiniGrilleRect (padR, s, visualCab);
-        if (gr.isEmpty()) return;
-        const auto p1 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosX)->load() * 0.01f) * gr.getWidth(),
-                                            gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic1PosY)->load() * 0.01f) * gr.getHeight());
-        const auto p2 = juce::Point<float> (gr.getX() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosX)->load() * 0.01f) * gr.getWidth(),
-                                            gr.getY() + (processor.apvts.getRawParameterValue (MiAmpParams::mic2PosY)->load() * 0.01f) * gr.getHeight());
-        const int which = (e.position.getDistanceFrom (p1) <= e.position.getDistanceFrom (p2)) ? 1 : 2;
-        setParamPlain (processor.apvts, which == 1 ? MiAmpParams::mic1PosX : MiAmpParams::mic2PosX, which == 1 ? 36.0f : 66.0f);
-        setParamPlain (processor.apvts, which == 1 ? MiAmpParams::mic1PosY : MiAmpParams::mic2PosY, which == 1 ? 52.0f : 48.0f);
-        if (changedCb) changedCb();
-        refresh();
-    }
-
-private:
-    juce::Rectangle<float> computeXyPadRect (juce::Rectangle<float> b, float s) const
-    {
-        return { 154.0f * s, 17.0f * s, 116.0f * s, 116.0f * s };
-    }
-
-    juce::Rectangle<float> computeMiniGrilleRect (juce::Rectangle<float> padR, float s, const CabSpec& visualCab) const
-    {
-        if (visualCab.imageData == nullptr || visualCab.imageSize <= 0) return {};
-        auto im = juce::ImageCache::getFromMemory (visualCab.imageData, visualCab.imageSize);
-        if (! im.isValid()) return {};
-        const float box = padR.getWidth() - 8.0f * s;
-        const float fit = juce::jmin (box / static_cast<float> (im.getWidth()),
-                                      box / static_cast<float> (im.getHeight()));
-        const float cw = im.getWidth() * fit;
-        const float ch = im.getHeight() * fit;
-        const float ox = padR.getX() + 4.0f * s + (box - cw) * 0.5f;
-        const float oy = padR.getY() + 4.0f * s + (box - ch) * 0.5f;
-        return { ox + visualCab.grilleX * cw, oy + visualCab.grilleY * ch,
-                 visualCab.grilleW * cw, visualCab.grilleH * ch };
-    }
-
-    void updateFromPt (juce::Point<float> pt, juce::Rectangle<float> gr)
-    {
-        const float nx = juce::jlimit (0.0f, 100.0f, ((pt.x - gr.getX()) / juce::jmax (1.0f, gr.getWidth())) * 100.0f);
-        const float ny = juce::jlimit (0.0f, 100.0f, ((pt.y - gr.getY()) / juce::jmax (1.0f, gr.getHeight())) * 100.0f);
-        setParamPlain (processor.apvts, dragMic == 1 ? MiAmpParams::mic1PosX : MiAmpParams::mic2PosX, nx);
-        setParamPlain (processor.apvts, dragMic == 1 ? MiAmpParams::mic1PosY : MiAmpParams::mic2PosY, ny);
-        if (changedCb) changedCb();
-        refresh();
+        drawPin (px1, py1, "57", juce::Colour::fromRGB (18, 34, 28), juce::Colour::fromRGB (158, 246, 212), juce::Colour::fromRGB (220, 255, 241), m1On);
+        drawPin (px2, py2, "87", juce::Colour::fromRGB (36, 28, 14), juce::Colour::fromRGB (255, 208, 123), juce::Colour::fromRGB (255, 242, 212), m2On);
     }
 
     MiAmpAudioProcessor& processor;
-    std::function<void()> changedCb, toggleZoomCb;
-    bool micZoomActive = false;
+    std::function<void()> changedCb, closeCb, wavCb;
+    std::function<void(bool)> modeCb;
+    bool cabMicZoom = false;
     int dragMic = 0;
+    int hoveredCell = -1;
 
-    juce::TextButton btnMic1On { "MI-57" }, btnMic1Dist { "CLOSE" }, btnMic1Phase { juce::String::fromUTF8 (u8"\u00d8") };
-    juce::TextButton btnMic2On { "MI-87" }, btnMic2Dist { "MED" },   btnMic2Phase { juce::String::fromUTF8 (u8"\u00d8") };
-    juce::TextButton btnMoveMics { "MOVER EN CAB" };
+    juce::TextButton btnClose    { juce::String::fromUTF8 (u8"\u00d7") };
+    juce::TextButton btnTabCabs  { "CAJAS" };
+    juce::TextButton btnTabMics  { juce::String::fromUTF8 (u8"MICR\u00d3FONOS") };
+    juce::TextButton btnHeroWav  { ".WAV IR" };
+    juce::TextButton btnBackCabs { juce::String::fromUTF8 (u8"\u2190 VOLVER A CAJAS") };
+
+    juce::TextButton btnMic1On { "MI-57 DYN" }, btnMic1Dist { "CLOSE" }, btnMic1Phase { juce::String::fromUTF8 (u8"\u00d8") };
+    juce::TextButton btnMic2On { "MI-87 COND" }, btnMic2Dist { "MED" },   btnMic2Phase { juce::String::fromUTF8 (u8"\u00d8") };
     std::unique_ptr<StudioMiniKnob> micMixKnob, roomKnob;
 };
 } // namespace miamp_rig

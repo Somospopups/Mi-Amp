@@ -410,7 +410,7 @@ private:
                     lp1.setLowPass (baseSr, 6500.0f, 0.76f);
                     lp2.setLowPass (baseSr, 7900.0f, 0.68f);
                     break;
-                default: // 7: 4x12 MI ZENBOX (Mint Tolex Original Stack: balanced punch + articulated bite)
+                default: // 7: 4x12 MI CLASSIC (Mint Tolex Original Stack: balanced punch + articulated bite)
                     hp.setHighPass (baseSr, 84.0f, 0.90f);
                     resLow.setPeaking (baseSr, 108.0f, 3.8f, 1.45f);
                     midScoop.setPeaking (baseSr, 460.0f, -2.4f, 1.05f);

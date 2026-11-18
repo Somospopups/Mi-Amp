@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "MiAmpGlassTheme.h"
 #include "RigStageComponents.h"
 #include <cmath>
 
@@ -550,12 +551,7 @@ public:
         g.fillRect (b);
 
         const auto card = b.reduced (b.getWidth() * 0.045f, b.getHeight() * 0.072f);
-        juce::ColourGradient grad (juce::Colour::fromRGBA (239, 222, 183, 86), card.getX(), card.getY(),
-                                   juce::Colour::fromRGBA (38, 40, 35, 232), card.getRight(), card.getBottom(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (card, 22.0f);
-        g.setColour (juce::Colour::fromRGBA (255, 243, 210, 180));
-        g.drawRoundedRectangle (card, 22.0f, 1.5f);
+        miamp_theme::paintFrostedGlassPanel (g, card, 22.0f);
 
         g.setColour (juce::Colour::fromRGB (250, 243, 227));
         g.setFont (juce::Font (juce::FontOptions ("Arial", 19.0f, juce::Font::bold)));
@@ -569,10 +565,7 @@ public:
         for (int p = 0; p < 4; ++p)
         {
             const auto& pr = panels[static_cast<size_t> (p)];
-            g.setColour (juce::Colour::fromRGBA (20, 23, 21, 170));
-            g.fillRoundedRectangle (pr, 14.0f);
-            g.setColour (juce::Colour::fromRGBA (255, 243, 210, 82));
-            g.drawRoundedRectangle (pr, 14.0f, 1.1f);
+            miamp_theme::paintGlassSubPanel (g, pr, 14.0f);
             g.setColour (juce::Colour::fromRGB (189, 238, 208));
             g.setFont (juce::Font (juce::FontOptions ("Arial", 13.5f, juce::Font::bold)));
             g.drawText (kTitles[p], pr.getX() + 16.0f, pr.getY() + 9.0f, 150.0f, 22.0f,

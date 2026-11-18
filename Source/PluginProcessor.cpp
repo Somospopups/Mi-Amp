@@ -161,7 +161,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
     addPct  (MiAmpParams::gtrInput,      "Guitar Input",       56.0f);
     addPct  (MiAmpParams::gtrGate,       "Guitar Gate",        32.0f);
     addBool (MiAmpParams::gtrOs4x,       "Guitar 4x OS",       true);
-    addInt  (MiAmpParams::gtrCab,        "Guitar Cab",         0, 9, 7); // 7 = 4x12 MI ZENBOX (Mint)
+    addInt  (MiAmpParams::gtrCab,        "Guitar Cab",         0, 9, 7); // 7 = 4x12 MI CLASSIC (Mint)
     addBool (MiAmpParams::gtrPower,      "Guitar Power",       true);
     addBool (MiAmpParams::gtrStandby,    "Guitar Standby",     false);
     addBool (MiAmpParams::gtrModeBright, "Guitar Bright Cap",  true);
@@ -271,7 +271,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MiAmpAudioProcessor::createP
         addPct (MiAmpParams::gtrEqBand[b], "Gtr EQ Band " + juce::String (b + 1), 50.0f);
 
     // v25 Extended Guitar & Bass Head Parameters
-    addInt  (MiAmpParams::gtrHeadModel,  "Guitar Head Model",  0, 8, 8); // 8 = MI AMP ZENBOX (Classic Mint)
+    addInt  (MiAmpParams::gtrHeadModel,  "Guitar Head Model",  0, 8, 8); // 8 = MI AMP CLASSIC (Classic Mint)
     addPct  (MiAmpParams::gtrResonance,  "Guitar Resonance",   50.0f);
     addPct  (MiAmpParams::gtrVol2,       "Guitar Vol 2",       45.0f);
     addPct  (MiAmpParams::gtrCleanBass,  "Guitar Clean Bass",  52.0f);
@@ -554,9 +554,9 @@ miamp::BassControlSnapshot MiAmpAudioProcessor::readBassSnapshot() const noexcep
     return s;
 }
 
-zenbox::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const noexcept
+miamp_gtr::GuitarControlSnapshot MiAmpAudioProcessor::readGuitarSnapshot() const noexcept
 {
-    zenbox::GuitarControlSnapshot s;
+    miamp_gtr::GuitarControlSnapshot s;
     auto g = [this](const char* id) { return apvts.getRawParameterValue (id)->load(); };
 
     s.headModel     = static_cast<int> (std::lround (g (MiAmpParams::gtrHeadModel)));
@@ -915,7 +915,7 @@ std::vector<int> MiAmpAudioProcessor::getActiveChain (bool forBass) const
 {
     std::vector<int> out;
     const int maxTypes = forBass ? static_cast<int> (miamp::PedalType::Count)
-                                 : static_cast<int> (zenbox::GuitarPedalType::Count);
+                                 : static_cast<int> (miamp_gtr::GuitarPedalType::Count);
     for (int i = 0; i < 10; ++i)
     {
         const char* id = forBass ? MiAmpParams::slot[i] : MiAmpParams::gtrSlot[i];
@@ -939,7 +939,7 @@ bool MiAmpAudioProcessor::addPedalToChain (bool forBass, int pedalType, int inse
 {
     auto chain = getActiveChain (forBass);
     const int maxTypes = forBass ? static_cast<int> (miamp::PedalType::Count)
-                                 : static_cast<int> (zenbox::GuitarPedalType::Count);
+                                 : static_cast<int> (miamp_gtr::GuitarPedalType::Count);
     if (pedalType < 0 || pedalType >= maxTypes) return false;
 
     auto it = std::find (chain.begin(), chain.end(), pedalType);

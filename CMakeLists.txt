@@ -64,6 +64,7 @@ target_sources(MiAmp
         Source/PluginEditor.cpp
         Source/PluginEditor.h
         Source/AmpCatalogSpecs.h
+        Source/MiAmpGlassTheme.h
         Source/RigStageComponents.h
         Source/StudioFxModal.h
         Source/CabPanels.h
@@ -78,7 +79,7 @@ target_sources(MiAmp
         Source/DSP/MiAmpCabMicDSP.h
         Source/DSP/MiAmpStudioFxDSP.h
         Source/DSP/MiAmpBoutiquePedalsDSP.h
-        Source/DSP/ZenboxCabIRs.h
+        Source/DSP/MiAmpCabIRs.h
         Source/DSP/XVBassDSP.h
         Source/DSP/XVCabIRs.h
         Source/DSP/XVBassTuner.h
@@ -171,7 +172,7 @@ juce_add_binary_data(MiAmpAssets
         Resources/rig/cab_4x12_green.png
         Resources/rig/cab_4x12_recto.png
         Resources/rig/cab_4x12_tangerine.png
-        Resources/rig/cab_4x12_zenbox.png
+        Resources/rig/cab_4x12_mint.png
         Resources/rig/head_mi6505.png
         Resources/rig/head_mi800.png
         Resources/rig/head_miac30.png
@@ -180,7 +181,7 @@ juce_add_binary_data(MiAmpAssets
         Resources/rig/head_mirecto.png
         Resources/rig/head_mirocker.png
         Resources/rig/head_mitwin.png
-        Resources/rig/head_zenbox_mint.png
+        Resources/rig/head_miamp_mint.png
         Resources/rig/knob_aguilar_silver.png
         Resources/rig/knob_bass_mint.png
         Resources/rig/knob_be_black.png
@@ -193,7 +194,7 @@ juce_add_binary_data(MiAmpAssets
         Resources/rig/knob_orange_black.png
         Resources/rig/knob_peavey_black.png
         Resources/rig/knob_svt_fluted.png
-        Resources/rig/knob_zenbox_mint.png
+        Resources/rig/knob_miamp_mint.png
         Resources/rig/mic_mi57_clean.png
         Resources/rig/mic_mi87_clean.png
         Resources/rig/fader_cap_hq.png

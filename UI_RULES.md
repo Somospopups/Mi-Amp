@@ -50,3 +50,32 @@ Estas reglas son obligatorias para cualquier cambio de interfaz, código C++ (`S
 - **Formato PNG obligatorio (`RGBA 32-bit` / `color_type = 6`):** **NUNCA** guardar assets críticos nuevos o regenerados como PNG8 indexado con paleta + `tRNS` (`color_type = 3`, por ej. cuantización `FASTOCTREE`) ni superar `1536 px` en el lado más largo en imágenes con alfa: en Windows con JUCE 8 (`libpng` + Direct2D), los PNG8 indexados con ciertos bloques `PLTE`/`tRNS` o alturas elevadas pueden decodificarse/renderizarse como una **silueta negra sólida (`#000000`)** manteniendo intacta la máscara alfa. Guardar siempre como **PNG 32-bit RGBA puro (`color_type = 6`, sin `PLTE` ni `tRNS`)**, con RGB puesto a `0` en píxeles donde `alpha == 0`.
 - **Controles completos:** cada cabezal debe mostrar todas sus perillas, switches y faders reales alineados según `Source/AmpCatalogSpecs.h`.
 - **Previews 100% reales:** cualquier captura o preview visual debe reflejar exactamente las posiciones y proporciones reales del plugin (no reubicar paneles en lugares donde no existen).
+
+---
+
+## 7. Estética Oficial de Vidrio Claro (Referencia Única Obligatoria)
+**Todos los paneles de vidrio del plugin** (selector izquierdo de `CAJAS / MICRÓFONOS`, menú derecho, barra inferior de pedalera, `GlassPopover` de Presets/Afinador/Buscar Tono/Config, `StudioFxModal`, `RigSelectorModal`, `UpdateOverlayComponent` y tarjetas internas) **DEBEN ser exactamente iguales**, usando el mismo tono **"Vidrio Claro"** definido en `Source/MiAmpGlassTheme.h`:
+
+- **Panel principal de vidrio (`paintFrostedGlassPanel`):**
+  - Gradiente diagonal (`top-left (x, y)` → `bottom-right (right, bottom)`):
+    - Inicio: `rgba(239, 222, 183, 74)` (`0.29` alfa)
+    - Fin: `rgba(53, 54, 45, 178)` (`0.70` alfa)
+  - Borde (`1.5 px`): `rgba(255, 243, 210, 158)` (`0.62` alfa)
+  - Radio estándar: `22 px` (`20 px` en el panel izquierdo de cajas/mics)
+- **Sub-paneles / Contenedores interiores (`paintGlassSubPanel` — Hero de cajas, tarjeta de controles Dual Mics, sub-paneles de Studio FX, cuadros de nota):**
+  - Gradiente vertical (`top` → `bottom`): `rgba(255, 250, 238, 41)` → `rgba(230, 218, 190, 23)`
+  - Borde (`1.2 px`): `rgba(255, 246, 222, 107)`
+- **Tarjetas / Celdas seleccionables (`paintGlassCard` — grilla `5×2` de cajas, `RigSelectorModal`, filas de presets/export):**
+  - Normal: gradiente vertical `rgba(255, 250, 238, 56)` → `rgba(236, 224, 198, 31)`, borde `1.2 px` `rgba(255, 246, 222, 122)`
+  - Hover: gradiente vertical `rgba(255, 252, 244, 87)` → `rgba(242, 232, 208, 56)`, borde `1.4 px` `rgba(255, 246, 222, 198)`
+  - Seleccionada: relleno `rgba(166, 223, 201, 71)`, borde `1.8 px` `rgb(166, 223, 201)`
+- **Regla estricta:** prohibido oscurecer popovers, modales o tarjetas con fondos negros/grises opacos (`rgba(12..45, ..., 130..232)`). Cualquier nuevo panel de vidrio debe llamar directamente a `miamp_theme::paintFrostedGlassPanel`, `paintGlassSubPanel` y `paintGlassCard`.
+
+---
+
+## 8. Selector Unificado de Cajas y Micrófonos (`CAJAS ↔ MICRÓFONOS`)
+- **Un solo panel izquierdo** (`x = 28, y = 25, w = 420, h = 716`, o `595` si la consola inferior está abierta) con toggle en la cabecera **`[ CAJAS | MICRÓFONOS ]`**.
+- **Modo `CAJAS`:** Hero grande arriba **sin flechas `< >` laterales en la caja** (ya son innecesarias al tener todas las cajas visibles abajo) + **grilla `5×2`** debajo mostrando los **10 modelos de guitarra / 9 de bajo completos sin recorte lateral**.
+- **Íconos propios (sin repetir la caja Mint):** `CUSTOM WAV IR` usa ícono propio de onda `.WAV IR` y `SIN CAJA (DI)` usa ícono propio rojo `DIRECT DI`.
+- **Modo `MICRÓFONOS`:** el mismo Hero grande muestra los micrófonos arrastrables sobre la grilla del gabinete y debajo aparecen los controles completos (`MI-57`, `MI-87`, distancia `CLOSE/MED/FAR`, fase `Ø`, `MIC MIX`, `ROOM` y botón `← VOLVER A CAJAS`).
+- **Identidad MI AMP:** usar exclusivamente la marca `MI AMP` en UI, código C++, recursos y nombres de archivo (prohibido reutilizar nombres externos anteriores).

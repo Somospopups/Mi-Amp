@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 
-namespace zenbox
+namespace miamp_gtr
 {
 inline constexpr int kCabIrSampleRate = 48000;
 inline constexpr int kCabIrLength = 512;
@@ -274,4 +274,4 @@ inline constexpr std::array<float, 512> kCab3_Studio1x12 = {
     -0.0000879f, -0.0000674f, -0.0000495f, -0.0000344f, -0.0000219f, -0.0000123f, -0.0000055f, -0.0000014f
 };
 
-} // namespace zenbox
+} // namespace miamp_gtr

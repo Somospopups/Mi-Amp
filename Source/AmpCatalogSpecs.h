@@ -262,9 +262,9 @@ inline const std::vector<AmpHeadSpec>& getGuitarHeadSpecs()
             }, {}
         },
         {
-            8, false, "zenbox", "MI AMP ZENBOX", "Signature 3-Channel California Mint",
-            BinaryData::head_zenbox_mint_png, BinaryData::head_zenbox_mint_pngSize,
-            BinaryData::knob_zenbox_mint_png, BinaryData::knob_zenbox_mint_pngSize, false,
+            8, false, "miamp_classic", "MI AMP CLASSIC", "Signature 3-Channel California Mint",
+            BinaryData::head_miamp_mint_png, BinaryData::head_miamp_mint_pngSize,
+            BinaryData::knob_miamp_mint_png, BinaryData::knob_miamp_mint_pngSize, false,
             {
                 { 0.2640f, 0.6640f, 0.0435f, MiAmpParams::gtrChGain[0], "CH1 GAIN" },
                 { 0.3140f, 0.6640f, 0.0435f, MiAmpParams::gtrChTreble[0], "CH1 TREBLE" },
@@ -504,8 +504,8 @@ inline const std::vector<CabSpec>& getGuitarCabSpecs()
         { 4, false, false, false, "2x12 CLASS-A",   "Alnico Blue Open-Back Chime", BinaryData::cab_2x12_classa_png,    BinaryData::cab_2x12_classa_pngSize,    0.96f, 0.62f, 0.12f, 0.2339f, 0.76f, 0.6166f },
         { 5, false, false, false, "4x12 TANGERINE", "Thick Mid-Rich Sludge",       BinaryData::cab_4x12_tangerine_png, BinaryData::cab_4x12_tangerine_pngSize, 1.00f, 0.96f, 0.12f, 0.1827f, 0.76f, 0.6843f },
         { 6, false, false, false, "2x12 BLACKFACE", "Jensen Clean Sparkle",        BinaryData::cab_2x12_twin_png,      BinaryData::cab_2x12_twin_pngSize,      0.96f, 0.60f, 0.12f, 0.2321f, 0.76f, 0.6181f },
-        { 7, false, false, false, "4x12 MI ZENBOX", "Mint Tolex Original Stack",   BinaryData::cab_4x12_zenbox_png,    BinaryData::cab_4x12_zenbox_pngSize,    1.00f, 1.00f, 0.09f, 0.1300f, 0.82f, 0.7200f },
-        { 8, false, true,  false, "CUSTOM WAV IR",  "Load External .WAV Impulse",  BinaryData::cab_4x12_zenbox_png,    BinaryData::cab_4x12_zenbox_pngSize,    1.00f, 1.00f, 0.09f, 0.1300f, 0.82f, 0.7200f },
+        { 7, false, false, false, "4x12 MI CLASSIC", "Mint Tolex Original Stack",   BinaryData::cab_4x12_mint_png,    BinaryData::cab_4x12_mint_pngSize,    1.00f, 1.00f, 0.09f, 0.1300f, 0.82f, 0.7200f },
+        { 8, false, true,  false, "CUSTOM WAV IR",  "Load External .WAV Impulse",  BinaryData::cab_4x12_mint_png,    BinaryData::cab_4x12_mint_pngSize,    1.00f, 1.00f, 0.09f, 0.1300f, 0.82f, 0.7200f },
         { 9, false, false, true,  "CAB OFF",        "Direct Amp Output (No Cab)",  nullptr, 0, 1.00f, 1.00f, 0.09f, 0.13f, 0.82f, 0.72f }
     };
     return specs;
