@@ -175,35 +175,6 @@ enum class Msg : int
     UpdBtnCancel,
     UpdFailed,
 
-    // Practice & Stem Studio (ENSAYO)
-    BtnPractice,
-    TitlePracticeStudio,
-    PracticePlaylistTitle,
-    PracticeAddSong,
-    PracticeFreeTake,
-    PracticeModeContinuous,
-    PracticeModePauseChoose,
-    PracticeBackToAmp,
-    PracticeAmpCab,
-    PracticeEmptyPlaylist,
-    PracticeExportMix,
-    PracticeExportStems,
-    PracticeExportMyTake,
-    PracticeEndTitle,
-    PracticeRepeatBtn,
-    PracticeNextBtn,
-    PracticeDownloadAi,
-    PracticeSeparateAi,
-    PracticeLinkPreset,
-    PracticeTrackVocals,
-    PracticeTrackGuitar,
-    PracticeTrackBass,
-    PracticeTrackDrums,
-    PracticeTrackOther,
-    PracticeTrackMyGuitar,
-    PracticeTrackMyBass,
-    PracticeTrackMetronome,
-
     Count
 };
 
@@ -532,36 +503,7 @@ inline juce::String tr (Msg id)
         { u8"ACTUALIZAR AHORA", u8"UPDATE NOW", u8"ATUALIZAR AGORA", u8"METTRE \u00c0 JOUR", u8"JETZT AKTUALISIEREN" },
         { u8"M\u00c1S TARDE", u8"LATER", u8"MAIS TARDE", u8"PLUS TARD", u8"SP\u00c4TER" },
         { u8"CONTINUAR SIN ACTUALIZAR", u8"CONTINUE WITHOUT UPDATING", u8"CONTINUAR SEM ATUALIZAR", u8"CONTINUER SANS METTRE \u00c0 JOUR", u8"OHNE UPDATE FORTFAHREN" },
-        { u8"No se pudo descargar. Reintentar luego.", u8"Download failed. Try again later.", u8"Falha no download. Tente depois.", u8"\u00c9chec du t\u00e9l\u00e9chargement. R\u00e9essayez plus tard.", u8"Download fehlgeschlagen. Sp\u00e4ter erneut versuchen." },
-
-        // Practice & Stem Studio (ENSAYO)
-        { u8"ENSAYO", u8"PRACTICE", u8"ENSAIO", u8"R\u00c9P\u00c9TITION", u8"PROBEN" },
-        { u8"MODO ENSAYO \u00b7 ESTUDIO", u8"PRACTICE STUDIO", u8"EST\u00daDIO DE ENSAIO", u8"STUDIO DE R\u00c9P\u00c9TITION", u8"\u00dcBUNGSSTUDIO" },
-        { u8"PLAYLIST DE ENSAYO", u8"PRACTICE PLAYLIST", u8"PLAYLIST DE ENSAIO", u8"PLAYLIST R\u00c9P\u00c9TITION", u8"PROBEN-PLAYLIST" },
-        { u8"+ AGREGAR CANCI\u00d3N", u8"+ ADD SONG", u8"+ ADICIONAR M\u00daSICA", u8"+ AJOUTER MORCEAU", u8"+ SONG LADEN" },
-        { u8"+ TOMA LIBRE", u8"+ FREE TAKE", u8"+ TAKE LIVRE", u8"+ PRISE LIBRE", u8"+ FREIE SPUR" },
-        { u8"CORRIDO", u8"CONTINUOUS", u8"CONT\u00cdNUO", u8"EN CONTINU", u8"DURCHLAUF" },
-        { u8"PAUSAR Y ELEGIR", u8"PAUSE & CHOOSE", u8"PAUSAR E ESCOLHER", u8"PAUSE & CHOIX", u8"PAUSE & W\u00c4HLEN" },
-        { u8"\u2190 VOLVER AL AMPLI", u8"\u2190 BACK TO AMP", u8"\u2190 VOLTAR AO AMP", u8"\u2190 RETOUR AMPLI", u8"\u2190 ZUR\u00dcCK ZUM AMP" },
-        { u8"AMPLI / CAJA", u8"AMP / CAB", u8"AMP / CX", u8"AMPLI / BAFFLE", u8"AMP / BOX" },
-        { u8"Agreg\u00e1 un MP3, WAV o FLAC\no cre\u00e1 una Toma Libre", u8"Add an MP3, WAV or FLAC\nor start a Free Take", u8"Adicione MP3, WAV ou FLAC\nou crie um Take Livre", u8"Ajoutez MP3, WAV ou FLAC\nou cr\u00e9ez une Prise Libre", u8"MP3, WAV oder FLAC laden\noder Freie Spur starten" },
-        { u8"EXPORTAR MEZCLA (.WAV)", u8"EXPORT MIX (.WAV)", u8"EXPORTAR MIX (.WAV)", u8"EXPORTER MIX (.WAV)", u8"MIX (.WAV)" },
-        { u8"EXPORTAR STEMS CHECKED", u8"EXPORT CHECKED STEMS", u8"EXPORTAR STEMS MARCADOS", u8"EXPORTER STEMS COCH\u00c9S", u8"STEMS (.WAV)" },
-        { u8"SOLO MI TOMA (.WAV)", u8"MY TAKE ONLY (.WAV)", u8"S\u00d3 MEU TAKE (.WAV)", u8"MA PRISE SEULE (.WAV)", u8"MEINE SPUR (.WAV)" },
-        { u8"FIN DE PISTA", u8"END OF TRACK", u8"FIM DA FAIXA", u8"FIN DE PISTE", u8"TRACK-ENDE" },
-        { u8"\u21bb REPETIR", u8"\u21bb REPEAT", u8"\u21bb REPETIR", u8"\u21bb R\u00c9P\u00c9TER", u8"\u21bb WIEDERHOLEN" },
-        { u8"SIGUIENTE \u2192", u8"NEXT \u2192", u8"PR\u00d3XIMA \u2192", u8"SUIVANT \u2192", u8"N\u00c4CHSTER \u2192" },
-        { u8"DESCARGAR AI (136 MB)", u8"DOWNLOAD AI (136 MB)", u8"BAIXAR IA (136 MB)", u8"T\u00c9L\u00c9CHARGER IA (136 Mo)", u8"KI LADEN (136 MB)" },
-        { u8"SEPARAR CON AI", u8"AI SEPARATE", u8"SEPARAR COM IA", u8"S\u00c9PARER PAR IA", u8"MIT KI TRENNEN" },
-        { u8"VINCULAR PRESET", u8"LINK PRESET", u8"VINCULAR PRESET", u8"LIER PRESET", u8"PRESET VERKN\u00dcPFEN" },
-        { u8"VOZ", u8"VOCALS", u8"VOZ", u8"CHANT", u8"GESANG" },
-        { u8"GUITARRA", u8"GUITAR", u8"GUITARRA", u8"GUITARE", u8"GITARRE" },
-        { u8"BAJO", u8"BASS", u8"BAIXO", u8"BASSE", u8"BASS" },
-        { u8"BATER\u00cdA", u8"DRUMS", u8"BATERIA", u8"BATTERIE", u8"SCHLAGZEUG" },
-        { u8"OTROS / FX", u8"OTHER / KEYS", u8"OUTROS / FX", u8"AUTRES / CLAVIERS", u8"SONSTIGE / KEYS" },
-        { u8"MI GUITARRA", u8"MY GUITAR", u8"MINHA GUITARRA", u8"MA GUITARE", u8"MEINE GITARRE" },
-        { u8"MI BAJO", u8"MY BASS", u8"MEU BAIXO", u8"MA BASSE", u8"MEIN BASS" },
-        { u8"METR\u00d3NOMO", u8"METRONOME", u8"METR\u00d3NOMO", u8"M\u00c9TRONOME", u8"METRONOM" }
+        { u8"No se pudo descargar. Reintentar luego.", u8"Download failed. Try again later.", u8"Falha no download. Tente depois.", u8"\u00c9chec du t\u00e9l\u00e9chargement. R\u00e9essayez plus tard.", u8"Download fehlgeschlagen. Sp\u00e4ter erneut versuchen." }
     }};
 
     const int li = juce::jlimit (0, 4, static_cast<int> (currentLang()));

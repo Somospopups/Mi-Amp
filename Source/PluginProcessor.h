@@ -5,7 +5,6 @@
 #include "DSP/MiAmpCabMicDSP.h"
 #include "DSP/MiAmpStudioFxDSP.h"
 #include "DSP/XVBassTuner.h"
-#include "DSP/MiAmpPracticeEngine.h"
 
 namespace MiAmpParams
 {
@@ -326,9 +325,6 @@ public:
     void loadUserPreset (int index);
     bool loadPresetByName (const juce::String& name, bool forBass);
 
-    miamp_practice::MiAmpPracticeEngine& getPracticeEngine() noexcept { return practiceEngine; }
-    const miamp_practice::MiAmpPracticeEngine& getPracticeEngine() const noexcept { return practiceEngine; }
-
     miamp::BassControlSnapshot getBassSnapshot() const noexcept { return readBassSnapshot(); }
     miamp_gtr::GuitarControlSnapshot getGuitarSnapshot() const noexcept { return readGuitarSnapshot(); }
     miamp::CabMicSnapshot getCabMicSnapshot() const noexcept { return readCabMicSnapshot(); }
@@ -365,7 +361,6 @@ private:
     miamp_gtr::MiAmpGuitarChainDSP guitarDsp;
     miamp::MiAmpCabMicDSP cabMicDsp;
     miamp::MiAmpStudioFxDSP studioFxDsp;
-    miamp_practice::MiAmpPracticeEngine practiceEngine;
     juce::String customGtrIrPath, customGtrIrName;
     juce::String customBassIrPath, customBassIrName;
     std::vector<float> monoScratch;

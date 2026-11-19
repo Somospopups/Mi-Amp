@@ -68,7 +68,6 @@ target_sources(MiAmp
         Source/RigStageComponents.h
         Source/StudioFxModal.h
         Source/CabPanels.h
-        Source/PracticeStudioView.h
         Source/PedalCatalogSpecs.h
         Source/ToneFinderEngine.h
         Source/PresetExporter.h
@@ -80,15 +79,11 @@ target_sources(MiAmp
         Source/DSP/MiAmpCabMicDSP.h
         Source/DSP/MiAmpStudioFxDSP.h
         Source/DSP/MiAmpBoutiquePedalsDSP.h
-        Source/DSP/MiAmpPracticeEngine.h
         Source/DSP/MiAmpCabIRs.h
         Source/DSP/XVBassDSP.h
         Source/DSP/XVCabIRs.h
         Source/DSP/XVBassTuner.h
         Source/DSP/XVPitchShifter.h
-        Source/ThirdParty/signalsmith/signalsmith-stretch.h
-        Source/ThirdParty/signalsmith/signalsmith-linear/stft.h
-        Source/ThirdParty/signalsmith/signalsmith-linear/fft.h
 )
 
 juce_add_binary_data(MiAmpAssets
@@ -222,90 +217,12 @@ target_compile_definitions(MiAmp
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
-        JUCE_USE_MP3AUDIOFORMAT=1
         JUCE_VST3_CAN_REPLACE_VST2=0
         JUCE_DISPLAY_SPLASH_SCREEN=0
         DONT_SET_USING_JUCE_NAMESPACE=1
         MIAMP_BUILD_NUMBER=${MIAMP_BUILD_NUMBER}
         MIAMP_APP_VERSION="1.1.${MIAMP_BUILD_NUMBER}"
 )
-
-# Pure-C++ Offline AI Stem Separation via Microsoft ONNX Runtime 1.23.2 (htdemucs_6s ONNX)
-option(MIAMP_ENABLE_DEMUCS "Build embedded ONNX Runtime 6-stem AI engine" ON)
-if(MIAMP_ENABLE_DEMUCS)
-    set(_ort_dir "${CMAKE_CURRENT_BINARY_DIR}/_deps/onnxruntime")
-    set(_ort_zip "${CMAKE_CURRENT_BINARY_DIR}/_deps/microsoft.ml.onnxruntime.1.23.2.zip")
-    if(NOT EXISTS "${_ort_dir}/build/native/include/onnxruntime_c_api.h")
-        file(MAKE_DIRECTORY "${_ort_dir}")
-        if(NOT EXISTS "${_ort_zip}")
-            message(STATUS "Downloading Microsoft.ML.OnnxRuntime 1.23.2 (headers + native runtime)...")
-            file(DOWNLOAD
-                "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.23.2/microsoft.ml.onnxruntime.1.23.2.nupkg"
-                "${_ort_zip}"
-                SHOW_PROGRESS
-                STATUS _ort_dl_status
-            )
-            list(GET _ort_dl_status 0 _ort_dl_code)
-            if(NOT _ort_dl_code EQUAL 0)
-                list(GET _ort_dl_status 1 _ort_dl_err)
-                message(FATAL_ERROR "Failed to download Microsoft.ML.OnnxRuntime 1.23.2: ${_ort_dl_err}")
-            endif()
-        endif()
-        file(ARCHIVE_EXTRACT INPUT "${_ort_zip}" DESTINATION "${_ort_dir}")
-    endif()
-
-    target_include_directories(MiAmp SYSTEM PUBLIC "${_ort_dir}/build/native/include")
-    target_compile_definitions(MiAmp PUBLIC MIAMP_HAS_DEMUCS=1)
-
-    if(WIN32)
-        set(_ort_win_dll "${_ort_dir}/runtimes/win-x64/native/onnxruntime.dll")
-        if(EXISTS "${_ort_win_dll}")
-            if(TARGET MiAmp_Standalone)
-                add_custom_command(TARGET MiAmp_Standalone POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ort_win_dll}" "$<TARGET_FILE_DIR:MiAmp_Standalone>/onnxruntime.dll"
-                )
-            endif()
-            if(TARGET MiAmp_VST3)
-                add_custom_command(TARGET MiAmp_VST3 POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ort_win_dll}" "$<TARGET_FILE_DIR:MiAmp_VST3>/onnxruntime.dll"
-                )
-            endif()
-        else()
-            message(FATAL_ERROR "Missing onnxruntime.dll inside NuGet package at ${_ort_win_dll}")
-        endif()
-    elseif(APPLE)
-        set(_ort_mac_arm "${_ort_dir}/runtimes/osx-arm64/native/libonnxruntime.dylib")
-        set(_ort_mac_x64 "${_ort_dir}/runtimes/osx-x64/native/libonnxruntime.dylib")
-        set(_ort_mac_univ "${_ort_dir}/libonnxruntime_universal.dylib")
-        if(EXISTS "${_ort_mac_arm}" AND EXISTS "${_ort_mac_x64}")
-            execute_process(
-                COMMAND lipo -create "${_ort_mac_arm}" "${_ort_mac_x64}" -output "${_ort_mac_univ}"
-                RESULT_VARIABLE _lipo_res
-            )
-            if(NOT _lipo_res EQUAL 0)
-                set(_ort_mac_univ "${_ort_mac_arm}")
-            endif()
-        elseif(EXISTS "${_ort_mac_arm}")
-            set(_ort_mac_univ "${_ort_mac_arm}")
-        elseif(EXISTS "${_ort_mac_x64}")
-            set(_ort_mac_univ "${_ort_mac_x64}")
-        endif()
-
-        if(EXISTS "${_ort_mac_univ}")
-            foreach(_mac_tgt IN ITEMS MiAmp_Standalone MiAmp_VST3 MiAmp_AU)
-                if(TARGET ${_mac_tgt})
-                    add_custom_command(TARGET ${_mac_tgt} POST_BUILD
-                        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${_mac_tgt}>/Frameworks"
-                        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ort_mac_univ}" "$<TARGET_BUNDLE_CONTENT_DIR:${_mac_tgt}>/Frameworks/libonnxruntime.dylib"
-                        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_CONTENT_DIR:${_mac_tgt}>/Frameworks/libonnxruntime.dylib"
-                    )
-                endif()
-            endforeach()
-        endif()
-    endif()
-else()
-    target_compile_definitions(MiAmp PUBLIC MIAMP_HAS_DEMUCS=0)
-endif()
 
 target_compile_options(MiAmp
     PUBLIC

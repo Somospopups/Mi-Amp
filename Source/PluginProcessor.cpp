@@ -386,7 +386,6 @@ void MiAmpAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     cabMicDsp.prepare (sampleRate, samplesPerBlock);
     studioFxDsp.prepare (sampleRate, samplesPerBlock);
     tuner.prepare (sampleRate);
-    practiceEngine.prepareToPlay (currentSampleRate, samplesPerBlock);
     monoScratch.resize (static_cast<size_t> (std::max (256, samplesPerBlock)), 0.0f);
 }
 
@@ -796,40 +795,16 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         return;
 
     // Standalone zero-noise startup & built-in mic guard:
-    // Keep input strictly silent until StandaloneAudioImpl verifies an external interface or manual selection,
-    // while still allowing Practice Studio backing track playback.
+    // Keep input strictly silent until StandaloneAudioImpl verifies an external interface or manual selection.
     if (wrapperType == wrapperType_Standalone
         && (! miamp_standalone::isStandaloneInputAllowed() || miamp_standalone::isAudioInputMuted()))
     {
         buffer.clear();
         feedbackHoldSamples = 0;
         inputRms.store (0.0f, std::memory_order_relaxed);
+        outputRms.store (0.0f, std::memory_order_relaxed);
+        isClipping.store (false, std::memory_order_relaxed);
         bassCompGrDb.store (0.0f, std::memory_order_relaxed);
-
-        if (buffer.getNumChannels() >= 2)
-            practiceEngine.processBlockPlaybackAndRecord (buffer);
-
-        double outSq = 0.0;
-        float peak = 0.0f;
-        for (int c = 0; c < buffer.getNumChannels(); ++c)
-        {
-            float* p = buffer.getWritePointer (c);
-            for (int i = 0; i < numSamples; ++i)
-            {
-                float v = p[i];
-                if (! std::isfinite (v)) v = 0.0f;
-                else if (std::fabs (v) > 0.88f)
-                {
-                    const float sign = (v >= 0.0f) ? 1.0f : -1.0f;
-                    v = sign * (0.88f + 0.06f * std::tanh ((std::fabs (v) - 0.88f) / 0.06f));
-                }
-                p[i] = v;
-                outSq += static_cast<double> (v) * static_cast<double> (v);
-                peak = std::max (peak, std::fabs (v));
-            }
-        }
-        outputRms.store (static_cast<float> (std::sqrt (outSq / static_cast<double> (numSamples * buffer.getNumChannels()))), std::memory_order_relaxed);
-        isClipping.store (peak >= 0.935f, std::memory_order_relaxed);
         return;
     }
 
@@ -964,37 +939,8 @@ void MiAmpAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         }
     }
 
-    if (buffer.getNumChannels() >= 2 && (practiceEngine.isPlaying() || practiceEngine.isRecording()))
-    {
-        practiceEngine.processBlockPlaybackAndRecord (buffer);
-
-        double mixSq = 0.0;
-        float mixPeak = 0.0f;
-        for (int c = 0; c < buffer.getNumChannels(); ++c)
-        {
-            float* p = buffer.getWritePointer (c);
-            for (int i = 0; i < numSamples; ++i)
-            {
-                float v = p[i];
-                if (! std::isfinite (v)) v = 0.0f;
-                else if (std::fabs (v) > 0.88f)
-                {
-                    const float sign = (v >= 0.0f) ? 1.0f : -1.0f;
-                    v = sign * (0.88f + 0.06f * std::tanh ((std::fabs (v) - 0.88f) / 0.06f));
-                }
-                p[i] = v;
-                mixSq += static_cast<double> (v) * static_cast<double> (v);
-                mixPeak = std::max (mixPeak, std::fabs (v));
-            }
-        }
-        outputRms.store (static_cast<float> (std::sqrt (mixSq / static_cast<double> (numSamples * buffer.getNumChannels()))), std::memory_order_relaxed);
-        isClipping.store (mixPeak >= 0.935f, std::memory_order_relaxed);
-    }
-    else
-    {
-        outputRms.store (outRmsVal, std::memory_order_relaxed);
-        isClipping.store (peak >= 0.935f, std::memory_order_relaxed);
-    }
+    outputRms.store (outRmsVal, std::memory_order_relaxed);
+    isClipping.store (peak >= 0.935f, std::memory_order_relaxed);
 }
 
 bool MiAmpAudioProcessor::isHeadBypassed (bool forBass) const noexcept
