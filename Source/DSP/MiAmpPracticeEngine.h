@@ -3,14 +3,16 @@
 #include "../ThirdParty/signalsmith/signalsmith-stretch.h"
 
 #if defined(MIAMP_HAS_DEMUCS) && MIAMP_HAS_DEMUCS
- #include "model.hpp"
+ #include <onnxruntime_c_api.h>
 #endif
 
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 namespace miamp_practice
@@ -79,18 +81,18 @@ inline juce::File getModelsDir()
 
 inline juce::File getDemucsModelFile()
 {
-    return getModelsDir().getChildFile ("ggml-model-htdemucs-6s-f16.bin");
+    return getModelsDir().getChildFile ("htdemucs_6s_fp16weights.onnx");
 }
 
 inline bool isDemucsModelReady()
 {
     const auto f = getDemucsModelFile();
-    return f.existsAsFile() && f.getSize() >= 54000000;
+    return f.existsAsFile() && f.getSize() >= 130000000;
 }
 
 inline juce::String demucsModelDownloadUrl()
 {
-    return "https://huggingface.co/datasets/Retrobear/demucs.cpp/resolve/main/ggml-model-htdemucs-6s-f16.bin";
+    return "https://huggingface.co/StemSplitio/htdemucs-6s-onnx/resolve/main/htdemucs_6s_fp16weights.onnx";
 }
 
 inline juce::File getSongCacheDir (const juce::String& songId)
@@ -1315,17 +1317,37 @@ private:
         return true;
     }
 
-    static bool readStereoAudioFileSafe (const juce::File& file, double targetSr, juce::Thread& thread,
-                                         juce::AudioBuffer<float>& outBuf)
+    static bool readStereoAudioFileInner (const juce::File* filePtr, double targetSr, juce::Thread* threadPtr,
+                                          juce::AudioBuffer<float>* outBufPtr)
     {
-        if (! file.existsAsFile())
+        if (filePtr == nullptr || threadPtr == nullptr || outBufPtr == nullptr || ! filePtr->existsAsFile())
             return false;
 
-        // Thread-local AudioFormatManager avoids any cross-thread Windows COM/WMAudioFormat contention
+        const juce::File& file = *filePtr;
         juce::AudioFormatManager localFormats;
-        localFormats.registerBasicFormats();
+
+        // Prefer pure-C++ decoders first so MP3/WAV/FLAC/AIFF/OGG never touch Windows Wmvcore.dll / COM
+        localFormats.registerFormat (new juce::WavAudioFormat(), true);
+        localFormats.registerFormat (new juce::AiffAudioFormat(), false);
+       #if defined(JUCE_USE_FLAC) && JUCE_USE_FLAC
+        localFormats.registerFormat (new juce::FlacAudioFormat(), false);
+       #endif
+       #if defined(JUCE_USE_OGGVORBIS) && JUCE_USE_OGGVORBIS
+        localFormats.registerFormat (new juce::OggVorbisAudioFormat(), false);
+       #endif
+       #if defined(JUCE_USE_MP3AUDIOFORMAT) && JUCE_USE_MP3AUDIOFORMAT
+        localFormats.registerFormat (new juce::MP3AudioFormat(), false);
+       #endif
 
         std::unique_ptr<juce::AudioFormatReader> reader (localFormats.createReaderFor (file));
+        if (reader == nullptr)
+        {
+            // Fallback (e.g. M4A / WMA / CoreAudio) only if pure-C++ formats could not decode
+            juce::AudioFormatManager fallbackFormats;
+            fallbackFormats.registerBasicFormats();
+            reader.reset (fallbackFormats.createReaderFor (file));
+        }
+
         if (reader == nullptr || reader->lengthInSamples <= 0 || reader->sampleRate <= 0.0 || reader->numChannels <= 0)
             return false;
 
@@ -1338,43 +1360,29 @@ private:
 
         constexpr int kReadChunk = 65536;
         int pos = 0;
-        while (pos < srcLen && ! thread.threadShouldExit())
+        while (pos < srcLen && ! threadPtr->threadShouldExit())
         {
             const int nThis = juce::jmin (kReadChunk, srcLen - pos);
             if (! reader->read (&srcBuf, pos, nThis, static_cast<int64_t> (pos), true, true))
                 break;
             pos += nThis;
         }
-        if (thread.threadShouldExit() || pos <= 0)
+        if (threadPtr->threadShouldExit() || pos <= 0)
             return false;
 
         sanitizeAudioBuffer (srcBuf, pos);
-        const bool ok = resampleStereoSafe (srcBuf, reader->sampleRate, targetSr, pos, outBuf);
+        const bool ok = resampleStereoSafe (srcBuf, reader->sampleRate, targetSr, pos, *outBufPtr);
         srcBuf.setSize (0, 0);
         return ok;
     }
 
-   #if defined(MIAMP_HAS_DEMUCS) && MIAMP_HAS_DEMUCS
-    static bool loadDemucsModelInner (const std::string* pathPtr, demucscpp::demucs_model* model)
-    {
-        return demucscpp::load_demucs_model (*pathPtr, model);
-    }
-
-    static bool runDemucsInferenceInner (const demucscpp::demucs_model* model,
-                                         const Eigen::MatrixXf* mixPtr,
-                                         Eigen::Tensor3dXf* outPtr,
-                                         const std::function<void(float, const std::string&)>* cbPtr)
-    {
-        *outPtr = demucscpp::demucs_inference (*model, *mixPtr, *cbPtr);
-        return true;
-    }
-
    #if defined(_MSC_VER)
-    __declspec(noinline) static bool sehLoadDemucsModel (const std::string* pathPtr, demucscpp::demucs_model* model, bool* outSehFault) noexcept
+    __declspec(noinline) static bool sehReadStereoAudioFile (const juce::File* filePtr, double targetSr, juce::Thread* threadPtr,
+                                                             juce::AudioBuffer<float>* outBufPtr, bool* outSehFault) noexcept
     {
         __try
         {
-            return loadDemucsModelInner (pathPtr, model);
+            return readStereoAudioFileInner (filePtr, targetSr, threadPtr, outBufPtr);
         }
         __except (1)
         {
@@ -1382,16 +1390,342 @@ private:
             return false;
         }
     }
+   #endif
 
-    __declspec(noinline) static bool sehRunDemucsInference (const demucscpp::demucs_model* model,
-                                                            const Eigen::MatrixXf* mixPtr,
-                                                            Eigen::Tensor3dXf* outPtr,
-                                                            const std::function<void(float, const std::string&)>* cbPtr,
-                                                            bool* outSehFault) noexcept
+    static bool readStereoAudioFileSafe (const juce::File& file, double targetSr, juce::Thread& thread,
+                                         juce::AudioBuffer<float>& outBuf)
+    {
+       #if defined(_MSC_VER)
+        bool sehFault = false;
+        const bool ok = sehReadStereoAudioFile (&file, targetSr, &thread, &outBuf, &sehFault);
+        return ! sehFault && ok;
+       #else
+        return readStereoAudioFileInner (&file, targetSr, &thread, &outBuf);
+       #endif
+    }
+
+   #if defined(MIAMP_HAS_DEMUCS) && MIAMP_HAS_DEMUCS
+    static juce::File findOnnxRuntimeLibraryFile()
+    {
+       #if defined(_WIN32)
+        const char* libName = "onnxruntime.dll";
+        const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+        const auto appDir = juce::File::getSpecialLocation (juce::File::currentApplicationFile).getParentDirectory();
+        const std::array<juce::File, 5> candidates = {
+            exeDir.getChildFile (libName),
+            appDir.getChildFile (libName),
+            exeDir.getParentDirectory().getChildFile (libName),
+            getModelsDir().getChildFile (libName),
+            juce::File ("C:\\Program Files\\Popups Audio\\MI AMP\\onnxruntime.dll")
+        };
+       #elif defined(__APPLE__)
+        const char* libName = "libonnxruntime.dylib";
+        const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+        const auto appDir = juce::File::getSpecialLocation (juce::File::currentApplicationFile);
+        const std::array<juce::File, 5> candidates = {
+            exeDir.getParentDirectory().getChildFile ("Frameworks").getChildFile (libName),
+            appDir.getChildFile ("Contents").getChildFile ("Frameworks").getChildFile (libName),
+            exeDir.getChildFile (libName),
+            getModelsDir().getChildFile (libName),
+            juce::File ("/Applications/MI AMP.app/Contents/Frameworks/libonnxruntime.dylib")
+        };
+       #else
+        const char* libName = "libonnxruntime.so";
+        const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+        const std::array<juce::File, 2> candidates = {
+            exeDir.getChildFile (libName),
+            getModelsDir().getChildFile (libName)
+        };
+       #endif
+        for (const auto& c : candidates)
+            if (c.existsAsFile())
+                return c;
+        return {};
+    }
+
+    static const OrtApi* getOrtApi (juce::String& outErr)
+    {
+        static std::mutex sOrtMutex;
+        static std::unique_ptr<juce::DynamicLibrary> sOrtLib;
+        static const OrtApi* sOrtApi = nullptr;
+
+        const std::lock_guard<std::mutex> lock (sOrtMutex);
+        if (sOrtApi != nullptr)
+            return sOrtApi;
+
+        const auto libFile = findOnnxRuntimeLibraryFile();
+        if (! libFile.existsAsFile())
+        {
+            outErr = "No se encontro onnxruntime junto a MI AMP";
+            return nullptr;
+        }
+
+        auto lib = std::make_unique<juce::DynamicLibrary>();
+        if (! lib->open (libFile.getFullPathName()))
+        {
+            outErr = "No se pudo cargar " + libFile.getFileName();
+            return nullptr;
+        }
+
+        using GetApiBaseFn = const OrtApiBase* (ORT_API_CALL*) (void);
+        auto fnPtr = lib->getFunction ("OrtGetApiBase");
+        if (fnPtr == nullptr)
+        {
+            outErr = "Simbolo OrtGetApiBase no encontrado en onnxruntime";
+            return nullptr;
+        }
+
+        auto getBase = reinterpret_cast<GetApiBaseFn> (fnPtr);
+        const OrtApiBase* base = getBase != nullptr ? getBase() : nullptr;
+        if (base == nullptr || base->GetApi == nullptr)
+        {
+            outErr = "OrtGetApiBase devolvio nulo";
+            return nullptr;
+        }
+
+        const OrtApi* api = base->GetApi (ORT_API_VERSION);
+        if (api == nullptr)
+        {
+            static constexpr uint32_t kFallbacks[] = { 23u, 22u, 21u, 20u, 17u, 15u };
+            for (uint32_t v : kFallbacks)
+            {
+                api = base->GetApi (v);
+                if (api != nullptr) break;
+            }
+        }
+        if (api == nullptr)
+        {
+            outErr = "Version de ONNX Runtime incompatible";
+            return nullptr;
+        }
+
+        sOrtLib = std::move (lib);
+        sOrtApi = api;
+        return sOrtApi;
+    }
+
+    static bool runOnnxSeparationInner (const juce::File* modelFilePtr,
+                                        const juce::AudioBuffer<float>* audio44Ptr,
+                                        std::array<juce::AudioBuffer<float>, kNumStems>* outStemsPtr,
+                                        juce::Thread* threadPtr,
+                                        const std::function<void(float, const juce::String&, bool)>* progCbPtr,
+                                        juce::String* outErrPtr)
+    {
+        auto setErr = [&] (const juce::String& m)
+        {
+            if (outErrPtr) *outErrPtr = m;
+            return false;
+        };
+
+        juce::String ortErr;
+        const OrtApi* ort = getOrtApi (ortErr);
+        if (ort == nullptr)
+            return setErr (ortErr);
+
+        OrtEnv* env = nullptr;
+        OrtSessionOptions* sessOpts = nullptr;
+        OrtSession* session = nullptr;
+        OrtMemoryInfo* memInfo = nullptr;
+
+        auto cleanup = [&]
+        {
+            if (memInfo != nullptr)  { ort->ReleaseMemoryInfo (memInfo); memInfo = nullptr; }
+            if (session != nullptr)  { ort->ReleaseSession (session); session = nullptr; }
+            if (sessOpts != nullptr) { ort->ReleaseSessionOptions (sessOpts); sessOpts = nullptr; }
+            if (env != nullptr)      { ort->ReleaseEnv (env); env = nullptr; }
+        };
+
+        auto checkStatus = [&] (OrtStatus* st, const char* stage) -> bool
+        {
+            if (st == nullptr) return true;
+            const char* msg = ort->GetErrorMessage (st);
+            const juce::String s = juce::String (stage) + ": " + juce::String::fromUTF8 (msg ? msg : "error");
+            ort->ReleaseStatus (st);
+            setErr (s);
+            return false;
+        };
+
+        if (! checkStatus (ort->CreateEnv (ORT_LOGGING_LEVEL_WARNING, "MiAmpPractice", &env), "CreateEnv"))
+        {
+            cleanup(); return false;
+        }
+        if (! checkStatus (ort->CreateSessionOptions (&sessOpts), "CreateSessionOptions"))
+        {
+            cleanup(); return false;
+        }
+        ort->SetSessionGraphOptimizationLevel (sessOpts, ORT_ENABLE_ALL);
+        const unsigned int hw = std::thread::hardware_concurrency();
+        const int nThreads = juce::jlimit (1, 6, hw > 1 ? static_cast<int> (hw / 2) : 2);
+        ort->SetIntraOpNumThreads (sessOpts, nThreads);
+
+        const juce::String modelPathStr = modelFilePtr->getFullPathName();
+       #if defined(_WIN32)
+        OrtStatus* stSess = ort->CreateSession (env, modelPathStr.toWideCharPointer(), sessOpts, &session);
+       #else
+        OrtStatus* stSess = ort->CreateSession (env, modelPathStr.toRawUTF8(), sessOpts, &session);
+       #endif
+        if (! checkStatus (stSess, "CreateSession"))
+        {
+            cleanup(); return false;
+        }
+
+        if (! checkStatus (ort->CreateCpuMemoryInfo (OrtArenaAllocator, OrtMemTypeDefault, &memInfo), "CreateCpuMemoryInfo"))
+        {
+            cleanup(); return false;
+        }
+
+        const int totalSamples = audio44Ptr->getNumSamples();
+        const float* inL = audio44Ptr->getReadPointer (0);
+        const float* inR = audio44Ptr->getReadPointer (1);
+
+        // HTDemucs-6s ONNX fixed segment spec: (1, 2, 343980) -> stems (1, 6, 2, 343980)
+        // Order: 0=drums, 1=bass, 2=other, 3=vocals, 4=guitar, 5=piano
+        constexpr int kSegSamples = 343980;
+        constexpr int kOverlap    = kSegSamples / 4; // 85995
+        constexpr int kStride     = kSegSamples - kOverlap; // 257985
+
+        std::vector<float> window (static_cast<size_t> (kSegSamples), 1.0f);
+        for (int i = 0; i < kOverlap; ++i)
+        {
+            const float fade = static_cast<float> (i) / static_cast<float> (juce::jmax (1, kOverlap - 1));
+            window[static_cast<size_t> (i)] = fade;
+            window[static_cast<size_t> (kSegSamples - 1 - i)] = fade;
+        }
+
+        for (int s = 0; s < kNumStems; ++s)
+        {
+            (*outStemsPtr)[static_cast<size_t> (s)].setSize (2, totalSamples, false, true, true);
+            (*outStemsPtr)[static_cast<size_t> (s)].clear();
+        }
+        std::vector<float> weightAcc (static_cast<size_t> (totalSamples), 0.0f);
+        std::vector<float> mixChunk (static_cast<size_t> (2 * kSegSamples), 0.0f);
+
+        const int nChunks = juce::jmax (1, (totalSamples + kStride - 1) / kStride);
+        const int64_t inputShape[3] = { 1, 2, kSegSamples };
+        const char* inputNames[1]  = { "mix" };
+        const char* outputNames[1] = { "stems" };
+
+        for (int ci = 0; ci < nChunks && ! threadPtr->threadShouldExit(); ++ci)
+        {
+            const int start = ci * kStride;
+            const int end   = juce::jmin (start + kSegSamples, totalSamples);
+            const int cLen  = end - start;
+            if (cLen <= 0) break;
+
+            std::fill (mixChunk.begin(), mixChunk.end(), 0.0f);
+            double energy = 0.0;
+            for (int i = 0; i < cLen; ++i)
+            {
+                const float l = inL[start + i];
+                const float r = inR[start + i];
+                mixChunk[static_cast<size_t> (i)] = l;
+                mixChunk[static_cast<size_t> (kSegSamples + i)] = r;
+                energy += static_cast<double> (l) * l + static_cast<double> (r) * r;
+            }
+
+            if (energy >= 1e-9)
+            {
+                OrtValue* inTensor = nullptr;
+                OrtValue* outTensor = nullptr;
+                if (! checkStatus (ort->CreateTensorWithDataAsOrtValue (
+                                       memInfo, mixChunk.data(), mixChunk.size() * sizeof (float),
+                                       inputShape, 3, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &inTensor),
+                                   "CreateInputTensor"))
+                {
+                    cleanup(); return false;
+                }
+
+                OrtStatus* runSt = ort->Run (session, nullptr, inputNames,
+                                             const_cast<const OrtValue* const*> (&inTensor), 1,
+                                             outputNames, 1, &outTensor);
+                ort->ReleaseValue (inTensor);
+
+                if (! checkStatus (runSt, "Run"))
+                {
+                    if (outTensor != nullptr) ort->ReleaseValue (outTensor);
+                    cleanup(); return false;
+                }
+
+                float* outData = nullptr;
+                if (! checkStatus (ort->GetTensorMutableData (outTensor, reinterpret_cast<void**> (&outData)), "GetOutputData")
+                    || outData == nullptr)
+                {
+                    ort->ReleaseValue (outTensor);
+                    cleanup(); return false;
+                }
+
+                auto accumStem = [&] (int dstStem, int ortSrcA, int ortSrcB = -1)
+                {
+                    float* dL = (*outStemsPtr)[static_cast<size_t> (dstStem)].getWritePointer (0);
+                    float* dR = (*outStemsPtr)[static_cast<size_t> (dstStem)].getWritePointer (1);
+                    const float* sAL = outData + static_cast<size_t> (ortSrcA * 2 + 0) * kSegSamples;
+                    const float* sAR = outData + static_cast<size_t> (ortSrcA * 2 + 1) * kSegSamples;
+                    const float* sBL = ortSrcB >= 0 ? (outData + static_cast<size_t> (ortSrcB * 2 + 0) * kSegSamples) : nullptr;
+                    const float* sBR = ortSrcB >= 0 ? (outData + static_cast<size_t> (ortSrcB * 2 + 1) * kSegSamples) : nullptr;
+
+                    for (int i = 0; i < cLen; ++i)
+                    {
+                        float l = sAL[i] + (sBL != nullptr ? sBL[i] : 0.0f);
+                        float r = sAR[i] + (sBR != nullptr ? sBR[i] : 0.0f);
+                        if (! std::isfinite (l)) l = 0.0f;
+                        if (! std::isfinite (r)) r = 0.0f;
+                        const float w = window[static_cast<size_t> (i)];
+                        dL[start + i] += l * w;
+                        dR[start + i] += r * w;
+                    }
+                };
+
+                // HTDemucs-6s order: 0=drums, 1=bass, 2=other, 3=vocals, 4=guitar, 5=piano
+                accumStem (0, 3);     // VOZ
+                accumStem (1, 4);     // GUITARRA
+                accumStem (2, 1);     // BAJO
+                accumStem (3, 0);     // BATERIA
+                accumStem (4, 2, 5);  // OTROS / FX (other + piano)
+
+                ort->ReleaseValue (outTensor);
+            }
+
+            for (int i = 0; i < cLen; ++i)
+                weightAcc[static_cast<size_t> (start + i)] += window[static_cast<size_t> (i)];
+
+            if (progCbPtr && *progCbPtr)
+            {
+                const float p = 0.12f + (0.82f * static_cast<float> (ci + 1)) / static_cast<float> (nChunks);
+                (*progCbPtr) (p, "Separando 6 pistas AI (ONNX): " + juce::String (juce::roundToInt (p * 100.0f)) + "%", false);
+            }
+        }
+
+        cleanup();
+        if (threadPtr->threadShouldExit())
+            return setErr ("Separacion cancelada");
+
+        for (int s = 0; s < kNumStems; ++s)
+        {
+            float* dL = (*outStemsPtr)[static_cast<size_t> (s)].getWritePointer (0);
+            float* dR = (*outStemsPtr)[static_cast<size_t> (s)].getWritePointer (1);
+            for (int i = 0; i < totalSamples; ++i)
+            {
+                const float w = juce::jmax (1e-8f, weightAcc[static_cast<size_t> (i)]);
+                dL[i] /= w;
+                dR[i] /= w;
+            }
+        }
+
+        return true;
+    }
+
+   #if defined(_MSC_VER)
+    __declspec(noinline) static bool sehRunOnnxSeparation (const juce::File* modelFilePtr,
+                                                           const juce::AudioBuffer<float>* audio44Ptr,
+                                                           std::array<juce::AudioBuffer<float>, kNumStems>* outStemsPtr,
+                                                           juce::Thread* threadPtr,
+                                                           const std::function<void(float, const juce::String&, bool)>* progCbPtr,
+                                                           juce::String* outErrPtr,
+                                                           bool* outSehFault) noexcept
     {
         __try
         {
-            return runDemucsInferenceInner (model, mixPtr, outPtr, cbPtr);
+            return runOnnxSeparationInner (modelFilePtr, audio44Ptr, outStemsPtr, threadPtr, progCbPtr, outErrPtr);
         }
         __except (1)
         {
@@ -1549,6 +1883,10 @@ private:
             const auto part = dest.getSiblingFile (dest.getFileName() + ".part");
             part.deleteFile();
 
+            // Clean up legacy ggml model if present
+            const auto legacyBin = getModelsDir().getChildFile ("ggml-model-htdemucs-6s-f16.bin");
+            if (legacyBin.existsAsFile()) legacyBin.deleteFile();
+
             juce::URL url (demucsModelDownloadUrl());
             auto opts = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
                             .withConnectionTimeoutMs (25000)
@@ -1563,7 +1901,7 @@ private:
             }
 
             const int64_t streamLen = stream->getTotalLength();
-            const int64_t total = streamLen > 0 ? streamLen : 54855129;
+            const int64_t total = streamLen > 0 ? streamLen : 136000000;
             juce::FileOutputStream fos (part);
             if (! fos.openedOk())
             {
@@ -1580,24 +1918,24 @@ private:
                 fos.write (buf.data(), static_cast<size_t> (got));
                 readTotal += got;
                 const float p = juce::jlimit (0.0f, 0.99f, static_cast<float> (readTotal) / static_cast<float> (total));
-                postProg (p, "Descargando motor AI: " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
+                postProg (p, "Descargando motor AI (ONNX): " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
             }
             fos.flush();
 
-            if (threadShouldExit() || readTotal < 54000000 || (streamLen > 0 && readTotal < streamLen))
+            if (threadShouldExit() || readTotal < 130000000 || (streamLen > 0 && readTotal < streamLen))
             {
                 part.deleteFile();
                 postDone (false, threadShouldExit() ? "Descarga cancelada" : "Descarga incompleta");
                 return;
             }
-            // Validate GGML magic 'dmc6' (0x646d6336)
+            // Reject accidental HTML/JSON error responses
             {
                 juce::FileInputStream fis (part);
-                uint32_t magic = 0;
-                if (! fis.openedOk() || fis.read (&magic, 4) < 4 || magic != 0x646d6336u)
+                char head[16] = {};
+                if (! fis.openedOk() || fis.read (head, 8) < 8 || head[0] == '<' || head[0] == '{')
                 {
                     part.deleteFile();
-                    postDone (false, "Archivo de modelo invalido");
+                    postDone (false, "Archivo de modelo ONNX invalido");
                     return;
                 }
             }
@@ -1629,7 +1967,7 @@ private:
             }
 
             juce::AudioBuffer<float> audio44;
-            const double demucsSr = static_cast<double> (demucscpp::SUPPORTED_SAMPLE_RATE);
+            constexpr double demucsSr = 44100.0;
             if (! readStereoAudioFileSafe (srcFile, demucsSr, *this, audio44))
             {
                 postDone (false, "No se pudo leer o remuestrear el archivo de audio");
@@ -1644,150 +1982,29 @@ private:
                 return;
             }
 
-            postProg (0.08f, "Cargando modelo HTDemucs-6s...", true);
-            auto model = std::make_unique<demucscpp::demucs_model>();
-            const std::string modelPathUtf8 = modelFile.getFullPathName().toStdString();
-            bool loadedOk = false;
+            postProg (0.08f, "Cargando modelo HTDemucs-6s (ONNX Runtime)...", true);
+            std::array<juce::AudioBuffer<float>, kNumStems> outStems;
+            juce::String ortErr;
+            std::function<void(float, const juce::String&, bool)> progFn =
+                [this] (float p, const juce::String& msg, bool force) { postProg (p, msg, force); };
+
+            bool inferOk = false;
             bool sehFault = false;
            #if defined(_MSC_VER)
-            loadedOk = sehLoadDemucsModel (&modelPathUtf8, model.get(), &sehFault);
+            inferOk = sehRunOnnxSeparation (&modelFile, &audio44, &outStems, this, &progFn, &ortErr, &sehFault);
            #else
-            loadedOk = loadDemucsModelInner (&modelPathUtf8, model.get());
+            inferOk = runOnnxSeparationInner (&modelFile, &audio44, &outStems, this, &progFn, &ortErr);
            #endif
-            if (sehFault || ! loadedOk || model->is_4sources)
-            {
-                postDone (false, sehFault ? "Fallo protegido al cargar HTDemucs-6s" : "Error cargando pesos HTDemucs-6s");
-                return;
-            }
-            if (threadShouldExit()) return;
 
-            const float* pL = audio44.getReadPointer (0);
-            const float* pR = audio44.getReadPointer (1);
-
-            std::array<juce::AudioBuffer<float>, kNumStems> outStems;
-            for (int s = 0; s < kNumStems; ++s)
-            {
-                outStems[static_cast<size_t> (s)].setSize (2, n44, false, true, true);
-                outStems[static_cast<size_t> (s)].clear();
-            }
-
-            // Process in <= 45s chunks with 2s crossfade overlap to cap peak RAM (~300 MB instead of 4+ GB!)
-            const int kChunkSamples   = 45 * 44100;
-            const int kOverlapSamples = 2 * 44100;
-            const int kStepSamples    = kChunkSamples - kOverlapSamples;
-
-            struct ChunkSpan { int start = 0; int len = 0; };
-            std::vector<ChunkSpan> chunks;
-            for (int pos = 0; pos < n44; )
-            {
-                const int remaining = n44 - pos;
-                const int len = (remaining <= kChunkSamples + 22050) ? remaining : kChunkSamples;
-                chunks.push_back ({ pos, len });
-                if (pos + len >= n44) break;
-                pos += kStepSamples;
-            }
-
-            for (size_t ci = 0; ci < chunks.size() && ! threadShouldExit(); ++ci)
-            {
-                const int cStart = chunks[ci].start;
-                const int cLen   = chunks[ci].len;
-
-                double chunkEnergy = 0.0;
-                for (int i = 0; i < cLen; ++i)
-                {
-                    const float l = pL[cStart + i];
-                    const float r = pR[cStart + i];
-                    chunkEnergy += static_cast<double> (l) * static_cast<double> (l)
-                                 + static_cast<double> (r) * static_cast<double> (r);
-                }
-
-                // Skip demucs_inference on pure silence to avoid 0/0 normalization NaN inside demucs_inference
-                if (chunkEnergy < 1e-9)
-                    continue;
-
-                Eigen::MatrixXf mix (2, cLen);
-                for (int i = 0; i < cLen; ++i)
-                {
-                    mix (0, i) = pL[cStart + i];
-                    mix (1, i) = pR[cStart + i];
-                }
-
-                const float baseProg = 0.10f + (0.84f * static_cast<float> (ci)) / static_cast<float> (chunks.size());
-                const float spanProg = 0.84f / static_cast<float> (chunks.size());
-
-                std::function<void(float, const std::string&)> progCb = [this, baseProg, spanProg] (float prog, const std::string&)
-                {
-                    const float p = juce::jlimit (0.10f, 0.94f, baseProg + prog * spanProg);
-                    postProg (p, "Separando 6 pistas AI: " + juce::String (juce::roundToInt (p * 100.0f)) + "%");
-                };
-
-                Eigen::Tensor3dXf stemsOut;
-                bool inferOk = false;
-                bool inferSehFault = false;
-               #if defined(_MSC_VER)
-                inferOk = sehRunDemucsInference (model.get(), &mix, &stemsOut, &progCb, &inferSehFault);
-               #else
-                inferOk = runDemucsInferenceInner (model.get(), &mix, &stemsOut, &progCb);
-               #endif
-                if (inferSehFault || ! inferOk)
-                {
-                    postDone (false, inferSehFault ? "Fallo protegido en separacion AI (usando DSP)" : "Error en separacion AI");
-                    return;
-                }
-
-                if (threadShouldExit()) return;
-
-                if (stemsOut.dimension (0) < 6 || stemsOut.dimension (1) < 2 || stemsOut.dimension (2) <= 0)
-                {
-                    postDone (false, "Salida invalida del motor HTDemucs-6s");
-                    return;
-                }
-
-                const int copyLen = juce::jmin (cLen, static_cast<int> (stemsOut.dimension (2)));
-                const int fadeLen = (ci > 0) ? juce::jmin (kOverlapSamples, copyLen) : 0;
-
-                auto blendStem = [&] (int fileStemIdx, int demucsSrcA, int demucsSrcB = -1)
-                {
-                    float* oL = outStems[static_cast<size_t> (fileStemIdx)].getWritePointer (0);
-                    float* oR = outStems[static_cast<size_t> (fileStemIdx)].getWritePointer (1);
-                    for (int i = 0; i < copyLen; ++i)
-                    {
-                        float l = stemsOut (demucsSrcA, 0, i);
-                        float r = stemsOut (demucsSrcA, 1, i);
-                        if (demucsSrcB >= 0)
-                        {
-                            l += stemsOut (demucsSrcB, 0, i);
-                            r += stemsOut (demucsSrcB, 1, i);
-                        }
-                        if (! std::isfinite (l)) l = 0.0f;
-                        if (! std::isfinite (r)) r = 0.0f;
-
-                        const int dstIdx = cStart + i;
-                        if (i < fadeLen)
-                        {
-                            const float w = static_cast<float> (i) / static_cast<float> (fadeLen);
-                            oL[dstIdx] = oL[dstIdx] * (1.0f - w) + l * w;
-                            oR[dstIdx] = oR[dstIdx] * (1.0f - w) + r * w;
-                        }
-                        else
-                        {
-                            oL[dstIdx] = l;
-                            oR[dstIdx] = r;
-                        }
-                    }
-                };
-
-                // HTDemucs-6s order: 0=drums, 1=bass, 2=other, 3=vocals, 4=guitar, 5=piano
-                blendStem (0, 3);     // VOZ
-                blendStem (1, 4);     // GUITARRA
-                blendStem (2, 1);     // BAJO
-                blendStem (3, 0);     // BATERIA
-                blendStem (4, 2, 5);  // OTROS / FX (other + piano)
-            }
-
-            model.reset();
             audio44.setSize (0, 0);
             if (threadShouldExit()) return;
+
+            if (sehFault || ! inferOk)
+            {
+                postDone (false, sehFault ? "Fallo protegido en ONNX Runtime (usando DSP)"
+                                          : (ortErr.isNotEmpty() ? ortErr : juce::String ("Error en separacion AI")));
+                return;
+            }
 
             postProg (0.96f, "Guardando stems locales (.wav)...", true);
             const auto cacheDir = getSongCacheDir (item.id);
@@ -1802,7 +2019,7 @@ private:
             postDone (ok, ok ? juce::String() : "Error guardando cache WAV");
            #else
             juce::ignoreUnused (targetSr);
-            postDone (false, "Motor Demucs AI disponible en build CMake");
+            postDone (false, "Motor ONNX AI disponible en build CMake");
            #endif
         }
 

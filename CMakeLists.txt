@@ -222,6 +222,7 @@ target_compile_definitions(MiAmp
     PUBLIC
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
+        JUCE_USE_MP3AUDIOFORMAT=1
         JUCE_VST3_CAN_REPLACE_VST2=0
         JUCE_DISPLAY_SPLASH_SCREEN=0
         DONT_SET_USING_JUCE_NAMESPACE=1
@@ -229,104 +230,79 @@ target_compile_definitions(MiAmp
         MIAMP_APP_VERSION="1.1.${MIAMP_BUILD_NUMBER}"
 )
 
-# Pure-C++ Offline AI Stem Separation (Eigen dd8c71e6 + sevagh/demucs.cpp htdemucs_6s)
-option(MIAMP_ENABLE_DEMUCS "Build embedded pure-C++ Demucs 6-stem AI engine" ON)
+# Pure-C++ Offline AI Stem Separation via Microsoft ONNX Runtime 1.23.2 (htdemucs_6s ONNX)
+option(MIAMP_ENABLE_DEMUCS "Build embedded ONNX Runtime 6-stem AI engine" ON)
 if(MIAMP_ENABLE_DEMUCS)
-    include(FetchContent)
-    if(POLICY CMP0169)
-        cmake_policy(SET CMP0169 OLD)
-    endif()
-
-    if(POLICY CMP0135)
-        cmake_policy(SET CMP0135 NEW)
-    endif()
-    FetchContent_Declare(
-        eigen
-        URL https://gitlab.com/libeigen/eigen/-/archive/dd8c71e62852b2fe429edb6682ac91fd1c578a26/eigen-dd8c71e62852b2fe429edb6682ac91fd1c578a26.tar.gz
-    )
-    FetchContent_GetProperties(eigen)
-    if(NOT eigen_POPULATED)
-        FetchContent_Populate(eigen)
-    endif()
-
-    FetchContent_Declare(
-        demucs_cpp
-        GIT_REPOSITORY https://github.com/sevagh/demucs.cpp.git
-        GIT_TAG        main
-        GIT_SHALLOW    TRUE
-        GIT_SUBMODULES ""
-    )
-    FetchContent_GetProperties(demucs_cpp)
-    if(NOT demucs_cpp_POPULATED)
-        FetchContent_Populate(demucs_cpp)
-    endif()
-
-    # Patch upstream sevagh/demucs.cpp bugs that crash Windows/macOS plugins on song load:
-    # 1) model_load.cpp: uninitialized n_dims/length before late feof(f) check causes stack smash / bad_alloc at EOF
-    # 2) model_load.cpp: fopen() on Windows fails on UTF-8 paths with accents -> use _wfopen
-    # 3) layers.cpp / crosstransformer.cpp: std::exit(1) terminates entire host DAW/app -> throw std::runtime_error
-    set(_demucs_ml "${demucs_cpp_SOURCE_DIR}/src/model_load.cpp")
-    if(EXISTS "${_demucs_ml}")
-        file(READ "${_demucs_ml}" _ml_src)
-        string(FIND "${_ml_src}" "miamp_open_model_rb" _has_patch)
-        if(_has_patch EQUAL -1)
-            string(REPLACE
-                "#include <vector>"
-                "#include <vector>\n#ifdef _WIN32\n#include <windows.h>\n#endif\nstatic FILE* miamp_open_model_rb(const std::string& p) {\n#ifdef _WIN32\n    int wlen = MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, nullptr, 0);\n    if (wlen > 0) {\n        std::wstring wp(static_cast<size_t>(wlen), L'\\0');\n        MultiByteToWideChar(CP_UTF8, 0, p.c_str(), -1, &wp[0], wlen);\n        if (FILE* wf = _wfopen(wp.c_str(), L\"rb\")) return wf;\n    }\n#endif\n    return fopen(p.c_str(), \"rb\");\n}"
-                _ml_src "${_ml_src}")
-            string(REPLACE
-                "FILE *f = fopen(model_file.c_str(), \"rb\");"
-                "FILE *f = miamp_open_model_rb(model_file);"
-                _ml_src "${_ml_src}")
-            string(REPLACE
-                "        int32_t n_dims;\n        int32_t length;\n\n        fread(&n_dims, sizeof(int32_t), 1, f);\n        fread(&length, sizeof(int32_t), 1, f);\n\n        int32_t nelements = 1;\n\n        // we are loading up to 4d tensors, so allocate 4 dims\n        int32_t ne[4] = {1, 1, 1, 1};\n        for (int i = 0; i < n_dims; ++i)\n        {\n            fread(&ne[i], sizeof(int32_t), 1, f);\n            nelements *= ne[i];\n        }\n\n        std::string name;\n        std::vector<char> tmp(length);               // create a buffer\n        fread(&tmp[0], sizeof(char), tmp.size(), f); // read to buffer\n        name.assign(&tmp[0], tmp.size());\n\n        // check if we reached eof of the open file f\n        if (feof(f))\n        {\n            break;\n        }"
-                "        int32_t n_dims = 0;\n        int32_t length = 0;\n\n        if (fread(&n_dims, sizeof(int32_t), 1, f) != 1 ||\n            fread(&length, sizeof(int32_t), 1, f) != 1)\n        {\n            break;\n        }\n        if (n_dims <= 0 || n_dims > 4 || length <= 0 || length > 4096)\n        {\n            fclose(f);\n            return false;\n        }\n\n        int32_t nelements = 1;\n\n        // we are loading up to 4d tensors, so allocate 4 dims\n        int32_t ne[4] = {1, 1, 1, 1};\n        for (int i = 0; i < n_dims; ++i)\n        {\n            if (fread(&ne[i], sizeof(int32_t), 1, f) != 1 || ne[i] <= 0)\n            {\n                fclose(f);\n                return false;\n            }\n            nelements *= ne[i];\n        }\n\n        std::string name;\n        std::vector<char> tmp(static_cast<size_t>(length));\n        if (fread(tmp.data(), sizeof(char), tmp.size(), f) != tmp.size())\n        {\n            break;\n        }\n        name.assign(tmp.data(), tmp.size());"
-                _ml_src "${_ml_src}")
-            string(REPLACE
-                "        if (loaded_size == 0)\n        {\n            my_fprintf(stderr, \"%s: failed to load %s\\n\", __func__,\n                       name.c_str());\n            return false;\n        }"
-                "        if (loaded_size == 0)\n        {\n            my_fprintf(stderr, \"%s: failed to load %s\\n\", __func__,\n                       name.c_str());\n            fclose(f);\n            return false;\n        }"
-                _ml_src "${_ml_src}")
-            file(WRITE "${_demucs_ml}" "${_ml_src}")
-        endif()
-    endif()
-
-    foreach(_demucs_guard_file IN ITEMS
-        "${demucs_cpp_SOURCE_DIR}/src/layers.cpp"
-        "${demucs_cpp_SOURCE_DIR}/src/crosstransformer.cpp")
-        if(EXISTS "${_demucs_guard_file}")
-            file(READ "${_demucs_guard_file}" _dg_src)
-            string(FIND "${_dg_src}" "std::exit(1);" _has_exit)
-            if(NOT _has_exit EQUAL -1)
-                string(FIND "${_dg_src}" "<stdexcept>" _has_stdexcept)
-                if(_has_stdexcept EQUAL -1)
-                    string(REPLACE "#include \"model.hpp\"" "#include \"model.hpp\"\n#include <stdexcept>" _dg_src "${_dg_src}")
-                endif()
-                string(REPLACE "std::exit(1);" "throw std::runtime_error(\"demucs invalid tensor dimension\");" _dg_src "${_dg_src}")
-                file(WRITE "${_demucs_guard_file}" "${_dg_src}")
+    set(_ort_dir "${CMAKE_CURRENT_BINARY_DIR}/_deps/onnxruntime")
+    set(_ort_zip "${CMAKE_CURRENT_BINARY_DIR}/_deps/microsoft.ml.onnxruntime.1.23.2.zip")
+    if(NOT EXISTS "${_ort_dir}/build/native/include/onnxruntime_c_api.h")
+        file(MAKE_DIRECTORY "${_ort_dir}")
+        if(NOT EXISTS "${_ort_zip}")
+            message(STATUS "Downloading Microsoft.ML.OnnxRuntime 1.23.2 (headers + native runtime)...")
+            file(DOWNLOAD
+                "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.23.2/microsoft.ml.onnxruntime.1.23.2.nupkg"
+                "${_ort_zip}"
+                SHOW_PROGRESS
+                STATUS _ort_dl_status
+            )
+            list(GET _ort_dl_status 0 _ort_dl_code)
+            if(NOT _ort_dl_code EQUAL 0)
+                list(GET _ort_dl_status 1 _ort_dl_err)
+                message(FATAL_ERROR "Failed to download Microsoft.ML.OnnxRuntime 1.23.2: ${_ort_dl_err}")
             endif()
         endif()
-    endforeach()
+        file(ARCHIVE_EXTRACT INPUT "${_ort_zip}" DESTINATION "${_ort_dir}")
+    endif()
 
-    file(GLOB DEMUCS_CORE_SOURCES CONFIGURE_DEPENDS "${demucs_cpp_SOURCE_DIR}/src/*.cpp")
-    add_library(demucs_core STATIC ${DEMUCS_CORE_SOURCES})
-    set_target_properties(demucs_core PROPERTIES
-        CXX_STANDARD 17
-        CXX_STANDARD_REQUIRED ON
-        POSITION_INDEPENDENT_CODE ON
-    )
-    target_include_directories(demucs_core SYSTEM PUBLIC
-        "${demucs_cpp_SOURCE_DIR}/src"
-        "${eigen_SOURCE_DIR}"
-    )
-    target_compile_definitions(demucs_core PUBLIC
-        $<$<PLATFORM_ID:Windows>:NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS>
-    )
-    target_compile_options(demucs_core PRIVATE
-        $<$<CXX_COMPILER_ID:MSVC>:/utf-8 /O2 /bigobj /Zc:__cplusplus>
-        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-O2 -Wno-sign-conversion -Wno-unused-parameter>
-    )
-    target_link_libraries(MiAmp PRIVATE demucs_core)
+    target_include_directories(MiAmp SYSTEM PUBLIC "${_ort_dir}/build/native/include")
     target_compile_definitions(MiAmp PUBLIC MIAMP_HAS_DEMUCS=1)
+
+    if(WIN32)
+        set(_ort_win_dll "${_ort_dir}/runtimes/win-x64/native/onnxruntime.dll")
+        if(EXISTS "${_ort_win_dll}")
+            if(TARGET MiAmp_Standalone)
+                add_custom_command(TARGET MiAmp_Standalone POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ort_win_dll}" "$<TARGET_FILE_DIR:MiAmp_Standalone>/onnxruntime.dll"
+                )
+            endif()
+            if(TARGET MiAmp_VST3)
+                add_custom_command(TARGET MiAmp_VST3 POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ort_win_dll}" "$<TARGET_FILE_DIR:MiAmp_VST3>/onnxruntime.dll"
+                )
+            endif()
+        else()
+            message(FATAL_ERROR "Missing onnxruntime.dll inside NuGet package at ${_ort_win_dll}")
+        endif()
+    elseif(APPLE)
+        set(_ort_mac_arm "${_ort_dir}/runtimes/osx-arm64/native/libonnxruntime.dylib")
+        set(_ort_mac_x64 "${_ort_dir}/runtimes/osx-x64/native/libonnxruntime.dylib")
+        set(_ort_mac_univ "${_ort_dir}/libonnxruntime_universal.dylib")
+        if(EXISTS "${_ort_mac_arm}" AND EXISTS "${_ort_mac_x64}")
+            execute_process(
+                COMMAND lipo -create "${_ort_mac_arm}" "${_ort_mac_x64}" -output "${_ort_mac_univ}"
+                RESULT_VARIABLE _lipo_res
+            )
+            if(NOT _lipo_res EQUAL 0)
+                set(_ort_mac_univ "${_ort_mac_arm}")
+            endif()
+        elseif(EXISTS "${_ort_mac_arm}")
+            set(_ort_mac_univ "${_ort_mac_arm}")
+        elseif(EXISTS "${_ort_mac_x64}")
+            set(_ort_mac_univ "${_ort_mac_x64}")
+        endif()
+
+        if(EXISTS "${_ort_mac_univ}")
+            foreach(_mac_tgt IN ITEMS MiAmp_Standalone MiAmp_VST3 MiAmp_AU)
+                if(TARGET ${_mac_tgt})
+                    add_custom_command(TARGET ${_mac_tgt} POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${_mac_tgt}>/Frameworks"
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_ort_mac_univ}" "$<TARGET_BUNDLE_CONTENT_DIR:${_mac_tgt}>/Frameworks/libonnxruntime.dylib"
+                        COMMAND codesign --force --sign - "$<TARGET_BUNDLE_CONTENT_DIR:${_mac_tgt}>/Frameworks/libonnxruntime.dylib"
+                    )
+                endif()
+            endforeach()
+        endif()
+    endif()
 else()
     target_compile_definitions(MiAmp PUBLIC MIAMP_HAS_DEMUCS=0)
 endif()

@@ -30,6 +30,7 @@ SectionEnd
 Section "App Independiente Standalone (.exe)" SecStandalone
   SetOutPath "$INSTDIR"
   File "build\MiAmp_artefacts\Release\Standalone\MI AMP.exe"
+  File "build\MiAmp_artefacts\Release\Standalone\onnxruntime.dll"
 
   CreateDirectory "$SMPROGRAMS\MI AMP"
   CreateShortcut "$SMPROGRAMS\MI AMP\MI AMP.lnk" "$INSTDIR\MI AMP.exe"
@@ -54,6 +55,7 @@ LangString DESC_SecStandalone ${LANG_SPANISH} "Instala la aplicacion independien
 Section "Uninstall"
   RMDir /r "$COMMONFILES64\VST3\MI AMP.vst3"
   Delete "$INSTDIR\MI AMP.exe"
+  Delete "$INSTDIR\onnxruntime.dll"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
   RMDir "$PROGRAMFILES64\Popups Audio"
